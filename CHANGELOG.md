@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.3.0 - 2026-09-13
+
+- Implement fixed model variants in the MuJoCo CPU adapter. Construction-time
+  `SceneCfg.fixed_variant_plan` is independently compiled for oracle/default
+  extraction, layout-validated, merged
+  through mjbatch `VariantPack`, and realized with per-world expanded model
+  fields. Same-layout variants and uniform-public-layout optional mesh slots are
+  supported; heterogeneous public topology fails closed. The adapter now exposes
+  canonical/per-world reset defaults, additional curated reset terms (geometry
+  solver fields, DoF damping/friction, and per-variant actuator tables), per-env
+  compiler defaults on reset, and per-env playback without retaining one full
+  compiled model per variant.
+- Add the backend-neutral fixed-variant contract needed for per-env model
+  identity. `FixedVariantPlan` carries a final read-only assignment, complete
+  materialized `ModelSourceDescriptor` entries, and a same-layout/uniform-public
+  layout declaration; it uses only stdlib and NumPy data and preserves its
+  read-only assignment across pickle. `DomainRandomizationCapabilities` now
+  advertises fixed-variant layouts and per-env playback, while
+  `SceneCfg.fixed_variant_plan` is the sole construction-time lifecycle input.
+  `SimBackend.get_reset_term_default()` defines
+  authoritative canonical or per-world default exposure. The legacy
+  `InitRandomizationPlan`, `ModelVariantSpec`, and `GeomSizeOverride`
+  init-lifecycle API is removed. Contract tests cover negotiation and
+  fail-closed behavior without exposing mjbatch, MuJoCo, or Warp objects.
+- Implement construction-time fixed variants in the MJWarp adapter. Each complete
+  MJCF source is compiled independently as the correctness oracle, validated
+  against `same_layout` or `uniform_public_layout`, and merged into one canonical
+  asset pool with stable named geom slots. After `put_model` and model-field
+  expansion but before the first forward and CUDA-graph capture, the adapter
+  installs per-world `geom_dataid`, `geom_matid`, and the eleven mesh-dependent
+  model fields. Host reset mirrors and reset-term defaults use the assigned
+  variant rows, and playback resolves each world to its source model. Variant
+  identity is accepted only at construction because replacing an initialized
+  Warp model would invalidate captured pointers.
+- Consume the published `mjbatch-uni~=0.2.0` executor API; the integration-only
+  git dependency is removed.
+
 ## 1.2.1 - 2026-09-13
 
 - **Breaking (mujoco executor):** the MuJoCo adapter's native batch executor is

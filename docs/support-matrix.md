@@ -24,9 +24,16 @@ kevinzakka/mjbatch with prebuilt wheels for Linux x86_64/aarch64 and macOS
 are unsupported for the native executor, so the Windows CI job runs the
 core/import-boundary subset only. Numerical results before and after the
 switch from the previous executor are not guaranteed identical — drift is
-characterized by a recorded baseline, not gated. Heterogeneous model variants
-are unsupported; field-level domain randomization goes through mjbatch
-`expand`/`set_const`. `chunk_size`/`adaptive_chunk_size` are deprecated and
+characterized by a recorded baseline, not gated. The MuJoCo adapter supports
+construction-time `FixedVariantPlan` catalogs with `same_layout` and
+`uniform_public_layout` guarantees. Same-layout variants and optional named
+mesh-geom slots are merged into one canonical mjbatch executor through
+`VariantPack`; heterogeneous public topology fails closed. Reset model-field
+writes and per-world compiler defaults go through mjbatch `expand`/`set_const`,
+and playback exposes a per-env independently compiled visual oracle. MJWarp
+realizes construction-time same-layout and uniform-public-layout variants by
+pooling assets in one canonical model and installing fixed per-world model rows
+before CUDA graph capture. `chunk_size`/`adaptive_chunk_size` are deprecated and
 ignored (warn-and-ignore); the chunk scheduler was removed and mjbatch's
 work-stealing thread pool is the tuning mechanism.
 
