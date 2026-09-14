@@ -16,7 +16,7 @@ To compare an upstream build with the roadmap build, use distinct extension
 directories. ``compare`` launches fresh child processes so that the two
 ``mochi_physics`` shared libraries cannot coexist in one Python interpreter:
 
-    uv run --no-sync python scripts/benchmark/superdex_scene_step.py compare \
+    uv run --no-sync python scripts/benchmarks/superdex_scene_step.py compare \
       --model "$SUPERDEX_ASSETS_PATH/bots/arms/fr3_v2/fr3_v2.superdex_bot" \
       --baseline-extension-dir /path/to/upstream/build/bin \
       --native-extension-dir /path/to/roadmap/build-cpu-pool/bin \

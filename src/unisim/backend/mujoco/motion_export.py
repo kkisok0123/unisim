@@ -1,6 +1,6 @@
 """MuJoCo-only forward-kinematics export for motion-tracking NPZ conversion.
 
-Cold-path tooling shared by the ``scripts/motion/`` CSV-to-NPZ converters. It
+Cold-path utility for external CSV-to-NPZ motion converters. It
 injects ``track_*`` sensors into a model, replays a (root + named joints)
 trajectory through ``mj_forward``, and reads back joint/body states with the
 same ``track_*``-sensor-first semantics the training backend uses.

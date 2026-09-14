@@ -2,7 +2,7 @@
 
 IsaacGym only supports Python 3.6-3.8 and can never be installed into the
 main UniLab environment (Python >= 3.10).  Physics therefore runs in a
-dedicated conda env created by ``scripts/tools/setup_isaacgym_env.sh`` under
+dedicated conda environment under
 ``$UNISIM_ISAACGYM_HOME`` (default ``~/.cache/unisim/isaacgym``):
 
 - ``miniconda3/envs/hsgym/bin/python3.8`` — the worker interpreter,
@@ -34,9 +34,8 @@ _CONDA_ENV_REL = Path("miniconda3") / "envs" / "hsgym"
 _ISAACGYM_PYTHON_REL = Path("isaacgym") / "python"
 
 _SETUP_HINT = (
-    "Install the dedicated IsaacGym worker environment with "
-    "scripts/tools/setup_isaacgym_env.sh (see the IsaacGym backend page in "
-    "docs/sphinx/source/*/2-user_guide/3-backends/4-isaacgym.md)."
+    "Create the dedicated IsaacGym worker environment under UNISIM_ISAACGYM_HOME "
+    "(see docs/en/support-matrix.md)."
 )
 
 

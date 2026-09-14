@@ -1,9 +1,9 @@
 """Host-compatibility implementation of the independent ``genesis`` backend.
 
 The adapter serves the ``SimBackend`` NumPy contract on top of Genesis 1.3.3,
-following the measured mappings of ``scripts/tools/genesis_feasibility/
-REPORT.md`` (#1372): link-addressed root state (never entity-level getters,
-REPORT §5.5), ``control_dofs_position`` inside an adapter-owned nsteps loop
+following its measured feasibility mappings (#1372): link-addressed root state
+(never entity-level getters, REPORT §5.5), ``control_dofs_position`` inside an
+adapter-owned nsteps loop
 honoring ``set_pre_step_control`` (§5.4), host caches refreshed once per
 step/reset barrier (§5.9), MJCF-named sensor equivalents from link state plus
 one IMUSensor per accelerometer site with clean (noise-free) data (§3.4/§5.3),

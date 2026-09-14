@@ -2,143 +2,75 @@
 
 [English](README.md) | [中文](README_zh.md)
 
-UniSim 提供后端中立的物理仿真契约（contract）和可选引擎适配器，面向机器人
-学习与仿真。PyPI 分发名为 `unisim-core`,Python 导入命名空间为 `unisim`。
+UniSim 为机器人学习与仿真提供后端中立的物理契约和可选引擎适配器。PyPI 发行包是 `unisim-core`，Python 导入命名空间是 `unisim`。
 
-统一的 `SimBackend` 契约覆盖状态访问、控制、重置与域随机化边界，同一份任务
-代码无需引擎专属分支即可运行在 MuJoCo、Motrix、Drake、MJWarp、Genesis、Newton、
-IsaacGym 或 IsaacSim 之上。基础安装仅依赖 NumPy;所有引擎 SDK 都是懒加载的
-可选 extra,`import unisim` 不会导入任何引擎。
+一个 `SimBackend` 契约覆盖状态访问、控制、重置和域随机化边界，使同一份任务代码可以使用 MuJoCo、Motrix、Drake、MJWarp、Genesis、Newton、SuperDex、IsaacGym 或 IsaacSim，而不需要编写引擎分支。基础安装只依赖 NumPy；每个引擎 SDK 都是懒加载的可选 extra，导入 `unisim` 不会导入任何引擎。
 
 ## 与 UniLab 的关系
 
-UniSim 是从 UniLab 中抽取出来的、后端中立的物理层，供 UniLab 使用。UniLab
-保留 Hydra 配置、任务/环境/管理器生命周期、机器人资产、强化学习训练、
-checkpoint 以及 sim2sim 策略 I/O;UniSim 负责物理契约、适配器生命周期与状态
-转换、可选运行时诊断，以及共享的子进程 IPC 层。每个后端只有一份生产实现，
-由本仓库持有——UniLab 只组装任务侧的场景与配置输入，并消费公共契约。
-UniSim 不会导入 UniLab。
+UniSim 是从 UniLab 抽取的后端中立物理层。UniLab 保留 Hydra 配置、task/env/manager 生命周期、机器人资产、RL 训练、checkpoint 和 sim2sim 策略 I/O；UniSim 拥有物理契约、适配器生命周期与状态转换、可选运行时诊断，以及共享的子进程 IPC 层。每个后端只有一个由本仓库拥有的生产实现。UniLab 只组装任务拥有的场景与配置输入并消费公共契约，UniSim 永不导入 UniLab。
 
 ## 安装
 
 ```bash
-pip install unisim-core                # 基础包:契约、工厂、fake 后端
-pip install "unisim-core[mujoco]"      # 需要时再加装引擎 extra
+pip install unisim-core                         # 基础契约、工厂和 fake backend
+pip install "unisim-core[<adapter-extra>]"      # 按需加入一个可选引擎运行时
 ```
 
-可用 extra:`mujoco`、`motrix`、`drake`、`mjwarp`、`genesis`、`newton`、`isaacgym`、
-`isaacsim`、`superdex`。SuperDex 的 Python 3.12 CPU 开发接入范围见
-[`docs/superdex.md`](docs/superdex.md)。Isaac 两个 extra 是空声明,因为这些厂商 SDK 不可再分发;对应
-适配器在构造时发现独立的 worker 安装。完整的适配器支持矩阵见
-[`docs/support-matrix.md`](docs/support-matrix.md)。
+可用 extra 为 `mujoco`、`motrix`、`drake`、`mjwarp`、`genesis`、`newton`、`superdex`、`isaacgym` 和 `isaacsim`。Isaac extra 是空拼写，因为相应厂商 SDK 不能再分发；它们的适配器会在构造时发现专用 worker 安装。所有适配器的安装、平台、CUDA 和执行器边界记录在[支持矩阵](docs/zh/support-matrix.md)。实验性 SuperDex CPU 配置有单独的[开发指南](docs/zh/superdex.md)。
 
-`mujoco`、`mjwarp`、`newton` 三个 extra 共享 MuJoCo 3.11 / MuJoCo-Warp 3.11 /
-warp-lang 1.16.0 版本线，可以安装在同一环境中。`newton` 保留精确版本固定
-（`newton==1.5.1` 及其耦合运行时）,`mjwarp` 则通过 `mujoco-warp~=3.11.0`
-跟随 3.11 版本线。安装后可运行
-`uv run scripts/check_newton_runtime.py` 做元数据探针，必要时追加 `--import`
-显式导入原生运行时。
+## 快速开始
 
-## MuJoCo 后端
-
-`mujoco` 适配器通过 [mjbatch](https://github.com/unilabsim/mjbatch) 执行批量
-仿真，它是 [kevinzakka/mjbatch](https://github.com/kevinzakka/mjbatch)
-的维护中 fork，随 `mujoco` extra 安装：
-
-```bash
-pip install "unisim-core[mujoco]"
-```
-
-mjbatch 为 Linux x86_64/aarch64 与 macOS(CPython 3.10–3.14t)提供预编译
-wheel,并钉版 `mujoco==3.11.0`;跳过 Windows 与 musllinux。原生执行器在
-Windows 上仍然不支持，与旧运行时一致；纯 Python 核心与 `FakeBackend` 在
-Windows 上完整可用。
-
-执行器替换带来的行为影响，如实记录：
-
-- **数值漂移**：替换前后两次执行器的结果不保证一致。两运行时之间的漂移
-  以记录基线表征，并由行为不变量测试保障；不设 bit-exact 门禁。
-- **模型变体（model variants）**：不支持在 `mujoco` 后端使用逐环境异构
-  模型结构。请改用字段级域随机化——mjbatch 的 `expand`/`set_const` 覆盖了
-  支持的随机化面。
-- **chunk 调优**:`chunk_size` 与 `adaptive_chunk_size` 是弃用的
-  warn-and-ignore 参数:chunk 调度器已删除,mjbatch 的 work-stealing 线程池
-  即为调优机制。
-
-## 快速上手
-
-公共导入边界刻意保持惰性,可以在任何环境安全导入:
+公共边界刻意保持懒加载，可以在任意位置安全导入：
 
 ```python
 from unisim import SimBackend, create_backend
 ```
 
-通过工厂和包中立的 `SceneCfg` 构造后端:
+通过工厂和包中立的 `SceneCfg` 构造适配器：
 
 ```python
 backend = create_backend("mujoco", scene=scene_cfg, num_envs=64, sim_dt=0.01)
-backend.materialize()      # 冷路径:解析 XML,构建引擎对象
+backend.materialize()      # 冷路径：解析模型并构建引擎对象
 backend.reset()
 state = backend.get_state()
-backend.step(ctrl)         # 热路径:已校验数组与缓存句柄
+backend.step(ctrl)         # 热路径：校验数组和缓存句柄
 ```
 
-当可选运行时缺失时,每个适配器都会给出后端专属、可操作的错误诊断——任何
-后端都不会被静默降级为其他引擎。引擎原生的 model/data 对象不会逃出适配器;
-状态与控制通过校验过的 NumPy 数组传递。
+每个适配器在可选运行时缺失时都会给出可操作的后端专属诊断并快速失败；后端不会被静默降级到另一个引擎。引擎原生 model/data 对象不会逃出适配器，状态和控制都通过校验过的 NumPy 数组传递。
 
-确定性的 `FakeBackend` 和 `assert_backend_conformance` 辅助函数让消费者无需
-安装任何引擎即可测试任务代码。`BenchmarkCase` 和 `BenchmarkResult` 是为未来
-benchmark 包保留的 schema 扩展点,本仓库不实现负载运行器。
+确定性 `FakeBackend` 和 `assert_backend_conformance` 辅助函数让消费者无需安装引擎即可测试任务代码。`BenchmarkCase` 和 `BenchmarkResult` 是为未来 benchmark 包保留的 schema 扩展点；本仓库不实现负载运行器。
 
-外部 worker 根目录可通过 `UNISIM_ISAACGYM_HOME`、`UNISIM_ISAACGYM_PYTHON`、
-`UNISIM_ISAACSIM_HOME`、`UNISIM_ISAACSIM_PYTHON` 配置。包同时兼容旧的
-`UNILAB_*` 拼写作为迁移回退。
+外部 worker 根目录可通过 `UNISIM_ISAACGYM_HOME`、`UNISIM_ISAACGYM_PYTHON`、`UNISIM_ISAACSIM_HOME` 和 `UNISIM_ISAACSIM_PYTHON` 配置。旧 `UNILAB_*` 拼写仍作为迁移回退保留。
 
 ## 文档
 
-- [`docs/architecture.md`](docs/architecture.md) — UniSim 与 UniLab 的
-  所有权边界
-- [`docs/support-matrix.md`](docs/support-matrix.md) — 适配器安装与运行时
-  要求
-- [`docs/migration.md`](docs/migration.md) — 从历史上的 UniLab 后端层迁移
-- [`docs/mocap-reset-contract.md`](docs/mocap-reset-contract.md) — 选中环境的
-  mocap 姿态与 MJWarp 基本几何体、接触、关节随机化
-- [`docs/benchmark-api.md`](docs/benchmark-api.md) — 保留的 benchmark schema
-- [`docs/release.md`](docs/release.md) — TestPyPI 与自动化生产发布流程
+- [架构](docs/zh/architecture.md) — 所有权边界与热/冷路径规则
+- [适配器支持矩阵](docs/zh/support-matrix.md) — 安装、运行时、平台和播放要求
+- [UniLab 迁移](docs/zh/migration.md) — 从历史上的 UniLab 后端层迁移
+- [Mocap 与重置随机化](docs/zh/mocap-reset-contract.md) — 选中环境的 mocap 姿态与 MJWarp 重置字段
+- [Benchmark API 预留](docs/zh/benchmark-api.md) — 预留的 benchmark 结果 schema
+- [发布手册](docs/zh/release.md) — TestPyPI 检查与自动化生产发布
+- [SuperDex CPU 配置](docs/zh/superdex.md) — 实验性适配器与原生资产细节
 
 ## 开发
 
 ```bash
-make sync       # 锁定环境,附带 MuJoCo 测试 extra
-make check      # Ruff + pytest
-make package    # 本地构建 sdist 与 wheel 检查
+make sync       # 锁定环境并加入 MuJoCo 测试 extra
+make check      # Ruff 与 pytest
+make package    # 构建用于检查的本地发行包
 ```
 
-每个适配器在发布前都必须记录其支持的 Python/平台/运行时矩阵,并通过一致性
-(conformance)检查。
+每个适配器发布前都必须记录支持的 Python、平台和运行时矩阵，并通过一致性辅助检查。仓库布局以及 `scripts/` 与 `tests/` 子目录的用途见 [AGENTS.md](AGENTS.md)、[scripts/README.md](scripts/README.md) 和 [tests/README.md](tests/README.md)。
 
 ## 引用
 
-如果 UniSim 对您的研究有帮助,请引用 UniLab 论文:
+如果 UniSim 对您的研究有帮助，请引用 UniLab 论文：
 
 ```bibtex
 @article{jia2026unilab,
-  title   = {UniLab: A Heterogeneous Architecture for Robot RL Beyond
-             GPU-Dominant Paradigms},
-  author  = {Yufei Jia and Zhanxiang Cao and Mingrui Yu and Heng Zhang and
-             Shenyu Chen and Dixuan Jiang and Meng Li and Xiaofan Li and
-             Yiyang Liu and Junzhe Wu and Zheng Li and XiLin Fang and
-             Tingyu Cui and Shengcheng Fu and Haoyang Li and Anqi Wang and
-             Zifan Wang and Dongjie Zhu and Chenyu Cao and Zhenbiao Huang and
-             Ziang Zheng and Jie Lu and Xin Ma and Zhengyang Wei and
-             Xiang Zhao and Tianyue Zhan and Ye He and Yuxiang Chen and
-             Yizhou Jiang and Yue Li and Haizhou Ge and Yuhang Dong and
-             Fan Jia and Ziheng Zhang and Meng Zhang and Xiwa Deng and
-             Zhixing Chen and Hanyang Shao and Chenxin Dong and Yixuan Li and
-             Yizhi Chen and Bokui Chen and Kaifeng Zhang and Hanqing Cui and
-             Yusen Qin and Ruqi Huang and Lei Han and Tiancai Wang and
-             Xiang Li and Yue Gao and Guyue Zhou},
+  title   = {UniLab: A Heterogeneous Architecture for Robot RL Beyond GPU-Dominant Paradigms},
+  author  = {Yufei Jia and Zhanxiang Cao and Mingrui Yu and Heng Zhang and Shenyu Chen and Dixuan Jiang and Meng Li and Xiaofan Li and Yiyang Liu and Junzhe Wu and Zheng Li and XiLin Fang and Tingyu Cui and Shengcheng Fu and Haoyang Li and Anqi Wang and Zifan Wang and Dongjie Zhu and Chenyu Cao and Zhenbiao Huang and Ziang Zheng and Jie Lu and Xin Ma and Zhengyang Wei and Xiang Zhao and Tianyue Zhan and Ye He and Yuxiang Chen and Yizhou Jiang and Yue Li and Haizhou Ge and Yuhang Dong and Fan Jia and Ziheng Zhang and Meng Zhang and Xiwa Deng and Zhixing Chen and Hanyang Shao and Chenxin Dong and Yixuan Li and Yizhi Chen and Bokui Chen and Kaifeng Zhang and Hanqing Cui and Yusen Qin and Ruqi Huang and Lei Han and Tiancai Wang and Xiang Li and Yue Gao and Guyue Zhou},
   journal = {arXiv preprint arXiv:2605.30313},
   year    = {2026},
   url     = {https://arxiv.org/abs/2605.30313}
@@ -147,24 +79,21 @@ make package    # 本地构建 sdist 与 wheel 检查
 
 ### 物理后端
 
-通过 UniSim 使用某个具体后端时,请同时引用对应的引擎。`mujoco` 适配器
-运行在 mjbatch 运行时之上,`drake` 适配器运行在 DrakeUni 运行时之上,因此
-请与原版引擎一并引用:
+通过 UniSim 使用具体后端时，请同时引用对应引擎。`mujoco` 适配器运行在 mjbatch 运行时之上，`drake` 适配器运行在 DrakeUni 运行时之上，因此请与原版引擎一并引用：
 
 ```bibtex
 % MuJoCo
 @inproceedings{todorov2012mujoco,
   title     = {MuJoCo: A Physics Engine for Model-Based Control},
   author    = {Todorov, Emanuel and Erez, Tom and Tassa, Yuval},
-  booktitle = {2012 IEEE/RSJ International Conference on Intelligent Robots
-               and Systems},
+  booktitle = {2012 IEEE/RSJ International Conference on Intelligent Robots and Systems},
   pages     = {5026--5033},
   year      = {2012},
   doi       = {10.1109/IROS.2012.6386109}
 }
 
-% mjbatch(`mujoco` 适配器的运行时;kevinzakka/mjbatch 的
-% UniLab 维护 fork)
+% mjbatch (runtime of the `mujoco` adapter; UniLab-maintained fork
+% of kevinzakka/mjbatch)
 @software{mjbatch,
   title  = {mjbatch: Batched MuJoCo Simulation},
   author = {Kevin Zakka and the mjbatch contributors},
@@ -175,8 +104,7 @@ make package    # 本地构建 sdist 与 wheel 检查
 
 % MotrixSim
 @software{motrixsim2026,
-  title  = {MotrixSim: A Physics Simulation Engine for Robotics and
-            Embodied AI},
+  title  = {MotrixSim: A Physics Simulation Engine for Robotics and Embodied AI},
   author = {{Motphys Team}},
   year   = {2026},
   url    = {https://motrixsim.readthedocs.io/},
@@ -191,7 +119,7 @@ make package    # 本地构建 sdist 与 wheel 检查
   url    = {https://drake.mit.edu}
 }
 
-% DrakeUni(`drake` 适配器的运行时)
+% DrakeUni (runtime of the `drake` adapter)
 @software{drakeuni,
   title  = {DrakeUni: Experimental Drake Batch Simulation Runtime for UniLab},
   author = {{UniLab Team}},
@@ -210,8 +138,7 @@ make package    # 本地构建 sdist 与 wheel 检查
 
 % Newton
 @software{newton2025,
-  title  = {Newton: GPU-accelerated physics simulation for robotics and
-            simulation research},
+  title  = {Newton: GPU-accelerated physics simulation for robotics and simulation research},
   author = {{Newton Contributors}},
   year   = {2025},
   url    = {https://github.com/newton-physics/newton}
@@ -219,8 +146,7 @@ make package    # 本地构建 sdist 与 wheel 检查
 
 % Genesis
 @misc{genesis,
-  title  = {Genesis: A Universal and Generative Physics Engine for Robotics
-            and Beyond},
+  title  = {Genesis: A Universal and Generative Physics Engine for Robotics and Beyond},
   author = {Genesis Authors},
   month  = {December},
   year   = {2024},
@@ -229,14 +155,9 @@ make package    # 本地构建 sdist 与 wheel 检查
 
 % Isaac Gym
 @inproceedings{makoviychuk2021isaacgym,
-  title     = {Isaac Gym: High Performance GPU-Based Physics Simulation for
-               Robot Learning},
-  author    = {Makoviychuk, Viktor and Wawrzyniak, Lukasz and Guo, Yunrong and
-               Lu, Michelle and Storey, Kier and Macklin, Miles and
-               Hoeller, David and Rudin, Nikita and Allshire, Arthur and
-               Handa, Ankur and State, Gavriel},
-  booktitle = {Proceedings of the Neural Information Processing Systems Track
-               on Datasets and Benchmarks},
+  title     = {Isaac Gym: High Performance GPU-Based Physics Simulation for Robot Learning},
+  author    = {Makoviychuk, Viktor and Wawrzyniak, Lukasz and Guo, Yunrong and Lu, Michelle and Storey, Kier and Macklin, Miles and Hoeller, David and Rudin, Nikita and Allshire, Arthur and Handa, Ankur and State, Gavriel},
+  booktitle = {Proceedings of the Neural Information Processing Systems Track on Datasets and Benchmarks},
   year      = {2021}
 }
 
@@ -251,4 +172,4 @@ make package    # 本地构建 sdist 与 wheel 检查
 
 ## 许可证
 
-Apache-2.0,见 [LICENSE](LICENSE)。
+Apache-2.0；见 [LICENSE](LICENSE)。

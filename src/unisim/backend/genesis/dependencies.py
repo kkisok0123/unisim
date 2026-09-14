@@ -3,7 +3,7 @@
 The Genesis runtime (PyPI distribution ``genesis-world``, import name
 ``genesis``) is a heavy optional dependency (torch, quadrants) that must never
 be imported at package import time.  It is pinned exactly to the release probed
-in ``scripts/tools/genesis_feasibility/REPORT.md`` (#1372) because the adapter
+in the Genesis feasibility audit (#1372) because the adapter
 relies on measured API behavior of that version.
 """
 

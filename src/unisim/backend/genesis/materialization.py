@@ -1,7 +1,7 @@
 """Cold-path scene materialization for the independent ``genesis`` backend.
 
-Genesis 1.3.3 drops three MJCF features UniLab relies on (measured in
-``scripts/tools/genesis_feasibility/REPORT.md`` #1372 §3): ``<keyframe>``,
+Genesis 1.3.3 drops three MJCF features UniLab relies on, as measured in
+the Genesis 1.3.3 feasibility audit (#1372 §3): ``<keyframe>``,
 the global ``<option>`` block, and the whole ``<sensor>`` block.  This module
 compensates on the cold path exactly as the report prescribes: keyframe and
 sensor metadata are scanned once with the ``mujoco`` package (the isaacgym

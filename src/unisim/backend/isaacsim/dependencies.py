@@ -15,9 +15,8 @@ _LEGACY_ENV_HOME = "UNILAB_ISAACSIM_HOME"
 _LEGACY_ENV_PYTHON = "UNILAB_ISAACSIM_PYTHON"
 
 _SETUP_HINT = (
-    "Install the dedicated IsaacSim/IsaacLab worker environment with "
-    "scripts/tools/setup_isaacsim_env.sh (see the IsaacSim backend page in "
-    "docs/sphinx/source/*/2-user_guide/3-backends/5-isaacsim.md)."
+    "Create the dedicated IsaacSim/IsaacLab worker environment under "
+    "UNISIM_ISAACSIM_HOME (see docs/en/support-matrix.md)."
 )
 
 
