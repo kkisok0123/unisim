@@ -6,5 +6,6 @@ dist/
 build/
 __pycache__/
 .zcode/
-assets/
-
+assets/**
+!assets/superdex/
+!assets/superdex/superdex-assets-integration-plan.md
