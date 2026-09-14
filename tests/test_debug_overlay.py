@@ -880,7 +880,15 @@ class TestOnFrameEndToEnd:
         env = SimpleNamespace(
             cfg=SimpleNamespace(scene=SceneCfg(model_file=model_path), ctrl_dt=0.05)
         )
-        state = np.array([[0.0, 0.0, 0.0], [0.0, 0.1, 0.0]], dtype=np.float32)
+        # Snapshot rows use the [time, qpos, qvel] layout; column 1 is the
+        # model's single slide joint. The two snapshots must differ in qpos so
+        # the rendered frames differ: identical consecutive frames are
+        # deduplicated by Pillow's GIF encoder (via imageio), which would drop
+        # a frame and fail the count check below.
+        state = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], dtype=np.float32)
+        next_state = state.copy()
+        next_state[:, 1] = 0.4
+        snapshots = [state, next_state]
         calls = []
 
         def on_frame(index, frame):
@@ -899,7 +907,7 @@ class TestOnFrameEndToEnd:
             render_spacing=1.0,
             headless=True,
             record_video=True,
-            frame_state_getter=lambda: state,
+            frame_state_getter=lambda: snapshots.pop(0),
             camera_kwargs=None,
             on_frame=on_frame,
         )
