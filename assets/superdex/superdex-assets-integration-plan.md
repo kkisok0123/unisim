@@ -5,15 +5,18 @@ work; it does not establish support for additional assets.
 
 ## Objective and approach
 
-Make assets from `/home/pc829/UniFamily/project_superdex` usable through UniSim's
-Superdex adapter, including their geometry, controls, state and reset behavior.
+Copy the contents of `/home/pc829/UniFamily/project_superdex/assets/` directly
+into `/home/pc829/UniFamily/unisim/assets/`, preserving the source directory
+structure. Make the copied assets usable through UniSim's Superdex adapter,
+including their geometry, controls, state and reset behavior.
 
 Expand by simulator capability. Prove each capability with one representative
 asset, then apply the same qualification checks to the remaining candidates.
-Each stage should produce a usable result.
+Each stage should produce a usable result and fit into a small set of reviewable
+pull requests.
 
-The first milestone ends after stages 1–3: a reproducible bundle, an unchanged
-FR3 running correctly, and a tested compatibility table for other bots.
+The first milestone ends after stages 1–3: a verified local asset copy, an
+unchanged FR3 running correctly, and a tested compatibility table for other bots.
 
 ## Baseline and scope
 
@@ -29,8 +32,10 @@ The initial local survey found approximately 248 MiB across 891 asset files:
 These figures describe the surveyed local checkout at
 `6b0541bd41adb39afe4e13fd6c45d9e9288f3021`. Earlier acquisition work pinned
 `ed30ce16361329cbbed956173d6a4f5842815d24`. The local revision includes actuated
-Wuji hands and removes some previously surveyed assets. Stage 1 must reconcile
-these baselines and regenerate the inventory for the selected revision.
+Wuji hands and removes some previously surveyed assets. Stage 1 copies the
+current local source assets, including local derivatives, and records their
+actual revision and working-tree changes. The historical pin is reference
+information; it does not replace the requested local source.
 
 The current UniSim worktree starts at
 `1ef3bb6b04a2cd76f20be72c49cd4d15f528e51b`. It includes the native bot loader but
@@ -46,50 +51,66 @@ mechanical cycles and general scene assembly need additional adapter work.
 See the [current Superdex profile](superdex.md) and
 [materialization implementation](../src/unisim/backend/superdex/materialization.py).
 
+The copied assets live directly in UniSim's repository-level `assets/` directory.
 UniSim owns asset resolution, compatibility records, cold materialization,
-adapter lifecycle and validation. Large asset bundles remain in an external
-store. UniLab continues to own asset deployment for tasks, observations,
-rewards, training and policy evaluation. Cross-engine conversion is a separate
-scope from native Superdex support.
+adapter lifecycle and validation. UniLab continues to own task configuration,
+observations, rewards, training and policy evaluation. Cross-engine conversion
+is a separate scope from native Superdex support. Copying assets into the
+repository does not by itself add them to the published Python package.
 
 ## Implementation stages
 
-### 1. Establish a reproducible asset bundle
+### 1. Copy the local assets and verify the result
 
 Deliverables:
 
-- Record the exact source revision, file hashes and local derivatives. Preserve
-  the distinction between upstream assets and locally modified assets.
-- Finish explicit acquisition and SDK-free inventory tooling. Cover bots,
-  prefabs, scenes, controllers and their referenced dependencies.
+- Copy all contents of `/home/pc829/UniFamily/project_superdex/assets/` directly
+  into `/home/pc829/UniFamily/unisim/assets/`, including hidden files. Use real
+  copies so the destination is usable independently of the source checkout.
+- Record the source revision, working-tree changes, file hashes and local
+  derivatives. Preserve the distinction between upstream assets and locally
+  modified assets without omitting the local variants from the copy.
+- Add SDK-free inventory and verification tooling. Cover bots, prefabs, scenes,
+  controllers and their referenced dependencies; acquisition is a local copy.
 - Preserve original directory structure, `.superdex_root` markers, collision
   geometry, render geometry, recipe dependencies and LICENSE/NOTICE files.
 - Record required capabilities and a support status for each entry.
-- Verify first-run preparation, existing-bundle reuse, changed content, missing
-  dependencies and relocation. Publish a verified bundle atomically.
+- Compare relative paths and file hashes between source and destination. Check
+  destination conflicts before copying and preserve unrelated existing files.
+- Verify that all required references resolve inside the destination tree and
+  that loading the copied assets does not require the source checkout.
 - Keep downloads out of imports, backend construction and the normal test suite.
 
-Proposed storage layout:
+Required destination layout:
 
 ```text
-<asset-store>/superdex/<source-revision>/
-  inventory.json
-  assets/
-    bots/
-    prefabs/
-    benchmarks/
-    ...
+/home/pc829/UniFamily/unisim/assets/
+  bots/
+  prefabs/
+  benchmarks/
+  cube/
+  test/
+  ...
 ```
 
-Point `SUPERDEX_ASSETS_PATH` at the bundle's `assets` directory. Record local
-derivatives with their own provenance instead of overwriting the source bundle.
+For example, source `assets/bots/arms/fr3_v2/fr3_v2.superdex_bot` maps to
+`/home/pc829/UniFamily/unisim/assets/bots/arms/fr3_v2/fr3_v2.superdex_bot`.
+There is no additional `assets/assets/`, `superdex/` or revision directory.
 
-**Done when:** the bundle can be relocated and verified, and every entry has
-provenance, dependency completeness and required capabilities recorded.
+Point `SUPERDEX_ASSETS_PATH` at `/home/pc829/UniFamily/unisim/assets` for loading
+examples and qualification runs. Keep generated provenance and verification
+reports outside the copied asset tree, for example under `docs/`, and leave
+source asset bytes unchanged.
+
+**Done when:** every source asset is present at the matching destination-relative
+path with the same contents, required dependencies resolve from the destination,
+and every entry has provenance and required capabilities recorded.
 
 ### 2. Prove one unchanged robot: FR3 v2
 
-Use `bots/arms/fr3_v2/fr3_v2.superdex_bot` through the existing native loader and
+Use the copied
+`/home/pc829/UniFamily/unisim/assets/bots/arms/fr3_v2/fr3_v2.superdex_bot`
+through the existing native loader and
 `create_backend("superdex", SceneCfg(bot_path), ...)`.
 
 - Verify body/joint inventories, initial pose, control ordering, effort limits
@@ -194,8 +215,9 @@ required by its selected scenes. Stage 8 is scheduled per capability.
 
 The first three pull requests are:
 
-1. **Asset acquisition and inventory:** source pinning, dependency records,
-   verification and first-run/reuse/relocation checks.
+1. **Direct asset copy and inventory:** copy the local source into UniSim's
+   `assets/`, record provenance and dependencies, verify matching file hashes,
+   and test loading independently of the source checkout.
 2. **Untouched FR3 qualification:** focused adapter fixes, runtime checks and a
    runnable loading example.
 3. **Reusable bot qualification:** parameterized checks and a compatibility
@@ -209,7 +231,7 @@ qualify an asset.
 
 | Check | Required evidence |
 | --- | --- |
-| Provenance and dependencies | Exact source revision/hashes; all required references resolve after relocation. |
+| Provenance and dependencies | Source revision and local changes recorded; copied file hashes match; required references resolve inside UniSim's `assets/`. |
 | Structure | Authored/compiled body, joint, actor and component inventories agree. |
 | State | Correct dimensions, ordering, frames and finite initial values. |
 | Control | Small bounded commands affect the intended joints; limits are enforced. |
@@ -231,12 +253,13 @@ feature rejection covered by tests.
 
 For implementation changes, run focused tests and `make check`. Run `make package`
 when packaging changes and `uv lock --check` when dependency metadata changes.
-External-asset/runtime tests may be optional in the normal suite, but an explicit
+Asset/runtime tests may be optional in the normal suite, but an explicit
 qualification run must fail if its required assets or runtime are missing.
 
 Keep NumPy as the sole base dependency and preserve lazy SDK imports. Inspect
-package contents when packaging changes to ensure large assets, caches and
-native SDKs stay outside `unisim-core`.
+package contents when packaging changes to ensure the repository-level asset
+copy does not unintentionally enter `unisim-core` distributions. Caches and
+native SDKs remain outside the base package.
 
 ## Deliverable for each completed stage
 
