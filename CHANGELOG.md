@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Add the stage-2B FR3 adapter qualification:
+  `uv run scripts/superdex_fr3_qualify.py` loads the unchanged
+  `bots/arms/fr3_v2/fr3_v2.superdex_bot` through the SuperDex adapter and runs
+  seven numerical/lifecycle checks — structure, control ordering and effort
+  clipping, batch/serial trajectory equivalence (1,000+ steps, also the
+  stability evidence), contact recovery from a pose beyond an authored joint
+  range, exact whole/selective reset and state round trips, two-environment
+  isolation, and repeated create/close cycles — each compared against a direct
+  SuperDex SDK scene driven with identical inputs in the same process. On the
+  qualification host every adapter-vs-SDK deviation was exactly 0.0 and no
+  adapter defect was demonstrated, so no adapter fix was required. The run
+  report lands in `docs/superdex-fr3-qualification/`; the pytest regression
+  subset is `tests/test_superdex_fr3_qualification.py` (opt-in via
+  `SUPERDEX_ASSETS_PATH`). See `docs/superdex.md`.
 - Add the stage-2A FR3 viewer demonstration:
   `uv run scripts/superdex_fr3_viewer.py` opens the unchanged
   `bots/arms/fr3_v2/fr3_v2.superdex_bot` from the local asset copy through the

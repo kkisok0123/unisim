@@ -1,8 +1,9 @@
 # Superdex asset integration plan
 
-Status: revised on 2026-09-14. Stages 1 (local asset copy and inventory) and 2A
-(FR3 visualization through UniSim) are complete. The next step is stage 2B FR3
-adapter qualification, followed by capability extensions. This document describes planned work;
+Status: revised on 2026-09-14. Stages 1 (local asset copy and inventory), 2A
+(FR3 visualization through UniSim) and 2B (FR3 adapter qualification) are
+complete. The next step is stage 3 compatible robots and compositions,
+followed by capability extensions. This document describes planned work;
 it does not establish runtime support for additional assets.
 
 ## Objective and approach
@@ -179,7 +180,18 @@ inspect its initial geometry, demonstrates bounded movement and visible reset,
 and exits cleanly. Record this as visual verification; it does not yet qualify
 the robot's physics or batch behavior.
 
-### 2B. Complete and qualify the FR3 adapter path
+### 2B. Complete and qualify the FR3 adapter path — complete
+
+Built as `scripts/superdex_fr3_qualify.py` with the recorded report under
+`docs/superdex-fr3-qualification/` and the pytest regression subset in
+`tests/test_superdex_fr3_qualification.py` (opt-in via
+`SUPERDEX_ASSETS_PATH`); see the FR3 qualification section in
+`docs/superdex.md`. All adapter-side results were checked against a direct
+SDK scene driven with identical inputs; every adapter-vs-SDK deviation was
+exactly 0.0 and no adapter defect was demonstrated, so no adapter fix was
+needed. The pre-existing mass-metadata regression
+(`test_native_fr3_when_registered_assets_are_available`) remains a separate
+test. Proceed to stage 3.
 
 Use the local
 `assets/superdex/bots/arms/fr3_v2/fr3_v2.superdex_bot`
@@ -307,8 +319,9 @@ For each new capability, follow the same process:
 
 ## Dependencies and next pull requests
 
-The immediate sequence is **stage 1 complete → stage 2A visualization complete →
-stage 2B FR3 adapter qualification → stage 3 compatible robots**.
+The immediate sequence is **stage 1 complete → stage 2A visualization
+complete → stage 2B FR3 adapter qualification complete → stage 3 compatible
+robots**.
 
 Stage 4 extends robot state support; stage 5 can build on the qualified fixed-base
 route independently of floating roots. The Wuji target in stage 6 depends on
@@ -320,9 +333,11 @@ The next three pull requests are:
 
 1. **FR3 visualization through UniSim (2A): complete** — see
    `scripts/superdex_fr3_viewer.py` and `docs/superdex-fr3-viewer/`.
-2. **Untouched FR3 adapter qualification (2B):** focused adapter fixes and
-   numerical, contact, reset, isolation and lifecycle tests against direct SDK
-   execution.
+2. **Untouched FR3 adapter qualification (2B): complete** — numerical,
+   contact, reset, isolation and lifecycle checks against direct SDK
+   execution; see `scripts/superdex_fr3_qualify.py`,
+   `docs/superdex-fr3-qualification/` and
+   `tests/test_superdex_fr3_qualification.py`. No adapter fix was required.
 3. **Reusable bot visualization and qualification (3):** a selectable-asset viewer
    example, parameterized checks, recipe adapter work where needed and a
    compatibility table for direct bots and recipes.

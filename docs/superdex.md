@@ -162,7 +162,56 @@ Closing the window releases the viewer and backend (verified for window close,
 Ctrl-C and error paths); captures and the run report land in
 `docs/superdex-fr3-viewer/`. Use `--frames N` for an offscreen smoke run on a
 headless host. This is visual verification only; physics and lifecycle
-qualification of the unchanged FR3 remains stage 2B.
+qualification of the unchanged FR3 follows below.
+
+## FR3 adapter qualification (stage 2B)
+
+One command runs the numerical and lifecycle qualification of the unchanged
+FR3 against direct SDK execution; no viewer or graphical session is needed:
+
+```sh
+export SUPERDEX_ASSETS_PATH="$PWD/assets/superdex"
+uv run scripts/superdex_fr3_qualify.py
+```
+
+The script verifies the asset tree against the recorded inventory, then loads
+the FR3 through `create_backend("superdex", ...)` while a direct SuperDex SDK
+scene in the same process is driven with identical inputs, separating adapter
+translation from asset/SDK behavior. Seven checks run, each recorded with
+evidence in `docs/superdex-fr3-qualification/report.json`:
+
+1. **Structure** — body/joint inventories, actuator control order, default
+   pose, dynamic-link masses, world link transforms, world AABBs and authored
+   joint ranges against the direct SDK actor and authored prefab.
+2. **Control** — per-joint ordering by rollout differencing (the torqued joint
+   is the most affected DoF for every joint index) and effort-limit clipping
+   (a saturated command reproduces per-joint capped dynamics exactly).
+3. **Trajectory equivalence** — batch and serial execution modes each match
+   the direct SDK rollout under the recorded PD sweep profile; this is also
+   the 1,000+ step stability check.
+4. **Contact recovery** — starting from a pose beyond joint 2's authored range
+   (`-2.6` rad < `-1.784`), `set_state` stores the pose unclamped and the
+   contact push-out matches the SDK rollout through 14 contact steps.
+5. **Reset** — whole-scene and selective restore are exact, and
+   `set_state`/`get_state` round-trip within float32 noise.
+6. **Isolation** — each environment of a two-environment backend reproduces
+   the matching single-environment backend exactly while the other runs
+   different commands.
+7. **Lifecycle** — repeated create/step/reset/close cycles.
+
+On the qualification host (SuperDex 1.0.0, float32, `sim_dt` 0.002) every
+adapter-vs-SDK deviation measured exactly 0.0 — batch, serial and direct SDK
+integrate identically — and no adapter defect was demonstrated, so stage 2B
+required no adapter fix. Known SDK behavior recorded alongside: authored joint
+limits are soft (an all-limits pose overshoots ~0.11 rad under 87 N·m), and
+`set_state` does not clamp to authored ranges by design. The report records
+code commit, asset tree digest, SDK precision, timestep, control profile and
+tolerances.
+
+The regression subset is `tests/test_superdex_fr3_qualification.py`
+(8 tests, opt-in via `SUPERDEX_ASSETS_PATH`; skips cleanly without the local
+assets or runtime). The pre-existing mass-metadata regression in
+`tests/test_superdex.py` stays a separate test.
 
 ## Audited MJCF profile
 
@@ -238,7 +287,8 @@ renderer when a visual MJCF model is available.
 ## Validation
 
 ```sh
-uv run --no-sync pytest -q tests/test_superdex_contract.py tests/test_superdex.py tests/test_superdex_materialization.py
+uv run --no-sync pytest -q tests/test_superdex_contract.py tests/test_superdex.py \
+  tests/test_superdex_materialization.py tests/test_superdex_fr3_qualification.py
 UV_NO_SYNC=1 make check
 uv lock --check
 make package

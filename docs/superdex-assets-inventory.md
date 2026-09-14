@@ -11,13 +11,13 @@ SDK-free inventory of the repository-local asset copy under
 - Working tree clean under `assets/`: True
 - Local derivative files (changed after initial commit `1d7150946fa3): 5
 - Historical upstream pin (reference only): `ed30ce16361329cbbed956173d6a4f5842815d24`
-- Generated: 2026-09-14T09:48:25Z
+- Generated: 2026-09-14T12:26:25Z
 
 ## Bundle summary
 
 - Files: 892
 - Total size: 248.3 MiB
-- Tree digest (SHA-256 over path+file hashes): `43b236b9f4c7c23b19d2e7f795b2eb8638be7e69d9d030c4feaa30dffa18fa98`
+- Tree digest (SHA-256 over path+file hashes): `82556a6729fb4b4ab808b92782e0cdd4e553d01480e3b927226db8b3a93de276`
 - Root markers: bots, prefabs, test
 - Entries by kind: {'bot': 37, 'controller': 1, 'prefab': 15, 'scene': 2}
 - Dispositions: {'control-profile': 1, 'profile-candidate': 6, 'recipe-candidate': 12, 'unsupported-features': 36}
