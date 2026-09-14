@@ -517,7 +517,7 @@ class MuJoCoBackend(SimBackend):
         self._position_actuator_gains = (
             None if position_actuator_gains is None else dict(position_actuator_gains)
         )
-        self._pre_step_control_fn = None
+        self._tracked_sensor_copyout_range: tuple[int, int] | None = None
         self._fixed_variant_build: _FixedVariantBuild | None = None
         self._static_playback_model: mujoco.MjModel | None = None
         self._num_envs = num_envs
@@ -643,6 +643,33 @@ class MuJoCoBackend(SimBackend):
             self._tracked_quat_w_all = _get_sensor_view("track_quat_w", 4)
             self._tracked_linvel_w_all = _get_sensor_view("track_linvel_w", 3)
             self._tracked_angvel_w_all = _get_sensor_view("track_angvel_w", 3)
+            # One contiguous sensordata column superset covering the four
+            # world-frame blocks (they may interleave unrelated sensors only
+            # between blocks, which the superset copies harmlessly).  Used as
+            # the opt-in mjbatch split-substep copyout range.
+            starts: list[int] = []
+            stops: list[int] = []
+            for prefix, dim in (
+                ("track_pos_w", 3),
+                ("track_quat_w", 4),
+                ("track_linvel_w", 3),
+                ("track_angvel_w", 3),
+            ):
+                first = self._model.sensor_adr[
+                    mujoco.mj_name2id(
+                        self._model, mujoco.mjtObj.mjOBJ_SENSOR, f"{prefix}_{self._valid_bnames[0]}"
+                    )
+                ]
+                last = self._model.sensor_adr[
+                    mujoco.mj_name2id(
+                        self._model,
+                        mujoco.mjtObj.mjOBJ_SENSOR,
+                        f"{prefix}_{self._valid_bnames[-1]}",
+                    )
+                ]
+                starts.append(int(first))
+                stops.append(int(last) + dim)
+            self._tracked_sensor_copyout_range = (min(starts), max(stops))
 
             # Local (baselink) sensors
             self._tracked_pos_b_all = _get_sensor_view("track_pos_b", 3)
@@ -1354,15 +1381,19 @@ class MuJoCoBackend(SimBackend):
     ) -> dict[str, dict[str, float]]:
         # Single batch dispatch for all substeps (#1259 M1b): the upstream
         # pre-step control hook recomputes the Manager-Based action before
-        # every substep through mjbatch's native per-substep callback.  Action
-        # terms only read physics-state-backed getters (joint pos/vel);
-        # _sensor_data is refreshed by the end-of-call CopyOut, as
-        # observation/metric terms only consume it after the full step.
+        # every substep through mjbatch's native per-substep callback.  Joint
+        # state comes from the callback's state rows, and the tracked
+        # world-frame sensor views are refreshed by the executor's split-
+        # substep copyout at every substep boundary (including substep 0) at
+        # memcpy cost.  xfrc_applied is recomposed and written absolutely
+        # before every substep as the sum of the staged interval wrench and the
+        # callback's dynamic wrench.
         set_ctrl_ms = 0.0
         refresh_cache_ms = 0.0
         layout = self._state_layout
+        sensor_copyout = self._tracked_sensor_copyout_range
 
-        def _callback(k, state_view, ctrl_view) -> None:
+        def _callback(k, state_view, ctrl_view, sensor_view=None) -> None:
             nonlocal set_ctrl_ms, refresh_cache_ms
             if k > 0:
                 # k == 0 receives the state from before the call, which is
@@ -1377,19 +1408,41 @@ class MuJoCoBackend(SimBackend):
                 refresh_cache_ms += (time.perf_counter() - t0) * 1000.0
 
             t0 = time.perf_counter()
-            ctrl_view[:] = self._apply_pre_step_control(ctrl)
+            output = self._convert_pre_step_control(ctrl)
+            ctrl_view[:] = output.ctrl
+            # Absolute per-substep wrench write: fixed interval wrench + this
+            # substep's dynamic callback wrench.  A substep whose callback
+            # returns no wrench applies the fixed part alone, so dynamic
+            # wrenches never leak across substeps of one call.
+            xfrc_view = self._xfrc_view.reshape(self._num_envs, -1)
+            xfrc_view[:] = self._pending_xfrc_applied
+            if output.force is not None or output.torque is not None:
+                for body_offset, body_id in enumerate(np.asarray(output.body_ids)):
+                    if output.force is not None:
+                        xfrc_view[:, self._resolve_push_body_force_slice(int(body_id))] += (
+                            output.force[:, body_offset, :]
+                        )
+                    if output.torque is not None:
+                        xfrc_view[
+                            :, self._resolve_push_body_torque_slice(int(body_id))
+                        ] += output.torque[:, body_offset, :]
             set_ctrl_ms += (time.perf_counter() - t0) * 1000.0
 
-        # Obligation 1: same absolute write as the direct path; the persistent
-        # channel carries the wrench across all substeps of this call.
-        self._xfrc_view.reshape(self._num_envs, -1)[:] = self._pending_xfrc_applied
         t0 = time.perf_counter()
-        self._pool.step(  # type: ignore[union-attr]
-            nstep=nsteps,
-            callback=_callback,
-        )
+        self._pre_step_control_active = True
+        try:
+            self._pool.step(  # type: ignore[union-attr]
+                nstep=nsteps,
+                callback=_callback,
+                **({} if sensor_copyout is None else {"substep_sensor_copyout": sensor_copyout}),
+            )
+        finally:
+            self._pre_step_control_active = False
         physics_ms = (time.perf_counter() - t0) * 1000.0 - set_ctrl_ms - refresh_cache_ms
         self._pending_xfrc_applied.fill(0.0)
+        # The last substep's composed wrench stays in the persistent batch
+        # channel; return it to zero so nothing leaks into the next call.
+        self._xfrc_view.reshape(self._num_envs, -1)[:] = 0.0
 
         return {
             "timing": {
@@ -1398,6 +1451,7 @@ class MuJoCoBackend(SimBackend):
                 "refresh_cache_ms": refresh_cache_ms,
             }
         }
+
 
     def set_state(
         self,
@@ -1601,10 +1655,19 @@ class MuJoCoBackend(SimBackend):
     def apply_interval_randomization(self, plan: IntervalRandomizationPlan) -> None:
         if plan.is_empty():
             return
+        self._reject_wrench_write_inside_pre_step_control("apply_interval_randomization")
         # A non-empty plan starts from cleared external wrenches; the force and
         # torque handlers then accumulate into ``_pending_xfrc_applied``.
         self._pending_xfrc_applied.fill(0.0)
         super().apply_interval_randomization(plan)
+
+    def _reject_wrench_write_inside_pre_step_control(self, operation: str) -> None:
+        if self._pre_step_control_active:
+            raise RuntimeError(
+                f"{operation} must not be called from inside a pre-step control callback; "
+                "return a PreStepControlOutput wrench instead so it applies to the current "
+                "substep"
+            )
 
     def _interval_term_handlers(self) -> dict[str, Callable[[IntervalTermOp], None]]:
         # Built lazily once; the table only binds methods, so it is stable for
@@ -1738,6 +1801,7 @@ class MuJoCoBackend(SimBackend):
         self._pool.forward(ids=active_rows)
 
     def push_robots(self, force_range: Sequence[float] | np.ndarray) -> None:
+        self._reject_wrench_write_inside_pre_step_control("push_robots")
         self._pending_xfrc_applied.fill(0.0)
         self._pending_xfrc_applied[:, self._push_body_force_slice] = self._sample_push_force(
             force_range
@@ -1760,6 +1824,7 @@ class MuJoCoBackend(SimBackend):
         Returns:
             None. The wrench is staged in ``xfrc_applied`` for the next step.
         """
+        self._reject_wrench_write_inside_pre_step_control("apply_body_force")
         body_ids_np = np.asarray(body_ids, dtype=np.int32).reshape(-1)
         force_np = np.asarray(force, dtype=np.float64)
         expected_shape = (self._num_envs, body_ids_np.size, 3)
