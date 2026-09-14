@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- Add the verified local SuperDex asset copy under `assets/superdex` (891
+  files, ~248 MiB) with SDK-free inventory tooling:
+  `unisim.backend.superdex.assets` (module stays outside the public import
+  boundary) and `scripts/copy_superdex_assets.py`, which records source
+  provenance (revision `6b0541b`, 5 local-derivative files), verifies
+  source/destination SHA-256 equality and dependency resolution, and writes
+  `docs/superdex-assets-inventory.{md,json}`. Every entry carries a
+  disposition and required-capability record; unsupported entries are
+  preserved with precise blockers. The asset tree is excluded from
+  `unisim-core` distributions.
+
 ## 1.2.0 - 2026-09-10
 
 - Promote the current contract and adapter surface to the `1.2.x` line. No

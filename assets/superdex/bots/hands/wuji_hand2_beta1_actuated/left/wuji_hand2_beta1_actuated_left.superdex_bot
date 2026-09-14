@@ -1,0 +1,2339 @@
+{
+  "defaultPose": [
+    0.2615000009536743,
+    0,
+    0.5235000252723694,
+    0.2615000009536743,
+    0.2615000009536743,
+    0,
+    0.5235000252723694,
+    0.2615000009536743,
+    0.2615000009536743,
+    0,
+    0.5235000252723694,
+    0.2615000009536743,
+    0.2615000009536743,
+    0,
+    0.5235000252723694,
+    0.2615000009536743,
+    0.05199998617172241,
+    -0.3929999768733978,
+    0.2615000009536743,
+    0.2615000009536743
+  ],
+  "joints": [
+    {
+      "name": "world_joint",
+      "parentLinkFromJoint": {
+        "rotation": [
+          0.7071067690849304,
+          -0.7071067690849304,
+          -1.376787679419067e-07,
+          1.376787679419067e-07
+        ]
+      },
+      "type": "Free"
+    },
+    {
+      "axis": [
+        -1,
+        0,
+        0
+      ],
+      "effortLimit": 2,
+      "maxLimit": [
+        -1.5700000524520874,
+        0,
+        0
+      ],
+      "minLimit": [
+        1.0470000505447388,
+        0,
+        0
+      ],
+      "name": "l_index_finger_mcp_flex",
+      "parentLinkFromJoint": {
+        "rotation": [
+          0.0163849089294672,
+          -0.06930719316005707,
+          -0.048694513738155365,
+          0.9962714910507202
+        ],
+        "translation": [
+          0.022652415558695793,
+          0.003325158730149269,
+          -0.0699780210852623
+        ]
+      },
+      "type": "Revolute",
+      "inertia": 0.0005
+    },
+    {
+      "axis": [
+        0,
+        1,
+        0
+      ],
+      "effortLimit": 0.20000000298023224,
+      "maxLimit": [
+        0,
+        0.6980000138282776,
+        0
+      ],
+      "minLimit": [
+        0,
+        -0.6980000138282776,
+        0
+      ],
+      "name": "l_index_finger_mcp_abd",
+      "parentLinkFromJoint": {
+        "translation": [
+          0,
+          0.0012009801575914025,
+          -0.014499999582767487
+        ]
+      },
+      "type": "Revolute",
+      "inertia": 0.0002
+    },
+    {
+      "axis": [
+        -1,
+        0,
+        0
+      ],
+      "effortLimit": 0.30000001192092896,
+      "maxLimit": [
+        -2.0940001010894775,
+        0,
+        0
+      ],
+      "minLimit": [
+        1.0470000505447388,
+        0,
+        0
+      ],
+      "name": "l_index_finger_pip",
+      "parentLinkFromJoint": {
+        "translation": [
+          0,
+          0,
+          -0.03759999945759773
+        ]
+      },
+      "type": "Revolute",
+      "inertia": 0.0002
+    },
+    {
+      "axis": [
+        -1,
+        0,
+        0
+      ],
+      "effortLimit": 0.30000001192092896,
+      "maxLimit": [
+        -1.5700000524520874,
+        0,
+        0
+      ],
+      "minLimit": [
+        1.0470000505447388,
+        0,
+        0
+      ],
+      "name": "l_index_finger_dip",
+      "parentLinkFromJoint": {
+        "translation": [
+          0,
+          0,
+          -0.029500000178813934
+        ]
+      },
+      "type": "Revolute",
+      "inertia": 0.0002
+    },
+    {
+      "name": "joint_l_index_finger_nail",
+      "type": "Hard"
+    },
+    {
+      "name": "joint_l_index_finger_pad",
+      "type": "Hard"
+    },
+    {
+      "name": "l_index_finger_tip_fixed",
+      "parentLinkFromJoint": {
+        "translation": [
+          0,
+          0,
+          -0.024749690666794777
+        ]
+      },
+      "type": "Hard"
+    },
+    {
+      "axis": [
+        -1,
+        0,
+        0
+      ],
+      "effortLimit": 2,
+      "maxLimit": [
+        -1.5700000524520874,
+        0,
+        0
+      ],
+      "minLimit": [
+        1.0470000505447388,
+        0,
+        0
+      ],
+      "name": "l_middle_finger_mcp_flex",
+      "parentLinkFromJoint": {
+        "rotation": [
+          0.0169537253677845,
+          0.005584218539297581,
+          0.0002629887603688985,
+          0.9998406171798706
+        ],
+        "translation": [
+          0.0009430936188437045,
+          0.008303013630211353,
+          -0.07391544431447983
+        ]
+      },
+      "type": "Revolute",
+      "inertia": 0.0005
+    },
+    {
+      "axis": [
+        0,
+        1,
+        0
+      ],
+      "effortLimit": 0.20000000298023224,
+      "maxLimit": [
+        0,
+        0.6980000138282776,
+        0
+      ],
+      "minLimit": [
+        0,
+        -0.6980000138282776,
+        0
+      ],
+      "name": "l_middle_finger_mcp_abd",
+      "parentLinkFromJoint": {
+        "translation": [
+          0,
+          0.0012009801575914025,
+          -0.014499999582767487
+        ]
+      },
+      "type": "Revolute",
+      "inertia": 0.0002
+    },
+    {
+      "axis": [
+        -1,
+        0,
+        0
+      ],
+      "effortLimit": 0.30000001192092896,
+      "maxLimit": [
+        -2.0940001010894775,
+        0,
+        0
+      ],
+      "minLimit": [
+        1.0470000505447388,
+        0,
+        0
+      ],
+      "name": "l_middle_finger_pip",
+      "parentLinkFromJoint": {
+        "translation": [
+          0,
+          0,
+          -0.03759999945759773
+        ]
+      },
+      "type": "Revolute",
+      "inertia": 0.0002
+    },
+    {
+      "axis": [
+        -1,
+        0,
+        0
+      ],
+      "effortLimit": 0.30000001192092896,
+      "maxLimit": [
+        -1.5700000524520874,
+        0,
+        0
+      ],
+      "minLimit": [
+        1.0470000505447388,
+        0,
+        0
+      ],
+      "name": "l_middle_finger_dip",
+      "parentLinkFromJoint": {
+        "translation": [
+          0,
+          0,
+          -0.029500000178813934
+        ]
+      },
+      "type": "Revolute",
+      "inertia": 0.0002
+    },
+    {
+      "name": "joint_l_middle_finger_nail",
+      "type": "Hard"
+    },
+    {
+      "name": "joint_l_middle_finger_pad",
+      "type": "Hard"
+    },
+    {
+      "name": "l_middle_finger_tip_fixed",
+      "parentLinkFromJoint": {
+        "translation": [
+          0,
+          0,
+          -0.024749690666794777
+        ]
+      },
+      "type": "Hard"
+    },
+    {
+      "axis": [
+        -1,
+        0,
+        0
+      ],
+      "effortLimit": 2,
+      "maxLimit": [
+        -1.5700000524520874,
+        0,
+        0
+      ],
+      "minLimit": [
+        1.0470000505447388,
+        0,
+        0
+      ],
+      "name": "l_pinky_mcp_flex",
+      "parentLinkFromJoint": {
+        "rotation": [
+          -0.003579037496820092,
+          0.12420906871557236,
+          0.06682536005973816,
+          0.9899967908859253
+        ],
+        "translation": [
+          -0.03735728561878204,
+          0.0007337598945014179,
+          -0.05529170110821724
+        ]
+      },
+      "type": "Revolute",
+      "inertia": 0.0005
+    },
+    {
+      "axis": [
+        0,
+        1,
+        0
+      ],
+      "effortLimit": 0.20000000298023224,
+      "maxLimit": [
+        0,
+        0.6980000138282776,
+        0
+      ],
+      "minLimit": [
+        0,
+        -0.6980000138282776,
+        0
+      ],
+      "name": "l_pinky_mcp_abd",
+      "parentLinkFromJoint": {
+        "translation": [
+          0,
+          0.0012009802740067244,
+          -0.014499999582767487
+        ]
+      },
+      "type": "Revolute",
+      "inertia": 0.0002
+    },
+    {
+      "axis": [
+        -1,
+        0,
+        0
+      ],
+      "effortLimit": 0.30000001192092896,
+      "maxLimit": [
+        -2.0940001010894775,
+        0,
+        0
+      ],
+      "minLimit": [
+        1.0470000505447388,
+        0,
+        0
+      ],
+      "name": "l_pinky_pip",
+      "parentLinkFromJoint": {
+        "translation": [
+          -9.999999747378752e-05,
+          0,
+          -0.03359999880194664
+        ]
+      },
+      "type": "Revolute",
+      "inertia": 0.0002
+    },
+    {
+      "axis": [
+        -1,
+        0,
+        0
+      ],
+      "effortLimit": 0.30000001192092896,
+      "maxLimit": [
+        -1.5700000524520874,
+        0,
+        0
+      ],
+      "minLimit": [
+        1.0470000505447388,
+        0,
+        0
+      ],
+      "name": "l_pinky_dip",
+      "parentLinkFromJoint": {
+        "translation": [
+          0,
+          0,
+          -0.027499999850988388
+        ]
+      },
+      "type": "Revolute",
+      "inertia": 0.0002
+    },
+    {
+      "name": "joint_l_pinky_nail",
+      "type": "Hard"
+    },
+    {
+      "name": "joint_l_pinky_pad",
+      "type": "Hard"
+    },
+    {
+      "name": "l_pinky_tip_fixed",
+      "parentLinkFromJoint": {
+        "translation": [
+          0,
+          0,
+          -0.024749690666794777
+        ]
+      },
+      "type": "Hard"
+    },
+    {
+      "axis": [
+        -1,
+        0,
+        0
+      ],
+      "effortLimit": 2,
+      "maxLimit": [
+        -1.5700000524520874,
+        0,
+        0
+      ],
+      "minLimit": [
+        1.0470000505447388,
+        0,
+        0
+      ],
+      "name": "l_ring_finger_mcp_flex",
+      "parentLinkFromJoint": {
+        "rotation": [
+          0.0058870078064501286,
+          0.07105772942304611,
+          0.03347715735435486,
+          0.9968928694725037
+        ],
+        "translation": [
+          -0.019751770421862602,
+          0.005592930596321821,
+          -0.06539750099182129
+        ]
+      },
+      "type": "Revolute",
+      "inertia": 0.0005
+    },
+    {
+      "axis": [
+        0,
+        1,
+        0
+      ],
+      "effortLimit": 0.20000000298023224,
+      "maxLimit": [
+        0,
+        0.6980000138282776,
+        0
+      ],
+      "minLimit": [
+        0,
+        -0.6980000138282776,
+        0
+      ],
+      "name": "l_ring_finger_mcp_abd",
+      "parentLinkFromJoint": {
+        "translation": [
+          0,
+          0.0012009801575914025,
+          -0.014499999582767487
+        ]
+      },
+      "type": "Revolute",
+      "inertia": 0.0002
+    },
+    {
+      "axis": [
+        -1,
+        0,
+        0
+      ],
+      "effortLimit": 0.30000001192092896,
+      "maxLimit": [
+        -2.0940001010894775,
+        0,
+        0
+      ],
+      "minLimit": [
+        1.0470000505447388,
+        0,
+        0
+      ],
+      "name": "l_ring_finger_pip",
+      "parentLinkFromJoint": {
+        "translation": [
+          0,
+          0,
+          -0.03759999945759773
+        ]
+      },
+      "type": "Revolute",
+      "inertia": 0.0002
+    },
+    {
+      "axis": [
+        -1,
+        0,
+        0
+      ],
+      "effortLimit": 0.30000001192092896,
+      "maxLimit": [
+        -1.5700000524520874,
+        0,
+        0
+      ],
+      "minLimit": [
+        1.0470000505447388,
+        0,
+        0
+      ],
+      "name": "l_ring_finger_dip",
+      "parentLinkFromJoint": {
+        "translation": [
+          0,
+          0,
+          -0.029500000178813934
+        ]
+      },
+      "type": "Revolute",
+      "inertia": 0.0002
+    },
+    {
+      "name": "joint_l_ring_finger_nail",
+      "type": "Hard"
+    },
+    {
+      "name": "joint_l_ring_finger_pad",
+      "type": "Hard"
+    },
+    {
+      "name": "l_ring_finger_tip_fixed",
+      "parentLinkFromJoint": {
+        "translation": [
+          0,
+          0,
+          -0.024749690666794777
+        ]
+      },
+      "type": "Hard"
+    },
+    {
+      "axis": [
+        -1,
+        0,
+        0
+      ],
+      "effortLimit": 0.6000000238418579,
+      "maxLimit": [
+        -1.2910000085830688,
+        0,
+        0
+      ],
+      "minLimit": [
+        1.187000036239624,
+        0,
+        0
+      ],
+      "name": "l_thumb_cmc_flex",
+      "parentLinkFromJoint": {
+        "rotation": [
+          0.06061699613928795,
+          -0.7200720310211182,
+          -0.2856290936470032,
+          0.6294742822647095
+        ],
+        "translation": [
+          0.01720762625336647,
+          -0.008137968368828297,
+          -0.016459617763757706
+        ]
+      },
+      "type": "Revolute",
+      "inertia": 0.0005
+    },
+    {
+      "axis": [
+        0,
+        1,
+        0
+      ],
+      "effortLimit": 0.6000000238418579,
+      "maxLimit": [
+        0,
+        0.6980000138282776,
+        0
+      ],
+      "minLimit": [
+        0,
+        -1.4839999675750732,
+        0
+      ],
+      "name": "l_thumb_cmc_abd",
+      "parentLinkFromJoint": {
+        "rotation": [
+          -0.09192988276481628,
+          0.3425179421901703,
+          0.023366903886198997,
+          0.9347108602523804
+        ],
+        "translation": [
+          0.00025789494975470006,
+          0.0006316727958619595,
+          -0.014161210507154465
+        ]
+      },
+      "type": "Revolute",
+      "inertia": 0.0005
+    },
+    {
+      "axis": [
+        -1,
+        0,
+        0
+      ],
+      "effortLimit": 0.30000001192092896,
+      "maxLimit": [
+        -1.5700000524520874,
+        0,
+        0
+      ],
+      "minLimit": [
+        1.0470000505447388,
+        0,
+        0
+      ],
+      "name": "l_thumb_mcp",
+      "parentLinkFromJoint": {
+        "rotation": [
+          0.01128952857106924,
+          0.04213309288024902,
+          -0.25857269763946533,
+          0.9650064706802368
+        ],
+        "translation": [
+          -4.3136460590176284e-05,
+          2.4904868041630834e-05,
+          -0.033495642244815826
+        ]
+      },
+      "type": "Revolute",
+      "inertia": 0.0002
+    },
+    {
+      "axis": [
+        -1,
+        0,
+        0
+      ],
+      "effortLimit": 0.30000001192092896,
+      "maxLimit": [
+        -1.5700000524520874,
+        0,
+        0
+      ],
+      "minLimit": [
+        1.0470000505447388,
+        0,
+        0
+      ],
+      "name": "l_thumb_ip",
+      "parentLinkFromJoint": {
+        "translation": [
+          0,
+          0,
+          -0.03500000014901161
+        ]
+      },
+      "type": "Revolute",
+      "inertia": 0.0002
+    },
+    {
+      "name": "joint_l_thumb_nail",
+      "type": "Hard"
+    },
+    {
+      "name": "joint_l_thumb_pad",
+      "type": "Hard"
+    },
+    {
+      "name": "l_thumb_tip_fixed",
+      "parentLinkFromJoint": {
+        "translation": [
+          0,
+          0,
+          -0.029787087813019753
+        ]
+      },
+      "type": "Hard"
+    }
+  ],
+  "links": [
+    {
+      "centerOfMass": [
+        -0.0035484647378325462,
+        0.0034668396692723036,
+        -0.03568606451153755
+      ],
+      "mass": 0.23229999840259552,
+      "momentOfInertia": [
+        9.853624214883894e-05,
+        5.027705469728971e-07,
+        4.684120995079866e-06,
+        0.00015487466589547694,
+        7.299836852325825e-06,
+        7.88065226515755e-05
+      ],
+      "name": "l_wrist",
+      "renderModel": "//hands/wuji_hand2_beta1/left/render/l_wrist_render.glb",
+      "shape": "//hands/wuji_hand2_beta1/left/collision/l_wrist_collision.mochi.h5"
+    },
+    {
+      "centerOfMass": [
+        -1.8318377925652385e-09,
+        0.001781369443051517,
+        -0.007601386867463589
+      ],
+      "mass": 0.011599999852478504,
+      "momentOfInertia": [
+        9.196839982905658e-07,
+        5.282633054951025e-13,
+        -2.2605090813521828e-13,
+        9.079126925826131e-07,
+        9.11687081384116e-09,
+        7.891077871136076e-07
+      ],
+      "name": "l_index_finger_proximal",
+      "parentLink": 0,
+      "renderModel": "//hands/wuji_hand2_beta1/left/render/l_index_finger_proximal_render.glb",
+      "shape": "//hands/wuji_hand2_beta1/left/collision/l_index_finger_proximal_collision.mochi.h5",
+      "actuators": [
+        {
+          "name": "l_FFJ0",
+          "params": {
+            "k_p": 0.37352218155860073,
+            "k_d": 0.01882274330029718,
+            "effort_limit": 2.0
+          },
+          "type": "WUJI_POSITION_SERVO"
+        }
+      ]
+    },
+    {
+      "centerOfMass": [
+        -8.046765742619755e-08,
+        -7.304043379008363e-07,
+        -0.018799379467964172
+      ],
+      "mass": 0.033900000154972076,
+      "momentOfInertia": [
+        7.015841219981667e-06,
+        1.1378772923897884e-10,
+        1.1906245087067724e-11,
+        7.015588835201925e-06,
+        1.9723346567079858e-10,
+        9.144804380412097e-07
+      ],
+      "name": "l_index_finger_proximal_abd",
+      "parentLink": 1,
+      "renderModel": "//hands/wuji_hand2_beta1/left/render/l_index_finger_proximal_abd_render.glb",
+      "shape": "//hands/wuji_hand2_beta1/left/collision/l_index_finger_proximal_abd_collision.mochi.h5",
+      "actuators": [
+        {
+          "name": "l_FFJ1",
+          "params": {
+            "k_p": 0.45592448909027794,
+            "k_d": 0.019798167597016643,
+            "effort_limit": 0.2
+          },
+          "type": "WUJI_POSITION_SERVO"
+        }
+      ]
+    },
+    {
+      "centerOfMass": [
+        5.0733515166712095e-08,
+        0.0002478867827448994,
+        -0.01903483457863331
+      ],
+      "mass": 0.021199999377131462,
+      "momentOfInertia": [
+        2.4052540084085194e-06,
+        4.367715911168801e-11,
+        1.0132195429890523e-11,
+        2.4762650809861952e-06,
+        -5.573787120738416e-08,
+        6.541816333083261e-07
+      ],
+      "name": "l_index_finger_middle",
+      "parentLink": 2,
+      "renderModel": "//hands/wuji_hand2_beta1/left/render/l_index_finger_middle_render.glb",
+      "shape": "//hands/wuji_hand2_beta1/left/collision/l_index_finger_middle_collision.mochi.h5",
+      "actuators": [
+        {
+          "name": "l_FFJ2",
+          "params": {
+            "k_p": 0.24368366649522863,
+            "k_d": 0.010477031953162727,
+            "effort_limit": 0.3
+          },
+          "type": "WUJI_POSITION_SERVO"
+        }
+      ]
+    },
+    {
+      "centerOfMass": [
+        0.0018910958897322416,
+        0.0007022341596893966,
+        -0.0011499034008011222
+      ],
+      "mass": 0.0015607594978064299,
+      "momentOfInertia": [
+        4.786821961033638e-08,
+        1.8303101256833543e-09,
+        -2.6624327187363406e-09,
+        8.954135211070025e-08,
+        4.923311980320477e-09,
+        8.315137023373609e-08
+      ],
+      "name": "l_index_finger_distal",
+      "parentLink": 3,
+      "renderModel": "//hands/wuji_hand2_beta1/left/render/l_index_finger_distal_render.glb",
+      "shape": "//hands/wuji_hand2_beta1/left/collision/l_index_finger_distal_collision.mochi.h5",
+      "actuators": [
+        {
+          "name": "l_FFJ3",
+          "params": {
+            "k_p": 0.18026971340925335,
+            "k_d": 0.008240212147903584,
+            "effort_limit": 0.3
+          },
+          "type": "WUJI_POSITION_SERVO"
+        }
+      ]
+    },
+    {
+      "centerOfMass": [
+        0.00012803678691852838,
+        0.005384318996220827,
+        -0.014219972304999828
+      ],
+      "mass": 0.0014971551718190312,
+      "momentOfInertia": [
+        4.099894468367893e-08,
+        1.869487724348584e-11,
+        -6.040155875464137e-11,
+        5.580122675041821e-08,
+        -1.3364724882336532e-09,
+        1.9208149737437452e-08
+      ],
+      "name": "l_index_finger_nail",
+      "parentLink": 4,
+      "renderModel": "//hands/wuji_hand2_beta1/left/render/l_index_finger_nail_render.glb",
+      "shape": "//hands/wuji_hand2_beta1/left/collision/l_index_finger_nail_collision.mochi.h5"
+    },
+    {
+      "centerOfMass": [
+        0.00012240598152857274,
+        -0.0011111958883702755,
+        -0.014738010242581367
+      ],
+      "mass": 0.005667881574481726,
+      "momentOfInertia": [
+        1.9082281710325333e-07,
+        -1.3408116630864164e-11,
+        -1.5643222828209957e-11,
+        2.1179545228733332e-07,
+        3.926567515577517e-08,
+        1.3814891985930444e-07
+      ],
+      "name": "l_index_finger_pad",
+      "parentLink": 4,
+      "renderModel": "//hands/wuji_hand2_beta1/left/render/l_index_finger_pad_render.glb",
+      "shape": "//hands/wuji_hand2_beta1/left/collision/l_index_finger_pad_collision.mochi.h5",
+      "sensors": [
+        {
+          "name": "l_index_finger_pad_contact_force",
+          "type": "WUJI_CONTACT_FORCE_SENSOR"
+        }
+      ]
+    },
+    {
+      "name": "l_index_finger_tip",
+      "parentLink": 4
+    },
+    {
+      "centerOfMass": [
+        -1.8318377925652385e-09,
+        0.001781369443051517,
+        -0.007601386867463589
+      ],
+      "mass": 0.011599999852478504,
+      "momentOfInertia": [
+        9.196839982905658e-07,
+        5.282633054951025e-13,
+        -2.2605090813521828e-13,
+        9.079126925826131e-07,
+        9.11687081384116e-09,
+        7.891077871136076e-07
+      ],
+      "name": "l_middle_finger_proximal",
+      "parentLink": 0,
+      "renderModel": "//hands/wuji_hand2_beta1/left/render/l_index_finger_proximal_render.glb",
+      "shape": "//hands/wuji_hand2_beta1/left/collision/l_index_finger_proximal_collision.mochi.h5",
+      "actuators": [
+        {
+          "name": "l_MFJ0",
+          "params": {
+            "k_p": 0.3687093483646485,
+            "k_d": 0.01848622487024593,
+            "effort_limit": 2.0
+          },
+          "type": "WUJI_POSITION_SERVO"
+        }
+      ]
+    },
+    {
+      "centerOfMass": [
+        -8.046765742619755e-08,
+        -7.304043379008363e-07,
+        -0.018799379467964172
+      ],
+      "mass": 0.033900000154972076,
+      "momentOfInertia": [
+        7.015841219981667e-06,
+        1.1378772923897884e-10,
+        1.1906245087067724e-11,
+        7.015588835201925e-06,
+        1.9723346567079858e-10,
+        9.144804380412097e-07
+      ],
+      "name": "l_middle_finger_proximal_abd",
+      "parentLink": 8,
+      "renderModel": "//hands/wuji_hand2_beta1/left/render/l_index_finger_proximal_abd_render.glb",
+      "shape": "//hands/wuji_hand2_beta1/left/collision/l_index_finger_proximal_abd_collision.mochi.h5",
+      "actuators": [
+        {
+          "name": "l_MFJ1",
+          "params": {
+            "k_p": 0.4164253443634641,
+            "k_d": 0.018032947229953678,
+            "effort_limit": 0.2
+          },
+          "type": "WUJI_POSITION_SERVO"
+        }
+      ]
+    },
+    {
+      "centerOfMass": [
+        5.0733515166712095e-08,
+        0.0002478867827448994,
+        -0.01903483457863331
+      ],
+      "mass": 0.021199999377131462,
+      "momentOfInertia": [
+        2.4052540084085194e-06,
+        4.367715911168801e-11,
+        1.0132195429890523e-11,
+        2.4762650809861952e-06,
+        -5.573787120738416e-08,
+        6.541816333083261e-07
+      ],
+      "name": "l_middle_finger_middle",
+      "parentLink": 9,
+      "renderModel": "//hands/wuji_hand2_beta1/left/render/l_index_finger_middle_render.glb",
+      "shape": "//hands/wuji_hand2_beta1/left/collision/l_index_finger_middle_collision.mochi.h5",
+      "actuators": [
+        {
+          "name": "l_MFJ2",
+          "params": {
+            "k_p": 0.22218607502059182,
+            "k_d": 0.009592200014076666,
+            "effort_limit": 0.3
+          },
+          "type": "WUJI_POSITION_SERVO"
+        }
+      ]
+    },
+    {
+      "centerOfMass": [
+        0.0018973418045789003,
+        0.0006815309752710164,
+        -0.0011500988621264696
+      ],
+      "mass": 0.0015607569366693497,
+      "momentOfInertia": [
+        4.7868152108776485e-08,
+        1.8262340528707455e-09,
+        -2.6649082940366497e-09,
+        8.95426168767699e-08,
+        4.922481533498058e-09,
+        8.314997046454664e-08
+      ],
+      "name": "l_middle_finger_distal",
+      "parentLink": 10,
+      "renderModel": "//hands/wuji_hand2_beta1/left/render/l_index_finger_distal_render.glb",
+      "shape": "//hands/wuji_hand2_beta1/left/collision/l_index_finger_distal_collision.mochi.h5",
+      "actuators": [
+        {
+          "name": "l_MFJ3",
+          "params": {
+            "k_p": 0.19427606072023446,
+            "k_d": 0.009152994605972402,
+            "effort_limit": 0.3
+          },
+          "type": "WUJI_POSITION_SERVO"
+        }
+      ]
+    },
+    {
+      "centerOfMass": [
+        0.00013830119860358536,
+        0.0053449030965566635,
+        -0.01434215996414423
+      ],
+      "mass": 0.0013887705281376839,
+      "momentOfInertia": [
+        3.816867533146251e-08,
+        1.644376475262721e-11,
+        -9.296942382608364e-11,
+        5.1655060673283515e-08,
+        -1.2410643623894657e-09,
+        1.7708291721874048e-08
+      ],
+      "name": "l_middle_finger_nail",
+      "parentLink": 11,
+      "renderModel": "//hands/wuji_hand2_beta1/left/render/l_index_finger_nail_render.glb",
+      "shape": "//hands/wuji_hand2_beta1/left/collision/l_index_finger_nail_collision.mochi.h5"
+    },
+    {
+      "centerOfMass": [
+        0.00013110159488860518,
+        -0.0015076280105859041,
+        -0.015035620890557766
+      ],
+      "mass": 0.0050582317635416985,
+      "momentOfInertia": [
+        1.7395046825186e-07,
+        -4.8780014749727485e-11,
+        -2.3689859102171695e-11,
+        1.9889775160208956e-07,
+        4.40556959802052e-08,
+        1.27833075680428e-07
+      ],
+      "name": "l_middle_finger_pad",
+      "parentLink": 11,
+      "renderModel": "//hands/wuji_hand2_beta1/left/render/l_index_finger_pad_render.glb",
+      "shape": "//hands/wuji_hand2_beta1/left/collision/l_index_finger_pad_collision.mochi.h5",
+      "sensors": [
+        {
+          "name": "l_middle_finger_pad_contact_force",
+          "type": "WUJI_CONTACT_FORCE_SENSOR"
+        }
+      ]
+    },
+    {
+      "name": "l_middle_finger_tip",
+      "parentLink": 11
+    },
+    {
+      "centerOfMass": [
+        2.128125942135739e-07,
+        0.0017813572194427252,
+        -0.007601449266076088
+      ],
+      "mass": 0.011599999852478504,
+      "momentOfInertia": [
+        9.196640462505457e-07,
+        1.9599118335211774e-12,
+        5.479612857212102e-12,
+        9.079079177354288e-07,
+        9.11613184939597e-09,
+        7.89108867138566e-07
+      ],
+      "name": "l_pinky_proximal",
+      "parentLink": 0,
+      "renderModel": "//hands/wuji_hand2_beta1/left/render/l_index_finger_proximal_render.glb",
+      "shape": "//hands/wuji_hand2_beta1/left/collision/l_index_finger_proximal_collision.mochi.h5",
+      "actuators": [
+        {
+          "name": "l_LFJ0",
+          "params": {
+            "k_p": 0.3655325975433942,
+            "k_d": 0.018616960278988272,
+            "effort_limit": 2.0
+          },
+          "type": "WUJI_POSITION_SERVO"
+        }
+      ]
+    },
+    {
+      "centerOfMass": [
+        -1.556485699438781e-06,
+        -5.454044185171369e-07,
+        -0.016784971579909325
+      ],
+      "mass": 0.030400000512599945,
+      "momentOfInertia": [
+        5.3794569794263225e-06,
+        1.1225383816926282e-10,
+        1.6415968584482243e-10,
+        5.380123184295371e-06,
+        2.3249717429063566e-10,
+        8.177098038686381e-07
+      ],
+      "name": "l_pinky_proximal_abd",
+      "parentLink": 15,
+      "renderModel": "//hands/wuji_hand2_beta1/left/render/l_index_finger_proximal_abd_render.glb",
+      "shape": "//hands/wuji_hand2_beta1/left/collision/l_index_finger_proximal_abd_collision.mochi.h5",
+      "actuators": [
+        {
+          "name": "l_LFJ1",
+          "params": {
+            "k_p": 0.41393113081120425,
+            "k_d": 0.018732177029667153,
+            "effort_limit": 0.2
+          },
+          "type": "WUJI_POSITION_SERVO"
+        }
+      ]
+    },
+    {
+      "centerOfMass": [
+        3.2323615073437395e-07,
+        0.00026449060533195734,
+        -0.017880667001008987
+      ],
+      "mass": 0.018799999728798866,
+      "momentOfInertia": [
+        1.9864739897457184e-06,
+        4.6236625639295426e-11,
+        -4.737479072230988e-12,
+        2.0580710042850114e-06,
+        -4.7056317953320104e-08,
+        5.864144441147801e-07
+      ],
+      "name": "l_pinky_middle",
+      "parentLink": 16,
+      "renderModel": "//hands/wuji_hand2_beta1/left/render/l_index_finger_middle_render.glb",
+      "shape": "//hands/wuji_hand2_beta1/left/collision/l_index_finger_middle_collision.mochi.h5",
+      "actuators": [
+        {
+          "name": "l_LFJ2",
+          "params": {
+            "k_p": 0.22729367621965954,
+            "k_d": 0.00951005441616486,
+            "effort_limit": 0.3
+          },
+          "type": "WUJI_POSITION_SERVO"
+        }
+      ]
+    },
+    {
+      "centerOfMass": [
+        0.002103912876918912,
+        0.0022050070110708475,
+        -0.0010889311088249087
+      ],
+      "mass": 0.00156076077837497,
+      "momentOfInertia": [
+        4.786810237078498e-08,
+        1.9425361319491685e-09,
+        -2.580510027883065e-09,
+        8.907733928253947e-08,
+        5.1952193658166834e-09,
+        8.361561754099966e-08
+      ],
+      "name": "l_pinky_distal",
+      "parentLink": 17,
+      "renderModel": "//hands/wuji_hand2_beta1/left/render/l_index_finger_distal_render.glb",
+      "shape": "//hands/wuji_hand2_beta1/left/collision/l_index_finger_distal_collision.mochi.h5",
+      "actuators": [
+        {
+          "name": "l_LFJ3",
+          "params": {
+            "k_p": 0.1964723550341816,
+            "k_d": 0.009017295241756363,
+            "effort_limit": 0.3
+          },
+          "type": "WUJI_POSITION_SERVO"
+        }
+      ]
+    },
+    {
+      "centerOfMass": [
+        0.00034496886655688286,
+        0.007469876203685999,
+        -0.014052676036953926
+      ],
+      "mass": 0.0013887817040085793,
+      "momentOfInertia": [
+        3.8169133631527075e-08,
+        2.0086066490621057e-11,
+        -9.172173437432818e-11,
+        5.169811956307058e-08,
+        3.2283886675088524e-10,
+        1.766646029466301e-08
+      ],
+      "name": "l_pinky_nail",
+      "parentLink": 18,
+      "renderModel": "//hands/wuji_hand2_beta1/left/render/l_index_finger_nail_render.glb",
+      "shape": "//hands/wuji_hand2_beta1/left/collision/l_index_finger_nail_collision.mochi.h5"
+    },
+    {
+      "centerOfMass": [
+        0.0003386707103345543,
+        0.0006567181553691626,
+        -0.015060932375490665
+      ],
+      "mass": 0.0050586131401360035,
+      "momentOfInertia": [
+        1.7396499174537894e-07,
+        -5.534377123250778e-11,
+        -2.2840696348169764e-11,
+        1.9471308121410402e-07,
+        4.713821510904381e-08,
+        1.3203302273723239e-07
+      ],
+      "name": "l_pinky_pad",
+      "parentLink": 18,
+      "renderModel": "//hands/wuji_hand2_beta1/left/render/l_index_finger_pad_render.glb",
+      "shape": "//hands/wuji_hand2_beta1/left/collision/l_index_finger_pad_collision.mochi.h5",
+      "sensors": [
+        {
+          "name": "l_pinky_pad_contact_force",
+          "type": "WUJI_CONTACT_FORCE_SENSOR"
+        }
+      ]
+    },
+    {
+      "name": "l_pinky_tip",
+      "parentLink": 18
+    },
+    {
+      "centerOfMass": [
+        -1.8318377925652385e-09,
+        0.001781369443051517,
+        -0.007601386867463589
+      ],
+      "mass": 0.011599999852478504,
+      "momentOfInertia": [
+        9.196839982905658e-07,
+        5.282633054951025e-13,
+        -2.2605090813521828e-13,
+        9.079126925826131e-07,
+        9.11687081384116e-09,
+        7.891077871136076e-07
+      ],
+      "name": "l_ring_finger_proximal",
+      "parentLink": 0,
+      "renderModel": "//hands/wuji_hand2_beta1/left/render/l_index_finger_proximal_render.glb",
+      "shape": "//hands/wuji_hand2_beta1/left/collision/l_index_finger_proximal_collision.mochi.h5",
+      "actuators": [
+        {
+          "name": "l_RFJ0",
+          "params": {
+            "k_p": 0.35718151495111794,
+            "k_d": 0.018376606800780005,
+            "effort_limit": 2.0
+          },
+          "type": "WUJI_POSITION_SERVO"
+        }
+      ]
+    },
+    {
+      "centerOfMass": [
+        -8.046765742619755e-08,
+        -7.304043379008363e-07,
+        -0.018799379467964172
+      ],
+      "mass": 0.033900000154972076,
+      "momentOfInertia": [
+        7.015841219981667e-06,
+        1.1378772923897884e-10,
+        1.1906245087067724e-11,
+        7.015588835201925e-06,
+        1.9723346567079858e-10,
+        9.144804380412097e-07
+      ],
+      "name": "l_ring_finger_proximal_abd",
+      "parentLink": 22,
+      "renderModel": "//hands/wuji_hand2_beta1/left/render/l_index_finger_proximal_abd_render.glb",
+      "shape": "//hands/wuji_hand2_beta1/left/collision/l_index_finger_proximal_abd_collision.mochi.h5",
+      "actuators": [
+        {
+          "name": "l_RFJ1",
+          "params": {
+            "k_p": 0.42977315313086895,
+            "k_d": 0.01867700966212433,
+            "effort_limit": 0.2
+          },
+          "type": "WUJI_POSITION_SERVO"
+        }
+      ]
+    },
+    {
+      "centerOfMass": [
+        5.0733515166712095e-08,
+        0.0002478867827448994,
+        -0.01903483457863331
+      ],
+      "mass": 0.021199999377131462,
+      "momentOfInertia": [
+        2.4052540084085194e-06,
+        4.367715911168801e-11,
+        1.0132195429890523e-11,
+        2.4762650809861952e-06,
+        -5.573787120738416e-08,
+        6.541816333083261e-07
+      ],
+      "name": "l_ring_finger_middle",
+      "parentLink": 23,
+      "renderModel": "//hands/wuji_hand2_beta1/left/render/l_index_finger_middle_render.glb",
+      "shape": "//hands/wuji_hand2_beta1/left/collision/l_index_finger_middle_collision.mochi.h5",
+      "actuators": [
+        {
+          "name": "l_RFJ2",
+          "params": {
+            "k_p": 0.24930151196247122,
+            "k_d": 0.01059512120909555,
+            "effort_limit": 0.3
+          },
+          "type": "WUJI_POSITION_SERVO"
+        }
+      ]
+    },
+    {
+      "centerOfMass": [
+        0.001902212155982852,
+        0.0006561834597960114,
+        -0.0011534261284396052
+      ],
+      "mass": 0.0015607597306370735,
+      "momentOfInertia": [
+        4.786822316305006e-08,
+        1.8234687093610091e-09,
+        -2.6668907082694204e-09,
+        8.954383190484805e-08,
+        4.921834939608516e-09,
+        8.314889043958829e-08
+      ],
+      "name": "l_ring_finger_distal",
+      "parentLink": 24,
+      "renderModel": "//hands/wuji_hand2_beta1/left/render/l_index_finger_distal_render.glb",
+      "shape": "//hands/wuji_hand2_beta1/left/collision/l_index_finger_distal_collision.mochi.h5",
+      "actuators": [
+        {
+          "name": "l_RFJ3",
+          "params": {
+            "k_p": 0.2285032688178066,
+            "k_d": 0.009917602877441107,
+            "effort_limit": 0.3
+          },
+          "type": "WUJI_POSITION_SERVO"
+        }
+      ]
+    },
+    {
+      "centerOfMass": [
+        0.0001434853475075215,
+        0.005318181123584509,
+        -0.014346018433570862
+      ],
+      "mass": 0.0013887837994843721,
+      "momentOfInertia": [
+        3.816919758037329e-08,
+        1.6094217972217884e-11,
+        -9.213860924228712e-11,
+        5.165554384234383e-08,
+        -1.2448005959342368e-09,
+        1.7708812194427992e-08
+      ],
+      "name": "l_ring_finger_nail",
+      "parentLink": 25,
+      "renderModel": "//hands/wuji_hand2_beta1/left/render/l_index_finger_nail_render.glb",
+      "shape": "//hands/wuji_hand2_beta1/left/collision/l_index_finger_nail_collision.mochi.h5"
+    },
+    {
+      "centerOfMass": [
+        0.0001368197554256767,
+        -0.0015343076083809137,
+        -0.015039026737213135
+      ],
+      "mass": 0.005058427341282368,
+      "momentOfInertia": [
+        1.7395805684827792e-07,
+        -5.403411051929652e-11,
+        -1.9046786717269448e-11,
+        1.9891363933766115e-07,
+        4.4050825209751565e-08,
+        1.2782562919255724e-07
+      ],
+      "name": "l_ring_finger_pad",
+      "parentLink": 25,
+      "renderModel": "//hands/wuji_hand2_beta1/left/render/l_index_finger_pad_render.glb",
+      "shape": "//hands/wuji_hand2_beta1/left/collision/l_index_finger_pad_collision.mochi.h5",
+      "sensors": [
+        {
+          "name": "l_ring_finger_pad_contact_force",
+          "type": "WUJI_CONTACT_FORCE_SENSOR"
+        }
+      ]
+    },
+    {
+      "name": "l_ring_finger_tip",
+      "parentLink": 25
+    },
+    {
+      "centerOfMass": [
+        0.000791225116699934,
+        0.00178311369381845,
+        -0.007019862998276949
+      ],
+      "mass": 0.010999999940395355,
+      "momentOfInertia": [
+        8.423203894381004e-07,
+        1.7166488675002256e-08,
+        2.7429212678953263e-08,
+        8.359795629075961e-07,
+        2.265477938578897e-08,
+        6.606131250919134e-07
+      ],
+      "name": "l_thumb_proximal",
+      "parentLink": 0,
+      "renderModel": "//hands/wuji_hand2_beta1/left/render/l_thumb_proximal_render.glb",
+      "shape": "//hands/wuji_hand2_beta1/left/collision/l_thumb_proximal_collision.mochi.h5",
+      "actuators": [
+        {
+          "name": "l_THJ0",
+          "params": {
+            "k_p": 0.40844710645048043,
+            "k_d": 0.020882010257063675,
+            "effort_limit": 0.6
+          },
+          "type": "WUJI_POSITION_SERVO"
+        }
+      ]
+    },
+    {
+      "centerOfMass": [
+        1.225524192705052e-05,
+        -4.921446361549897e-06,
+        -0.01356047485023737
+      ],
+      "mass": 0.03359999880194664,
+      "momentOfInertia": [
+        4.2738647607620806e-06,
+        5.5107811647303606e-08,
+        1.3342935645255238e-08,
+        4.362054824014194e-06,
+        -7.49032125213489e-09,
+        1.2373474191917921e-06
+      ],
+      "name": "l_thumb_proximal_abd",
+      "parentLink": 29,
+      "renderModel": "//hands/wuji_hand2_beta1/left/render/l_thumb_proximal_abd_render.glb",
+      "shape": "//hands/wuji_hand2_beta1/left/collision/l_thumb_proximal_abd_collision.mochi.h5",
+      "actuators": [
+        {
+          "name": "l_THJ1",
+          "params": {
+            "k_p": 0.6858601063643346,
+            "k_d": 0.030610939996373314,
+            "effort_limit": 0.6
+          },
+          "type": "WUJI_POSITION_SERVO"
+        }
+      ]
+    },
+    {
+      "centerOfMass": [
+        7.074874019963318e-07,
+        4.311649348665014e-08,
+        -0.01430557295680046
+      ],
+      "mass": 0.03579999879002571,
+      "momentOfInertia": [
+        4.819597052119207e-06,
+        -2.577665025871312e-10,
+        3.271416471051225e-10,
+        4.928587259200867e-06,
+        5.199403407818437e-12,
+        1.326880237684236e-06
+      ],
+      "name": "l_thumb_middle",
+      "parentLink": 30,
+      "renderModel": "//hands/wuji_hand2_beta1/left/render/l_thumb_middle_render.glb",
+      "shape": "//hands/wuji_hand2_beta1/left/collision/l_thumb_middle_collision.mochi.h5",
+      "actuators": [
+        {
+          "name": "l_THJ2",
+          "params": {
+            "k_p": 0.2391112196099482,
+            "k_d": 0.010181475050560962,
+            "effort_limit": 0.3
+          },
+          "type": "WUJI_POSITION_SERVO"
+        }
+      ]
+    },
+    {
+      "centerOfMass": [
+        -6.59521683701314e-05,
+        0.0009306267602369189,
+        -0.0003892635286320001
+      ],
+      "mass": 0.0019179285736754537,
+      "momentOfInertia": [
+        7.999937423619485e-08,
+        -5.667635805117754e-10,
+        3.820432303847099e-10,
+        6.855071887912345e-08,
+        5.412483350397679e-09,
+        6.294975207765674e-08
+      ],
+      "name": "l_thumb_distal",
+      "parentLink": 31,
+      "renderModel": "//hands/wuji_hand2_beta1/left/render/l_thumb_distal_render.glb",
+      "shape": "//hands/wuji_hand2_beta1/left/collision/l_thumb_distal_collision.mochi.h5",
+      "actuators": [
+        {
+          "name": "l_THJ3",
+          "params": {
+            "k_p": 0.20736128319711747,
+            "k_d": 0.00909698844675045,
+            "effort_limit": 0.3
+          },
+          "type": "WUJI_POSITION_SERVO"
+        }
+      ]
+    },
+    {
+      "centerOfMass": [
+        0.00043181850924156606,
+        0.006446319632232189,
+        -0.015383338555693626
+      ],
+      "mass": 0.0019231836777180433,
+      "momentOfInertia": [
+        8.562683717627806e-08,
+        1.0728704591400628e-09,
+        3.1504826525363683e-10,
+        1.1271252731148707e-07,
+        1.257140169741433e-09,
+        3.1557345181454366e-08
+      ],
+      "name": "l_thumb_nail",
+      "parentLink": 32,
+      "renderModel": "//hands/wuji_hand2_beta1/left/render/l_thumb_nail_render.glb",
+      "shape": "//hands/wuji_hand2_beta1/left/collision/l_thumb_nail_collision.mochi.h5"
+    },
+    {
+      "centerOfMass": [
+        0.000170496990904212,
+        -0.0011470470344647765,
+        -0.016368554905056953
+      ],
+      "mass": 0.011747519485652447,
+      "momentOfInertia": [
+        5.832148985973618e-07,
+        4.80216488796259e-09,
+        4.5094070699747135e-09,
+        6.919193538124091e-07,
+        9.920837840127206e-08,
+        4.656430121485755e-07
+      ],
+      "name": "l_thumb_pad",
+      "parentLink": 32,
+      "renderModel": "//hands/wuji_hand2_beta1/left/render/l_thumb_pad_render.glb",
+      "shape": "//hands/wuji_hand2_beta1/left/collision/l_thumb_pad_collision.mochi.h5",
+      "sensors": [
+        {
+          "name": "l_thumb_pad_contact_force",
+          "type": "WUJI_CONTACT_FORCE_SENSOR"
+        }
+      ]
+    },
+    {
+      "name": "l_thumb_tip",
+      "parentLink": 32
+    }
+  ],
+  "name": "wuji_hand2_beta1_actuated_left",
+  "contactOverrides": [
+    {
+      "enable": false,
+      "linkA": "l_wrist",
+      "linkB": "l_index_finger_middle"
+    },
+    {
+      "enable": false,
+      "linkA": "l_wrist",
+      "linkB": "l_index_finger_distal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_wrist",
+      "linkB": "l_index_finger_pad"
+    },
+    {
+      "enable": false,
+      "linkA": "l_wrist",
+      "linkB": "l_middle_finger_middle"
+    },
+    {
+      "enable": false,
+      "linkA": "l_wrist",
+      "linkB": "l_middle_finger_distal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_wrist",
+      "linkB": "l_pinky_middle"
+    },
+    {
+      "enable": false,
+      "linkA": "l_wrist",
+      "linkB": "l_pinky_distal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_wrist",
+      "linkB": "l_ring_finger_middle"
+    },
+    {
+      "enable": false,
+      "linkA": "l_wrist",
+      "linkB": "l_ring_finger_distal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_wrist",
+      "linkB": "l_ring_finger_nail"
+    },
+    {
+      "enable": false,
+      "linkA": "l_wrist",
+      "linkB": "l_ring_finger_pad"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_proximal",
+      "linkB": "l_index_finger_middle"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_proximal",
+      "linkB": "l_index_finger_distal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_proximal",
+      "linkB": "l_index_finger_nail"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_proximal",
+      "linkB": "l_index_finger_pad"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_proximal",
+      "linkB": "l_middle_finger_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_proximal",
+      "linkB": "l_middle_finger_middle"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_proximal",
+      "linkB": "l_middle_finger_distal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_proximal",
+      "linkB": "l_middle_finger_nail"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_proximal",
+      "linkB": "l_middle_finger_pad"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_proximal",
+      "linkB": "l_pinky_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_proximal",
+      "linkB": "l_pinky_proximal_abd"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_proximal",
+      "linkB": "l_pinky_middle"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_proximal",
+      "linkB": "l_pinky_distal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_proximal",
+      "linkB": "l_pinky_nail"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_proximal",
+      "linkB": "l_pinky_pad"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_proximal",
+      "linkB": "l_ring_finger_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_proximal",
+      "linkB": "l_ring_finger_proximal_abd"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_proximal",
+      "linkB": "l_ring_finger_middle"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_proximal",
+      "linkB": "l_ring_finger_distal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_proximal",
+      "linkB": "l_ring_finger_nail"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_proximal",
+      "linkB": "l_ring_finger_pad"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_proximal",
+      "linkB": "l_thumb_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_proximal",
+      "linkB": "l_thumb_proximal_abd"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_proximal_abd",
+      "linkB": "l_index_finger_distal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_proximal_abd",
+      "linkB": "l_index_finger_nail"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_proximal_abd",
+      "linkB": "l_index_finger_pad"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_proximal_abd",
+      "linkB": "l_middle_finger_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_proximal_abd",
+      "linkB": "l_pinky_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_proximal_abd",
+      "linkB": "l_pinky_nail"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_proximal_abd",
+      "linkB": "l_ring_finger_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_proximal_abd",
+      "linkB": "l_thumb_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_proximal_abd",
+      "linkB": "l_thumb_proximal_abd"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_middle",
+      "linkB": "l_middle_finger_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_middle",
+      "linkB": "l_pinky_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_middle",
+      "linkB": "l_ring_finger_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_middle",
+      "linkB": "l_thumb_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_distal",
+      "linkB": "l_middle_finger_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_distal",
+      "linkB": "l_pinky_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_distal",
+      "linkB": "l_ring_finger_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_distal",
+      "linkB": "l_thumb_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_nail",
+      "linkB": "l_middle_finger_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_nail",
+      "linkB": "l_pinky_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_nail",
+      "linkB": "l_ring_finger_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_nail",
+      "linkB": "l_thumb_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_pad",
+      "linkB": "l_middle_finger_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_pad",
+      "linkB": "l_pinky_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_pad",
+      "linkB": "l_ring_finger_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_index_finger_pad",
+      "linkB": "l_thumb_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_middle_finger_proximal",
+      "linkB": "l_middle_finger_middle"
+    },
+    {
+      "enable": false,
+      "linkA": "l_middle_finger_proximal",
+      "linkB": "l_middle_finger_distal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_middle_finger_proximal",
+      "linkB": "l_middle_finger_nail"
+    },
+    {
+      "enable": false,
+      "linkA": "l_middle_finger_proximal",
+      "linkB": "l_middle_finger_pad"
+    },
+    {
+      "enable": false,
+      "linkA": "l_middle_finger_proximal",
+      "linkB": "l_pinky_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_middle_finger_proximal",
+      "linkB": "l_pinky_proximal_abd"
+    },
+    {
+      "enable": false,
+      "linkA": "l_middle_finger_proximal",
+      "linkB": "l_pinky_middle"
+    },
+    {
+      "enable": false,
+      "linkA": "l_middle_finger_proximal",
+      "linkB": "l_pinky_distal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_middle_finger_proximal",
+      "linkB": "l_pinky_nail"
+    },
+    {
+      "enable": false,
+      "linkA": "l_middle_finger_proximal",
+      "linkB": "l_pinky_pad"
+    },
+    {
+      "enable": false,
+      "linkA": "l_middle_finger_proximal",
+      "linkB": "l_ring_finger_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_middle_finger_proximal",
+      "linkB": "l_ring_finger_middle"
+    },
+    {
+      "enable": false,
+      "linkA": "l_middle_finger_proximal",
+      "linkB": "l_ring_finger_distal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_middle_finger_proximal",
+      "linkB": "l_ring_finger_nail"
+    },
+    {
+      "enable": false,
+      "linkA": "l_middle_finger_proximal",
+      "linkB": "l_ring_finger_pad"
+    },
+    {
+      "enable": false,
+      "linkA": "l_middle_finger_proximal",
+      "linkB": "l_thumb_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_middle_finger_proximal",
+      "linkB": "l_thumb_proximal_abd"
+    },
+    {
+      "enable": false,
+      "linkA": "l_middle_finger_proximal_abd",
+      "linkB": "l_middle_finger_distal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_middle_finger_proximal_abd",
+      "linkB": "l_middle_finger_nail"
+    },
+    {
+      "enable": false,
+      "linkA": "l_middle_finger_proximal_abd",
+      "linkB": "l_middle_finger_pad"
+    },
+    {
+      "enable": false,
+      "linkA": "l_middle_finger_proximal_abd",
+      "linkB": "l_pinky_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_middle_finger_proximal_abd",
+      "linkB": "l_thumb_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_middle_finger_proximal_abd",
+      "linkB": "l_thumb_proximal_abd"
+    },
+    {
+      "enable": false,
+      "linkA": "l_middle_finger_middle",
+      "linkB": "l_pinky_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_middle_finger_middle",
+      "linkB": "l_ring_finger_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_middle_finger_middle",
+      "linkB": "l_thumb_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_middle_finger_distal",
+      "linkB": "l_pinky_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_middle_finger_distal",
+      "linkB": "l_ring_finger_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_middle_finger_distal",
+      "linkB": "l_thumb_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_middle_finger_nail",
+      "linkB": "l_pinky_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_middle_finger_nail",
+      "linkB": "l_ring_finger_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_middle_finger_nail",
+      "linkB": "l_thumb_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_middle_finger_pad",
+      "linkB": "l_pinky_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_middle_finger_pad",
+      "linkB": "l_thumb_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_pinky_proximal",
+      "linkB": "l_pinky_middle"
+    },
+    {
+      "enable": false,
+      "linkA": "l_pinky_proximal",
+      "linkB": "l_pinky_distal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_pinky_proximal",
+      "linkB": "l_pinky_nail"
+    },
+    {
+      "enable": false,
+      "linkA": "l_pinky_proximal",
+      "linkB": "l_pinky_pad"
+    },
+    {
+      "enable": false,
+      "linkA": "l_pinky_proximal",
+      "linkB": "l_ring_finger_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_pinky_proximal",
+      "linkB": "l_ring_finger_middle"
+    },
+    {
+      "enable": false,
+      "linkA": "l_pinky_proximal",
+      "linkB": "l_ring_finger_distal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_pinky_proximal",
+      "linkB": "l_ring_finger_nail"
+    },
+    {
+      "enable": false,
+      "linkA": "l_pinky_proximal",
+      "linkB": "l_thumb_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_pinky_proximal",
+      "linkB": "l_thumb_proximal_abd"
+    },
+    {
+      "enable": false,
+      "linkA": "l_pinky_proximal",
+      "linkB": "l_thumb_middle"
+    },
+    {
+      "enable": false,
+      "linkA": "l_pinky_proximal",
+      "linkB": "l_thumb_distal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_pinky_proximal_abd",
+      "linkB": "l_pinky_distal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_pinky_proximal_abd",
+      "linkB": "l_pinky_nail"
+    },
+    {
+      "enable": false,
+      "linkA": "l_pinky_proximal_abd",
+      "linkB": "l_pinky_pad"
+    },
+    {
+      "enable": false,
+      "linkA": "l_pinky_proximal_abd",
+      "linkB": "l_thumb_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_pinky_proximal_abd",
+      "linkB": "l_thumb_proximal_abd"
+    },
+    {
+      "enable": false,
+      "linkA": "l_pinky_middle",
+      "linkB": "l_ring_finger_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_pinky_middle",
+      "linkB": "l_thumb_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_pinky_distal",
+      "linkB": "l_ring_finger_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_pinky_distal",
+      "linkB": "l_thumb_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_pinky_nail",
+      "linkB": "l_ring_finger_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_pinky_nail",
+      "linkB": "l_thumb_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_pinky_pad",
+      "linkB": "l_ring_finger_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_pinky_pad",
+      "linkB": "l_thumb_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_ring_finger_proximal",
+      "linkB": "l_ring_finger_middle"
+    },
+    {
+      "enable": false,
+      "linkA": "l_ring_finger_proximal",
+      "linkB": "l_ring_finger_distal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_ring_finger_proximal",
+      "linkB": "l_ring_finger_nail"
+    },
+    {
+      "enable": false,
+      "linkA": "l_ring_finger_proximal",
+      "linkB": "l_ring_finger_pad"
+    },
+    {
+      "enable": false,
+      "linkA": "l_ring_finger_proximal",
+      "linkB": "l_thumb_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_ring_finger_proximal",
+      "linkB": "l_thumb_proximal_abd"
+    },
+    {
+      "enable": false,
+      "linkA": "l_ring_finger_proximal_abd",
+      "linkB": "l_ring_finger_distal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_ring_finger_proximal_abd",
+      "linkB": "l_ring_finger_nail"
+    },
+    {
+      "enable": false,
+      "linkA": "l_ring_finger_proximal_abd",
+      "linkB": "l_ring_finger_pad"
+    },
+    {
+      "enable": false,
+      "linkA": "l_ring_finger_proximal_abd",
+      "linkB": "l_thumb_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_ring_finger_proximal_abd",
+      "linkB": "l_thumb_proximal_abd"
+    },
+    {
+      "enable": false,
+      "linkA": "l_ring_finger_middle",
+      "linkB": "l_thumb_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_ring_finger_distal",
+      "linkB": "l_thumb_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_ring_finger_nail",
+      "linkB": "l_thumb_proximal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_thumb_proximal",
+      "linkB": "l_thumb_middle"
+    },
+    {
+      "enable": false,
+      "linkA": "l_thumb_proximal",
+      "linkB": "l_thumb_distal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_thumb_proximal",
+      "linkB": "l_thumb_nail"
+    },
+    {
+      "enable": false,
+      "linkA": "l_thumb_proximal",
+      "linkB": "l_thumb_pad"
+    },
+    {
+      "enable": false,
+      "linkA": "l_thumb_proximal_abd",
+      "linkB": "l_thumb_distal"
+    },
+    {
+      "enable": false,
+      "linkA": "l_thumb_proximal_abd",
+      "linkB": "l_thumb_nail"
+    },
+    {
+      "enable": false,
+      "linkA": "l_thumb_proximal_abd",
+      "linkB": "l_thumb_pad"
+    },
+    {
+      "enable": false,
+      "linkA": "l_thumb_middle",
+      "linkB": "l_thumb_nail"
+    },
+    {
+      "enable": false,
+      "linkA": "l_pinky_middle",
+      "linkB": "l_pinky_pad"
+    },
+    {
+      "enable": false,
+      "linkA": "l_pinky_middle",
+      "linkB": "l_pinky_nail"
+    }
+  ]
+}

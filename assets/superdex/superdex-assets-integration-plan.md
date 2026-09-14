@@ -81,10 +81,11 @@ Deliverables:
   that loading the copied assets does not require the source checkout.
 - Keep downloads out of imports, backend construction and the normal test suite.
 
-Required destination layout:
+Required destination layout (amended: the copy lives under `assets/superdex/`,
+alongside this plan document, rather than directly under `assets/`):
 
 ```text
-/home/pc829/UniFamily/unisim/assets/
+/home/pc829/UniFamily/unisim/assets/superdex/
   bots/
   prefabs/
   benchmarks/
@@ -94,13 +95,14 @@ Required destination layout:
 ```
 
 For example, source `assets/bots/arms/fr3_v2/fr3_v2.superdex_bot` maps to
-`/home/pc829/UniFamily/unisim/assets/bots/arms/fr3_v2/fr3_v2.superdex_bot`.
-There is no additional `assets/assets/`, `superdex/` or revision directory.
+`/home/pc829/UniFamily/unisim/assets/superdex/bots/arms/fr3_v2/fr3_v2.superdex_bot`.
+There is no additional `assets/assets/`, `superdex/superdex/` or revision
+directory.
 
-Point `SUPERDEX_ASSETS_PATH` at `/home/pc829/UniFamily/unisim/assets` for loading
-examples and qualification runs. Keep generated provenance and verification
-reports outside the copied asset tree, for example under `docs/`, and leave
-source asset bytes unchanged.
+Point `SUPERDEX_ASSETS_PATH` at `/home/pc829/UniFamily/unisim/assets/superdex`
+for loading examples and qualification runs. Provenance and verification
+reports are kept outside the copied asset tree under `docs/`, and source asset
+bytes remain unchanged.
 
 **Done when:** every source asset is present at the matching destination-relative
 path with the same contents, required dependencies resolve from the destination,
