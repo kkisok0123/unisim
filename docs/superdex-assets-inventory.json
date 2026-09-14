@@ -13,11 +13,11 @@
       "bots/hands/wuji_hand2_beta1_actuated/right/wuji_hand2_beta1_actuated_right.superdex_bot"
     ],
     "historical_upstream_sha": "ed30ce16361329cbbed956173d6a4f5842815d24",
-    "generated_utc": "2026-09-14T07:26:02Z"
+    "generated_utc": "2026-09-14T09:48:25Z"
   },
   "file_count": 892,
-  "total_bytes": 260320423,
-  "tree_digest": "7c1673ee9fe82f78a882a8303540b3c323a8b7d3445126e2c692b43a8c593f74",
+  "total_bytes": 260328578,
+  "tree_digest": "43b236b9f4c7c23b19d2e7f795b2eb8638be7e69d9d030c4feaa30dffa18fa98",
   "root_markers": [
     "bots",
     "prefabs",

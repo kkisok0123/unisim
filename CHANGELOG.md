@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+- Add the stage-2A FR3 viewer demonstration:
+  `uv run scripts/superdex_fr3_viewer.py` opens the unchanged
+  `bots/arms/fr3_v2/fr3_v2.superdex_bot` from the local asset copy through the
+  SuperDex adapter's native `run_playback` interactive path (serial mode, one
+  environment) and runs three observable phases — authored initial-pose hold,
+  bounded joint-space sine movement inside the authored ranges, and a visible
+  `reset()` restore verified numerically. Commands are joint-position targets
+  in radians (`fr3_joint1..7`); a pre-step PD converter clips to explicit
+  87/87/87/87/12/12/12 N·m effort limits (demonstration profile, not hardware
+  ratings). Window close, Ctrl-C and error paths release the viewer and
+  backend; captures and the run report are written to
+  `docs/superdex-fr3-viewer/`. See `docs/superdex.md`.
+- Add `verify_asset_bundle()` to `unisim.backend.superdex.assets`: it
+  re-hashes a local asset tree against the recorded inventory JSON and
+  re-resolves every dependency edge, so qualification runs fail closed on
+  missing, modified or escaped assets without the source checkout.
+  `scripts/copy_superdex_assets.py --report-only` rebuilds the inventory and
+  verifies without copying; the recorded digest was refreshed for the current
+  tree (asset bytes unchanged).
 - Add the verified local SuperDex asset copy under `assets/superdex` (891
   files, ~248 MiB) with SDK-free inventory tooling:
   `unisim.backend.superdex.assets` (module stays outside the public import

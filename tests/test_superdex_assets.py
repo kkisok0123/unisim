@@ -23,6 +23,7 @@ from unisim.backend.superdex.assets import (
     build_inventory,
     hash_tree,
     resolve_reference,
+    verify_asset_bundle,
     verify_bundle,
 )
 
@@ -477,3 +478,103 @@ def test_copy_script_deterministic_reports(tmp_path):
     # on the entry classification, independent of timestamps.
     assert first["tree_digest"] == second["tree_digest"]
     assert first["entries"] == second["entries"]
+
+
+def _run_copy(source, destination, reports, *extra):
+    return subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--source",
+            str(source),
+            "--destination",
+            str(destination),
+            "--report-dir",
+            str(reports),
+            *extra,
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+
+def test_copy_script_report_only_rebuilds_without_modifying(tmp_path):
+    source = _seed_source_repo(tmp_path / "src-repo")
+    destination = tmp_path / "dest" / "assets"
+    reports = tmp_path / "reports"
+    assert _run_copy(source, destination, reports).returncode == 0
+    marker = destination / "bots" / "arms" / "collision" / "base.mochi.h5"
+    before = marker.read_bytes()
+    stamp = marker.stat().st_mtime_ns
+    result = _run_copy(source, destination, reports, "--report-only")
+    assert result.returncode == 0, result.stderr
+    assert marker.read_bytes() == before
+    assert marker.stat().st_mtime_ns == stamp
+
+
+def test_copy_script_report_only_detects_modified_destination(tmp_path):
+    source = _seed_source_repo(tmp_path / "src-repo")
+    destination = tmp_path / "dest" / "assets"
+    reports = tmp_path / "reports"
+    assert _run_copy(source, destination, reports).returncode == 0
+    (destination / "bots" / "arms" / "collision" / "base.mochi.h5").write_bytes(b"tampered")
+    result = _run_copy(source, destination, reports, "--report-only")
+    assert result.returncode == 1
+    assert "comparison failed" in result.stderr
+
+
+def _recorded_report(bundle: Path, tmp_path: Path) -> Path:
+    inventory = build_inventory(bundle, _provenance())
+    report = tmp_path / "recorded-inventory.json"
+    report.write_text(json.dumps(inventory.to_json()), encoding="utf-8")
+    return report
+
+
+def test_verify_asset_bundle_matches_recorded_report(tmp_path):
+    bundle = _seed_bundle(tmp_path / "bundle")
+    report = _recorded_report(bundle, tmp_path)
+    summary = verify_asset_bundle(bundle, report)
+    assert summary["file_count"] > 0
+    assert summary["dependency_errors"] == []
+
+
+def test_verify_asset_bundle_rejects_modified_tree(tmp_path):
+    bundle = _seed_bundle(tmp_path / "bundle")
+    report = _recorded_report(bundle, tmp_path)
+    (bundle / "bots" / "arms" / "render" / "base.glb").write_bytes(b"tampered")
+    with pytest.raises(SuperdexAssetError) as excinfo:
+        verify_asset_bundle(bundle, report)
+    assert excinfo.value.code == "tree_mismatch"
+
+
+def test_verify_asset_bundle_rejects_added_files(tmp_path):
+    bundle = _seed_bundle(tmp_path / "bundle")
+    report = _recorded_report(bundle, tmp_path)
+    (bundle / "bots" / "extra.txt").write_text("unrecorded")
+    with pytest.raises(SuperdexAssetError) as excinfo:
+        verify_asset_bundle(bundle, report)
+    assert excinfo.value.code == "tree_mismatch"
+
+
+def test_verify_asset_bundle_reports_broken_dependency(tmp_path):
+    bundle = _seed_bundle(tmp_path / "bundle")
+    # Record the report against the reduced tree so its digest matches while
+    # one dependency edge is broken; the edge itself must fail the run.
+    (bundle / "bots" / "hands" / "collision" / "palm.mochi.h5").unlink()
+    reduced = build_inventory(bundle, _provenance())
+    report = tmp_path / "recorded-inventory.json"
+    report.write_text(json.dumps(reduced.to_json()), encoding="utf-8")
+    with pytest.raises(SuperdexAssetError) as excinfo:
+        verify_asset_bundle(bundle, report)
+    assert excinfo.value.code == "dependency_missing"
+
+
+def test_verify_asset_bundle_rejects_broken_report(tmp_path):
+    bundle = _seed_bundle(tmp_path / "bundle")
+    report = tmp_path / "inventory.json"
+    report.write_text(json.dumps({"entries": []}), encoding="utf-8")
+    with pytest.raises(SuperdexAssetError, match="schema_unexpected"):
+        verify_asset_bundle(bundle, report)
+    with pytest.raises(SuperdexAssetError, match="schema_unexpected"):
+        verify_asset_bundle(bundle, tmp_path / "absent.json")
+

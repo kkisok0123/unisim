@@ -74,13 +74,9 @@ def collect_provenance(source: Path) -> tuple[Provenance, frozenset[str]]:
     clean = not changed
     root_commits = _git(repo, "rev-list", "--max-parents=0", "HEAD").splitlines()
     initial_commit = root_commits[-1] if root_commits else revision
-    derivative_lines = _git(
-        repo, "diff", "--name-only", initial_commit, "HEAD", "--", "assets"
-    )
+    derivative_lines = _git(repo, "diff", "--name-only", initial_commit, "HEAD", "--", "assets")
     prefix = "assets/"
-    derivatives = frozenset(
-        line[len(prefix) :] for line in derivative_lines.splitlines() if line
-    )
+    derivatives = frozenset(line[len(prefix) :] for line in derivative_lines.splitlines() if line)
     provenance = Provenance(
         source_repo=str(repo),
         source_branch=branch,
@@ -123,9 +119,7 @@ def copy_tree(source: Path, destination: Path) -> int:
     return len(files)
 
 
-def compare_trees(
-    source: Path, destination: Path, preserved: set[str]
-) -> list[str]:
+def compare_trees(source: Path, destination: Path, preserved: set[str]) -> list[str]:
     """Compare relative path sets and SHA-256 hashes between two trees.
 
     ``preserved`` lists destination files that existed before the copy; they
@@ -189,8 +183,7 @@ def write_reports(inventory_json: dict, report_dir: Path) -> None:
     for entry in entries:
         notes = "; ".join(entry["blockers"]) or ", ".join(entry["required_capabilities"])
         lines.append(
-            f"| `{entry['entrypoint']}` | {entry['kind']} | {entry['disposition']}"
-            f" | {notes} |"
+            f"| `{entry['entrypoint']}` | {entry['kind']} | {entry['disposition']} | {notes} |"
         )
     lines += [
         "",
@@ -219,6 +212,14 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="re-copy files even if identical content is already present",
     )
+    parser.add_argument(
+        "--report-only",
+        action="store_true",
+        help=(
+            "do not copy: rebuild the inventory and verify the destination "
+            "against the source without modifying either tree"
+        ),
+    )
     args = parser.parse_args(argv)
 
     source = args.source.resolve()
@@ -227,6 +228,27 @@ def main(argv: list[str] | None = None) -> int:
     if not source.is_dir():
         print(f"error: source directory not found: {source}", file=sys.stderr)
         return 1
+
+    if args.report_only:
+        preserved = set(_relative_files(destination))
+        problems = compare_trees(source, destination, preserved)
+        if problems:
+            print("error: source/destination comparison failed:", file=sys.stderr)
+            for problem in problems[:20]:
+                print(f"  {problem}", file=sys.stderr)
+            return 1
+        provenance, derivatives = collect_provenance(source)
+        inventory = build_inventory(destination, provenance, derivatives)
+        errors, warnings = verify_bundle(inventory, destination)
+        payload = inventory.to_json()
+        payload["verify"] = {"errors": errors, "warnings": warnings}
+        write_reports(payload, report_dir)
+        print(f"tree digest:  {inventory.tree_digest}")
+        print(f"reports:      {(report_dir / INVENTORY_JSON_NAME)}")
+        if errors:
+            print(f"error: {len(errors)} dependency problems:", file=sys.stderr)
+            return 1
+        return 0
 
     print(f"source:      {source}")
     print(f"destination: {destination}")
@@ -257,8 +279,7 @@ def main(argv: list[str] | None = None) -> int:
     write_reports(payload, report_dir)
 
     print(f"tree digest:  {inventory.tree_digest}")
-    print(f"entries:      {len(inventory.entries)} "
-          f"({payload['entry_counts_by_kind']})")
+    print(f"entries:      {len(inventory.entries)} ({payload['entry_counts_by_kind']})")
     print(f"dispositions: {payload['disposition_counts']}")
     if warnings:
         print(f"warnings:     {len(warnings)}")

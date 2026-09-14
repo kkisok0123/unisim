@@ -760,6 +760,86 @@ def build_inventory(
     )
 
 
+def load_recorded_inventory(report: Path) -> dict[str, Any]:
+    """Load a recorded inventory JSON report written by ``build_inventory``.
+
+    Raises :class:`SuperdexAssetError` (``schema_unexpected``) when the file is
+    absent or not the expected JSON shape.
+    """
+    try:
+        data = json.loads(Path(report).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise SuperdexAssetError(
+            "schema_unexpected", f"{report}: {exc}"
+        ) from exc
+    if not isinstance(data, dict) or not isinstance(data.get("provenance"), dict):
+        raise SuperdexAssetError(
+            "schema_unexpected", f"{report}: not a recorded asset inventory report"
+        )
+    return data
+
+
+def verify_asset_bundle(bundle_root: Path, report: Path) -> dict[str, Any]:
+    """Verify a local asset tree against one recorded inventory report.
+
+    The recorded ``tree_digest``, ``file_count`` and ``total_bytes`` are
+    compared against a fresh hash of ``bundle_root``, and every entrypoint
+    manifest is re-parsed so its dependency edges are re-resolved against the
+    tree on disk.  Nothing is downloaded and the original source checkout is
+    never consulted.
+
+    Returns a summary dict with ``tree_digest``, ``file_count``,
+    ``total_bytes``, ``dependency_errors`` and ``warnings``.  Raises
+    :class:`SuperdexAssetError` on any hash/count mismatch (code
+    ``tree_mismatch``), missing entrypoint (``dependency_missing``) or
+    dependency failure, so a qualification run fails when its required assets
+    are missing or modified.
+    """
+    bundle_root = Path(bundle_root).resolve()
+    recorded = load_recorded_inventory(report)
+    for key in ("tree_digest", "file_count", "total_bytes"):
+        if not isinstance(recorded.get(key), (int, str)):
+            raise SuperdexAssetError(
+                "schema_unexpected", f"{report}: recorded {key} is missing"
+            )
+    digest, file_count, total_bytes = hash_tree(bundle_root)
+    if (digest, file_count, total_bytes) != (
+        recorded["tree_digest"],
+        recorded["file_count"],
+        recorded["total_bytes"],
+    ):
+        raise SuperdexAssetError(
+            "tree_mismatch",
+            f"{bundle_root}: tree verification failed (recorded "
+            f"{recorded['file_count']} files / {recorded['total_bytes']} bytes / "
+            f"{recorded['tree_digest'][:12]}, found {file_count} files / "
+            f"{total_bytes} bytes / {digest[:12]})",
+        )
+    # The provenance block travels with the report; rebuild the entries over
+    # the tree on disk so dependency resolution is rechecked, not trusted.
+    provenance = Provenance(
+        **{
+            field: (
+                tuple(recorded["provenance"][field])
+                if field == "local_derivative_paths"
+                else recorded["provenance"][field]
+            )
+            for field in Provenance.__dataclass_fields__
+        }
+    )
+    inventory = build_inventory(bundle_root, provenance)
+    errors, warnings = verify_bundle(inventory, bundle_root)
+    if errors:
+        raise SuperdexAssetError("dependency_missing", "; ".join(sorted(errors)))
+    return {
+        "tree_digest": digest,
+        "file_count": file_count,
+        "total_bytes": total_bytes,
+        "dependency_errors": errors,
+        "warnings": warnings,
+    }
+
+
 def verify_bundle(inventory: Inventory, bundle_root: Path) -> tuple[list[str], list[str]]:
     """Check every dependency edge of an inventory against the bundle on disk.
 
