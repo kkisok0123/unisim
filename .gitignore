@@ -9,3 +9,4 @@ __pycache__/
 assets/**
 !assets/superdex/
 !assets/superdex/superdex-assets-integration-plan.md
+!assets/superdex/README.md
