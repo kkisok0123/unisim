@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+- Add the stage-3 compatible-bots qualification:
+  `uv run scripts/superdex_bot_qualify.py` runs the stage-2B check set for
+  eleven registered candidates — the fr3/fr3_v2 arms, both openarm_v20 arms,
+  googly_eyes, fr3_v2_with_eyes and the recipe compositions openarm_v20,
+  openarm_v20_wuji, fr3_dg5f_short (left/right) and fr3_v2_allegro_v5_right —
+  each against a direct SuperDex SDK scene driven with identical inputs, with
+  a recipe-accounting check that every base/attachment reference resolves
+  inside the verified bundle. Every adapter-vs-SDK deviation was exactly 0.0;
+  no adapter extension was needed because the SDK compiles recipes into the
+  native loader's supported profile. Two checks were generalized for light
+  distal links: control verifies the adapter's per-joint response matrix
+  matches the SDK matrix (FR3's single-joint dominance does not hold for the
+  openarm wrist), and the 10 rad/s sweep-velocity guard now applies only to
+  the pure fr3 arms. Reports and the compatibility table land in
+  `docs/superdex-bots-qualification/`, including precise blockers for every
+  remaining bot (floating roots, sensor components, mechanical cycles,
+  spherical joints, the 0-DoF torso's batch rejection). The stage-2A viewer
+  gained `--bot <key>` with shared per-asset control profiles
+  (`scripts/superdex_bot_profiles.py`); the pytest subset is
+  `tests/test_superdex_bot_qualification.py` (opt-in via
+  `SUPERDEX_ASSETS_PATH`). See `docs/superdex.md`.
 - Add the stage-2B FR3 adapter qualification:
   `uv run scripts/superdex_fr3_qualify.py` loads the unchanged
   `bots/arms/fr3_v2/fr3_v2.superdex_bot` through the SuperDex adapter and runs

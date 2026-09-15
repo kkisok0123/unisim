@@ -1,0 +1,290 @@
+{
+  "bot": "bots/arm_hand_combos/openarm_v20/openarm_v20.superdex_bot",
+  "key": "openarm_v20",
+  "sim_dt": 0.002,
+  "decimation": 8,
+  "actuator_order": [
+    "arm_openarm_left_joint1",
+    "arm_openarm_left_joint2",
+    "arm_openarm_left_joint3",
+    "arm_openarm_left_joint4",
+    "arm_openarm_left_joint5",
+    "arm_openarm_left_joint6",
+    "arm_openarm_left_joint7",
+    "openarm_left_finger_joint1",
+    "openarm_left_finger_joint2",
+    "arm_openarm_right_joint1",
+    "arm_openarm_right_joint2",
+    "arm_openarm_right_joint3",
+    "arm_openarm_right_joint4",
+    "arm_openarm_right_joint5",
+    "arm_openarm_right_joint6",
+    "arm_openarm_right_joint7",
+    "openarm_right_finger_joint1",
+    "openarm_right_finger_joint2"
+  ],
+  "effort_limits_nm": [
+    40.0,
+    40.0,
+    27.0,
+    27.0,
+    7.0,
+    7.0,
+    7.0,
+    7.0,
+    7.0,
+    40.0,
+    40.0,
+    27.0,
+    27.0,
+    7.0,
+    7.0,
+    7.0,
+    7.0,
+    7.0
+  ],
+  "pd_gains": {
+    "kp": [
+      60.0,
+      60.0,
+      60.0,
+      60.0,
+      60.0,
+      60.0,
+      60.0,
+      60.0,
+      60.0,
+      60.0,
+      60.0,
+      60.0,
+      60.0,
+      60.0,
+      60.0,
+      60.0,
+      60.0,
+      60.0
+    ],
+    "kd": [
+      3.4641016151377544,
+      3.4641016151377544,
+      3.4641016151377544,
+      3.4641016151377544,
+      3.4641016151377544,
+      3.4641016151377544,
+      3.4641016151377544,
+      3.4641016151377544,
+      3.4641016151377544,
+      3.4641016151377544,
+      3.4641016151377544,
+      3.4641016151377544,
+      3.4641016151377544,
+      3.4641016151377544,
+      3.4641016151377544,
+      3.4641016151377544,
+      3.4641016151377544,
+      3.4641016151377544
+    ],
+    "dof_armature": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "armature_floor": 0.05
+  },
+  "sweep_amplitudes_rad": [
+    0.3,
+    0.3,
+    0.3,
+    0.3,
+    0.3,
+    0.3,
+    0.3,
+    0.2094,
+    0.2094,
+    0.3,
+    0.3,
+    0.3,
+    0.3,
+    0.3,
+    0.3,
+    0.3,
+    0.2094,
+    0.2094
+  ],
+  "tolerances": {
+    "structure": 1e-06,
+    "trajectory": 1e-07,
+    "reset": 1e-06
+  },
+  "checks": {
+    "recipe_accounting": {
+      "passed": true,
+      "recipe": true,
+      "edges": [
+        {
+          "kind": "base",
+          "reference": "//torsos/openarm_v20/openarm_v20_torso.superdex_bot",
+          "resolution_rule": "root-marker",
+          "resolved": true,
+          "target": "bots/torsos/openarm_v20/openarm_v20_torso.superdex_bot"
+        },
+        {
+          "kind": "AttachBot",
+          "reference": "//arms/openarm_v20/left/openarm_v20_left_arm.superdex_bot",
+          "resolution_rule": "root-marker",
+          "resolved": true,
+          "target": "bots/arms/openarm_v20/left/openarm_v20_left_arm.superdex_bot"
+        },
+        {
+          "kind": "ReplaceLinkWithBot",
+          "reference": "//grippers/openarm_v20/left/openarm_v20_left_gripper.superdex_bot",
+          "resolution_rule": "root-marker",
+          "resolved": true,
+          "target": "bots/grippers/openarm_v20/left/openarm_v20_left_gripper.superdex_bot"
+        },
+        {
+          "kind": "AttachBot",
+          "reference": "//arms/openarm_v20/right/openarm_v20_right_arm.superdex_bot",
+          "resolution_rule": "root-marker",
+          "resolved": true,
+          "target": "bots/arms/openarm_v20/right/openarm_v20_right_arm.superdex_bot"
+        },
+        {
+          "kind": "ReplaceLinkWithBot",
+          "reference": "//grippers/openarm_v20/right/openarm_v20_right_gripper.superdex_bot",
+          "resolution_rule": "root-marker",
+          "resolved": true,
+          "target": "bots/grippers/openarm_v20/right/openarm_v20_right_gripper.superdex_bot"
+        }
+      ]
+    },
+    "structure": {
+      "passed": true,
+      "body_inventory_ok": true,
+      "joint_inventory_ok": true,
+      "control_order_ok": true,
+      "default_qpos_max_dev_rad": 0.0,
+      "dynamic_body_mass_max_dev_kg": 0.0,
+      "body_pos_max_dev_m": 0.0,
+      "aabb_max_dev_m": 0.0,
+      "joint_range_max_dev_rad": 0.0
+    },
+    "control": {
+      "passed": true,
+      "probe_torque_nm": 3.5,
+      "control_columns_reach_own_joint": true,
+      "response_matrix_vs_sdk_max_dev_rad_s": 0.0,
+      "response_matrix_diagonal": [
+        0.309115,
+        0.615046,
+        2.254927,
+        1.197671,
+        43.975319,
+        18.830343,
+        31.380682,
+        -8.795284,
+        -9.735632,
+        0.30963,
+        0.615535,
+        2.206058,
+        1.197293,
+        43.398991,
+        18.874317,
+        30.652435,
+        -5.718535,
+        -6.493577
+      ],
+      "effort_clip_exact": true,
+      "effort_clip_max_dev_rad": 0.0
+    },
+    "trajectory_equivalence": {
+      "passed": true,
+      "physics_steps": 1040,
+      "sweep_amplitudes_rad": [
+        0.3,
+        0.3,
+        0.3,
+        0.3,
+        0.3,
+        0.3,
+        0.3,
+        0.2094,
+        0.2094,
+        0.3,
+        0.3,
+        0.3,
+        0.3,
+        0.3,
+        0.3,
+        0.3,
+        0.2094,
+        0.2094
+      ],
+      "batch_vs_sdk_max_dev_rad": 0.0,
+      "serial_vs_sdk_max_dev_rad": 0.0,
+      "reference_max_abs_qvel_rad_s": 228.83050537109375,
+      "max_abs_qvel_bound_rad_s": null,
+      "finite_state": true
+    },
+    "contact_recovery": {
+      "passed": true,
+      "penetrating_joint": "arm_openarm_left_joint2",
+      "penetrating_qpos_rad": -4.1161,
+      "set_state_agreement_rad": 0.0,
+      "reference_contact_steps": 139,
+      "adapter_vs_sdk_max_dev_rad": 0.0
+    },
+    "reset": {
+      "passed": true,
+      "whole_reset_max_dev_rad": 0.0,
+      "reset_matches_sdk_default_rad": 0.0,
+      "selective_reset_env0_dev_rad": 0.0,
+      "selective_reset_env1_untouched": true,
+      "roundtrip_qpos_dev_rad": 3.365909351238372e-08,
+      "roundtrip_qvel_dev_rad": 1.7969047361177104e-09
+    },
+    "isolation": {
+      "passed": true,
+      "env0_vs_single_max_dev_rad": 0.0,
+      "env1_vs_single_max_dev_rad": 0.0
+    },
+    "lifecycle": {
+      "passed": true,
+      "cycles": 3,
+      "reset_deviations_rad": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  },
+  "elapsed_seconds": 7.11,
+  "provenance": {
+    "code_commit": "b90249ac4487382af45830e069efddaaf9a60aa0",
+    "branch": "superdex-assets-import",
+    "asset_root": "/home/pc829/UniFamily/unisim/assets/superdex",
+    "tree_digest": "decf1b36a59a3479cd5efa40057b76e3e82e653eeeb3a0ef37ff9254bd598010",
+    "sdk_precision": "float32",
+    "gravity": [
+      0,
+      0,
+      -9.81
+    ],
+    "visual_verification": "separate (scripts/superdex_fr3_viewer.py --bot <key>)"
+  }
+}

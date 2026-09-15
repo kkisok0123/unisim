@@ -1,10 +1,11 @@
 # Superdex asset integration plan
 
-Status: revised on 2026-09-14. Stages 1 (local asset copy and inventory), 2A
-(FR3 visualization through UniSim) and 2B (FR3 adapter qualification) are
-complete. The next step is stage 3 compatible robots and compositions,
-followed by capability extensions. This document describes planned work;
-it does not establish runtime support for additional assets.
+Status: revised on 2026-09-15. Stages 1 (local asset copy and inventory), 2A
+(FR3 visualization through UniSim), 2B (FR3 adapter qualification) and 3
+(compatible robots and compositions) are complete. The next step is stage 4
+native floating roots, followed by capability extensions. This document
+describes planned work; it does not establish runtime support for additional
+assets.
 
 ## Objective and approach
 
@@ -212,7 +213,17 @@ through the existing native loader and
 **Done when:** the unchanged FR3 passes the physics and lifecycle checks below
 through UniSim, with visual verification reported separately.
 
-### 3. Reuse the adapter and viewer for compatible robots and compositions
+### 3. Reuse the adapter and viewer for compatible robots and compositions — complete
+
+Built as `scripts/superdex_bot_qualify.py` with `scripts/superdex_bot_profiles.py`
+(shared candidate/control registry), reports plus the compatibility table under
+`docs/superdex-bots-qualification/`, and the pytest subset in
+`tests/test_superdex_bot_qualification.py` (opt-in via
+`SUPERDEX_ASSETS_PATH`); the stage-2A viewer gained `--bot <key>`. See the
+compatible-bots section in `docs/superdex.md`. Eleven bots qualified with every
+adapter-vs-SDK deviation exactly 0.0; no adapter extension was needed because
+the SDK compiles recipes into the native loader's supported profile. Every
+remaining bot has a precise recorded blocker. Proceed to stage 4.
 
 - Qualify other fixed-base arms and simple bots using a parameterized runner.
 - Resolve Mod Bot recipes through the SDK and inspect the compiled robot,
@@ -321,7 +332,7 @@ For each new capability, follow the same process:
 
 The immediate sequence is **stage 1 complete → stage 2A visualization
 complete → stage 2B FR3 adapter qualification complete → stage 3 compatible
-robots**.
+robots complete → stage 4 native floating roots**.
 
 Stage 4 extends robot state support; stage 5 can build on the qualified fixed-base
 route independently of floating roots. The Wuji target in stage 6 depends on
@@ -338,9 +349,13 @@ The next three pull requests are:
    execution; see `scripts/superdex_fr3_qualify.py`,
    `docs/superdex-fr3-qualification/` and
    `tests/test_superdex_fr3_qualification.py`. No adapter fix was required.
-3. **Reusable bot visualization and qualification (3):** a selectable-asset viewer
-   example, parameterized checks, recipe adapter work where needed and a
-   compatibility table for direct bots and recipes.
+3. **Reusable bot visualization and qualification (3): complete** — a
+   selectable-asset viewer example (`--bot <key>`), parameterized checks over
+   shared profiles, no recipe adapter work needed (the SDK compiles recipes
+   inside the native profile) and a compatibility table for direct bots and
+   recipes; see `scripts/superdex_bot_qualify.py`,
+   `scripts/superdex_bot_profiles.py`, `docs/superdex-bots-qualification/`
+   and `tests/test_superdex_bot_qualification.py`.
 
 ## Validation and reporting
 

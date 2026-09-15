@@ -213,6 +213,69 @@ The regression subset is `tests/test_superdex_fr3_qualification.py`
 assets or runtime). The pre-existing mass-metadata regression in
 `tests/test_superdex.py` stays a separate test.
 
+## Compatible bots and recipe compositions (stage 3)
+
+One parameterized runner applies the stage-2B check set to every registered
+candidate — native fixed-base bots and Mod Bot recipe compositions — against
+direct SDK execution; the stage-2A viewer demonstration gained `--bot <key>`
+for the same assets:
+
+```sh
+export SUPERDEX_ASSETS_PATH="$PWD/assets/superdex"
+uv run scripts/superdex_bot_qualify.py                  # all candidates + blocked probes
+uv run scripts/superdex_bot_qualify.py --bots openarm_v20_wuji,googly_eyes
+uv run scripts/superdex_fr3_viewer.py --bot openarm_v20 # visual check, serial + 1 env
+```
+
+Candidate selection and per-asset control profiles live in
+`scripts/superdex_bot_profiles.py` (explicit effort limits where authored
+limits are unlimited, `kp` with critically damped `kd` from authored armature,
+per-joint sweep amplitudes bounded by the authored ranges). Eleven bots
+qualified with every adapter-vs-SDK deviation exactly 0.0: the fr3 and fr3_v2
+arms, both openarm_v20 arms, googly_eyes, fr3_v2_with_eyes, and the recipe
+compositions `openarm_v20` (18 joints), `openarm_v20_wuji` (54),
+`fr3_dg5f_short` left/right (27) and `fr3_v2_allegro_v5_right` (23). Reports
+and the compatibility table land in `docs/superdex-bots-qualification/`.
+
+Recipe compositions need no adapter extension for this set: the SDK resolves
+`base` plus `AttachBot`/`ReplaceLinkWithBot` references (including `//`-rooted
+paths and prefixes) into one compiled prefab at load time, and the compiled
+results stay inside the native loader's profile (HARD root, fixed/revolute
+joints, no components). The runner adds a recipe-accounting check that every
+base/attachment reference resolves inside the verified bundle, and structure
+checks compare against the *compiled* SDK actor, not a sum of parts
+(`ReplaceLinkWithBot` merges links: openarm_v20's components sum to 28 links,
+the compiled robot has 26).
+
+Two stage-2B check generalizations were required. The FR3 control-ordering
+probe (torqued joint = most affected DoF) does not hold for light distal
+links — openarm's wrist responds more to a proximal torque than to its own —
+so control now verifies the adapter's per-joint velocity *response matrix*
+matches the direct SDK matrix exactly plus a nonzero diagonal (each control
+column reaches its own joint). The FR3 10 rad/s sweep-velocity guard is kept
+only on the pure fr3 arms; near-massless distal joints (googly_eyes,
+hand/finger combos) legitimately oscillate far faster while staying
+adapter-vs-SDK exact. Recorded SDK behaviors, not adapter defects: the debug
+SDK build asserts natively if CONTACT_POINTS queries are registered on a
+scene whose earlier rollout produced deep self-collisions (the runner uses a
+fresh reference scene per contact probe), and the openarm arms' authored
+armature of 0 needs a damping floor (`armature_floor=0.05` in the profile) —
+with the default floor the viewer sweep diverges the solver deterministically
+around frame 141 of the demo.
+
+Every non-registered bot has a precise recorded blocker (see
+`docs/superdex-bots-qualification/blocked-probes.json`): floating FREE roots
+(stage 4), actuator/sensor components (stage 6; the dg5f *seed* variants and
+`fr3_dg5f_short_seed` carry 5 each), mechanical cycles (`fr3_v2_2f_85`
+compiles 2 from its 2f_85 attachment; `2f_85` also has a FREE root),
+SPHERICAL joints (oculus_xr hands), and the 0-DoF `openarm_v20_torso`, which
+loads in serial mode but is rejected by the default batch executor
+(`SceneBatchExecutor requires articulated actors with DoFs`). The pytest
+regression subset is `tests/test_superdex_bot_qualification.py` (6 tests,
+opt-in via `SUPERDEX_ASSETS_PATH`); it also guards that every stage-1
+recipe-candidate is either qualified or precisely blocked, so silent drops
+fail CI.
+
 ## Audited MJCF profile
 
 The cold importer accepts one articulation tree, one optional free root,

@@ -14,13 +14,18 @@ demonstration runs three distinct, observable phases:
 3. Reset: ``backend.reset()`` restores the authored default pose in view, and
    the restored joint state is checked numerically.
 
+Stage 3 adds ``--bot <key>`` to reuse the same demonstration for any bot
+registered in ``scripts/superdex_bot_profiles.py`` (fixed-base arms and
+recipe compositions), each with its explicit per-asset control profile.
+
 Close the window to exit; the viewer and backend are released in ``finally``
 blocks, including on errors. Requires the optional SuperDex runtime, Polyscope
 >= 2.5.0 and a graphical session (or ``--frames N`` for an offscreen smoke
 run). Asset setup:
 
     export SUPERDEX_ASSETS_PATH="$PWD/assets/superdex"
-    uv run scripts/superdex_fr3_viewer.py
+    uv run scripts/superdex_fr3_viewer.py                     # fr3_v2
+    uv run scripts/superdex_fr3_viewer.py --bot openarm_v20_wuji
 """
 
 from __future__ import annotations
@@ -37,35 +42,32 @@ from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPOSITORY_ROOT / "src"))
+sys.path.insert(0, str(REPOSITORY_ROOT / "scripts"))
+
+from superdex_bot_profiles import (  # noqa: E402
+    DEFAULT_KEY,
+    PROFILES,
+    resolve_gains,
+    sweep_amplitudes,
+)
 
 from unisim.backend.superdex.assets import verify_asset_bundle  # noqa: E402
 
-BOT_RELPATH = "bots/arms/fr3_v2/fr3_v2.superdex_bot"
 INVENTORY_REPORT = REPOSITORY_ROOT / "docs" / "superdex-assets-inventory.json"
 
 SIM_DT = 0.002
 CTRL_DT = 1.0 / 60.0
 DECIMATION = int(round(CTRL_DT / SIM_DT))
 
-# Explicit stage-2A control profile. Commands are joint-position targets in
-# radians for a pre-step PD converter whose outputs are motor torques in N·m,
-# clipped to the effort limits. Actuator order follows the authored single-DoF
-# joint names fr3_joint1..fr3_joint7. Values define this demonstration
-# profile, not verified FR3 hardware ratings.
-EFFORT_LIMITS = [87.0, 87.0, 87.0, 87.0, 12.0, 12.0, 12.0]
-KP = [400.0, 400.0, 400.0, 400.0, 20.0, 20.0, 20.0]
-KD = [
-    2.0 * math.sqrt(kp * inertia)
-    for kp, inertia in zip(KP, [0.11, 0.11, 0.06, 0.03, 0.01, 0.005, 0.005])
-]
-
-# Phase schedule in wall-clock demo seconds and bounded amplitudes (rad),
-# applied per joint around the authored default pose with a phase shift.
+# Phase schedule in wall-clock demo seconds; the movement amplitude per joint
+# comes from the bot profile bounded by the authored reachable range.
 HOLD_SECONDS = 2.0
 MOVE_SECONDS = 6.0
 SETTLE_SECONDS = 1.0
-MOVE_AMPLITUDES = [0.35, 0.25, 0.35, 0.30, 0.25, 0.25, 0.35]
 MOVE_PERIOD = 2.0
+# Fraction of the reachable range around the default pose used when bounding
+# the requested sweep amplitude (kept identical to the qualification runner).
+REACHABLE_FRACTION = 0.6
 
 
 def _png_chunk(tag: bytes, data: bytes) -> bytes:
@@ -115,8 +117,49 @@ def resolve_assets_root(cli_value: str | None) -> Path:
     return root
 
 
+def _authored_joint_metadata(bot_path: Path):
+    """(names, ranges, efforts, armature) of a prefab's active joints.
+
+    Prefab parsing needs no process runtime; the SDK's verbose joint dumps on
+    recipe compilation are silenced.
+    """
+    import contextlib
+    import io
+
+    import numpy as np
+    import superdex.physics as physics
+    import superdex.robotics as robotics
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        cfg = robotics.load_bot_prefab_from_file(str(bot_path))
+    jt = physics.ArticulatedJointType
+    names, ranges, efforts, armature = [], [], [], []
+    for joint in cfg.joints:
+        if joint.type == jt.HARD:
+            continue
+        names.append(str(joint.name))
+        if joint.type == jt.REVOLUTE and joint.min_limit is not None:
+            axis = np.asarray(joint.axis, dtype=float)
+            axis = axis / np.linalg.norm(axis)
+            ranges.append(
+                [float(np.dot(joint.min_limit, axis)), float(np.dot(joint.max_limit, axis))]
+            )
+        else:
+            ranges.append([-math.inf, math.inf])
+        efforts.append(float(joint.effort_limit))
+        armature.append(float(joint.inertia or 0))
+    return tuple(names), ranges, efforts, armature
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument(
+        "--bot",
+        type=str,
+        default=DEFAULT_KEY,
+        choices=sorted(PROFILES),
+        help=f"profile key (default {DEFAULT_KEY}; see scripts/superdex_bot_profiles.py)",
+    )
     parser.add_argument(
         "--assets",
         type=str,
@@ -126,8 +169,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--out",
         type=Path,
-        default=REPOSITORY_ROOT / "docs" / "superdex-fr3-viewer",
-        help="directory for captures and the run report",
+        default=None,
+        help="directory for captures and the run report "
+        "(default docs/superdex-bots-viewer/<key> or docs/superdex-fr3-viewer for fr3_v2)",
     )
     parser.add_argument(
         "--frames",
@@ -142,8 +186,15 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
+    profile = PROFILES[args.bot]
     root = resolve_assets_root(args.assets)
-    bot_path = root / BOT_RELPATH
+    bot_path = root / profile.relpath
+    if args.out is None:
+        args.out = (
+            REPOSITORY_ROOT / "docs" / "superdex-fr3-viewer"
+            if args.bot == "fr3_v2"
+            else REPOSITORY_ROOT / "docs" / "superdex-bots-viewer" / args.bot
+        )
     if args.skip_verification:
         print("asset verification: skipped")
     else:
@@ -159,30 +210,35 @@ def main(argv: list[str] | None = None) -> int:
     from unisim.scene import SceneCfg
 
     args.out.mkdir(parents=True, exist_ok=True)
+
+    import numpy as np
+
+    # Resolve the control profile from the authored prefab before any backend
+    # exists (prefab parsing needs no process runtime): explicit effort limits
+    # and critically damped kd from the authored armature.
+    names, _, efforts, armature = _authored_joint_metadata(bot_path)
+    try:
+        resolved = resolve_gains(profile, names, armature, efforts)
+    except ValueError as exc:
+        raise SystemExit(f"error: {exc}") from exc
+
     backend = create_backend(
         "superdex",
         SceneCfg(str(bot_path)),
         1,
         SIM_DT,
-        base_name="fr3_link0",
         superdex_execution_mode="serial",
         superdex_num_workers=0,
-        superdex_effort_limits=EFFORT_LIMITS,
+        superdex_effort_limits=list(resolved.effort_limits),
     )
-
-    import numpy as np
 
     q0 = backend.get_default_qpos()
     joint_ranges = backend.get_joint_range()
     # Movement stays inside the authored joint ranges around the default pose.
-    for i, amplitude in enumerate(MOVE_AMPLITUDES):
-        reachable = min(q0[i] - joint_ranges[i][0], joint_ranges[i][1] - q0[i])
-        if amplitude > reachable:
-            raise SystemExit(
-                f"demo amplitude exceeds joint range for {i}: {amplitude} > {reachable}"
-            )
-
-    kp, kd, effort = (np.asarray(v, dtype=float) for v in (KP, KD, EFFORT_LIMITS))
+    amplitudes = np.asarray(sweep_amplitudes(profile, q0, joint_ranges, REACHABLE_FRACTION))
+    kp, kd, effort = (
+        np.asarray(v, dtype=float) for v in (resolved.kp, resolved.kd, resolved.effort_limits)
+    )
 
     def position_control(backend, ctrl):
         q = backend.get_dof_pos()[0]
@@ -199,15 +255,16 @@ def main(argv: list[str] | None = None) -> int:
     phase_time = 0.0
     report = {
         "asset_root": str(root),
-        "bot": BOT_RELPATH,
+        "bot": profile.relpath,
+        "bot_key": profile.key,
         "tree_verified": not args.skip_verification,
         "sim_dt": SIM_DT,
         "ctrl_dt": CTRL_DT,
         "decimation": DECIMATION,
         "actuator_order": list(backend.get_actuator_names()),
-        "effort_limits_nm": EFFORT_LIMITS,
-        "pd_gains": {"kp": KP, "kd": KD},
-        "move_amplitudes_rad": MOVE_AMPLITUDES,
+        "effort_limits_nm": list(resolved.effort_limits),
+        "pd_gains": {"kp": list(resolved.kp), "kd": list(resolved.kd)},
+        "move_amplitudes_rad": [round(float(a), 4) for a in amplitudes],
         "phases": {},
     }
     captures: list[tuple[str, Path]] = []
@@ -219,7 +276,7 @@ def main(argv: list[str] | None = None) -> int:
         from superdex.physics.viewer.backend import polyscope as ps
 
         name = pending_capture.pop(0)
-        path = args.out / f"fr3_{name}.png"
+        path = args.out / f"{profile.key}_{name}.png"
         write_png(path, ps.screenshot_to_buffer())
         captures.append((name, path))
 
@@ -244,7 +301,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"[{name}] holding authored default pose (inspect geometry)")
             mark_capture("initial_pose")
         elif name == "bounded-movement":
-            print(f"[{name}] sine sweep, amplitudes {MOVE_AMPLITUDES} rad")
+            print(f"[{name}] sine sweep, amplitudes {[round(float(a), 3) for a in amplitudes]} rad")
         elif name == "reset":
             backend.reset()
             reset_error = float(np.max(np.abs(backend.get_state()["qpos"][0] - q0)))
@@ -265,7 +322,7 @@ def main(argv: list[str] | None = None) -> int:
             if phase_time >= HOLD_SECONDS:
                 phase, phase_time = "bounded-movement", -CTRL_DT
         elif phase == "bounded-movement":
-            target = q0 + np.asarray(MOVE_AMPLITUDES) * np.sin(
+            target = q0 + amplitudes * np.sin(
                 2.0 * math.pi * phase_time / MOVE_PERIOD
                 + np.linspace(0.0, 3.0 * math.pi / 2.0, len(q0))
             )
