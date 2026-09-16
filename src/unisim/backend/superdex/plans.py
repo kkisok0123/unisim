@@ -25,11 +25,24 @@ class SensorPlan:
 
 
 @dataclass
+class RigidPlan:
+    """One standalone rigid body; static bodies have no state coordinates."""
+
+    name: str
+    body_id: int
+    qpos_index: int | None
+    qvel_index: int | None
+
+
+@dataclass
 class ModelPlan:
     """Canonical arrays and a native scene constructor; no hot-path XML access.
 
     Body zero is the world. ``body_link_indices`` maps every other canonical
-    body to the native articulation's nested link actors. Free-root
+    robot body to the native articulation's nested link actors; rigid prefab
+    bodies use -1 and have separate ownership in ``rigids``. Dynamic rigid
+    coordinates follow the robot, with seven qpos and six qvel values each.
+    Static prefab bodies have no generalized coordinates. Free-root
     qpos is world xyz + wxyz followed by
     single-DoF joints; qvel is world origin velocity + body angular velocity
     followed by single-DoF joints. Native free qvel uses the parent joint's axes;
@@ -69,3 +82,14 @@ class ModelPlan:
     actuator_force_ranges: np.ndarray | None = None
     dof_armature: np.ndarray | None = None
     root_reference: RootReference | None = None
+    rigids: tuple[RigidPlan, ...] = ()
+    spawn_rigids: Callable[[Any], list[Any]] | None = None
+    default_qvel: np.ndarray | None = None
+
+    @property
+    def robot_nq(self) -> int:
+        return self.nq - 7 * sum(item.qpos_index is not None for item in self.rigids)
+
+    @property
+    def robot_nv(self) -> int:
+        return self.nv - 6 * sum(item.qvel_index is not None for item in self.rigids)

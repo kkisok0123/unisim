@@ -98,6 +98,7 @@ class SuperDexBackend(SimBackend):
         self._worlds: list[Any] = []
         self._actors: list[Any] = []
         self._links: list[list[Any]] = []
+        self._rigids: list[list[Any]] = []
         self._actor_cleanups: list[Any] = []
         self._snapshots: list[Any] = []
         self._sensor_sources: list[dict[str, tuple[Any, Any]]] = []
@@ -163,7 +164,7 @@ class SuperDexBackend(SimBackend):
         self._qpos = np.zeros((n, m.nq), dtype=dtype)
         self._qvel = np.zeros((n, m.nv), dtype=dtype)
         self._ctrl = np.zeros((n, self.num_actuators), dtype=dtype)
-        self._native_q = np.zeros((n, m.nv), dtype=dtype)
+        self._native_q = np.zeros((n, m.robot_nv), dtype=dtype)
         self._native_v = np.zeros_like(self._native_q)
         self._batch_forces = np.zeros_like(self._native_q)
         self._env_ids = np.arange(n, dtype=np.intp)
@@ -223,7 +224,7 @@ class SuperDexBackend(SimBackend):
                     None if axis is None else np.asarray(axis),
                 )
             )
-        self._all_dofs = np.arange(m.nv, dtype=np.int32)
+        self._all_dofs = np.arange(m.robot_nv, dtype=np.int32)
         self._contact_sensor_index = {
             sensor.name: i for i, sensor in enumerate(self._contact_sensors)
         }
@@ -265,10 +266,13 @@ class SuperDexBackend(SimBackend):
             actor, cleanup = self.model.spawn_actor(world)
             self._actors.append(actor)
             self._actor_cleanups.append(cleanup)
-            if actor.get_num_dofs() != self.model.nv:
+            if actor.get_num_dofs() != self.model.robot_nv:
                 raise ValueError("SuperDex compiled DoF count differs from audited authoring plan")
             links = [world.get_actor(h) for h in actor.get_nested_link_actors()]
             self._links.append(links)
+            self._rigids.append(
+                self.model.spawn_rigids(world) if self.model.spawn_rigids else []
+            )
             actor_names: dict[str, Any] = {}
             world.for_each_actor(lambda item: actor_names.__setitem__(item.get_name(), item))
             sources: dict[str, tuple[Any, Any]] = {}
@@ -366,6 +370,11 @@ class SuperDexBackend(SimBackend):
             raise NotImplementedError("superdex does not support reset model randomization")
         if self.model.floating and not np.allclose(np.linalg.norm(q[:, 3:7], axis=1), 1, atol=1e-5):
             raise ValueError("free-root quaternion must be normalized wxyz")
+        for item in self.model.rigids:
+            if item.qpos_index is not None:
+                qi = item.qpos_index
+                if not np.allclose(np.linalg.norm(q[:, qi + 3:qi + 7], axis=1), 1, atol=1e-5):
+                    raise ValueError("rigid quaternion must be normalized wxyz")
         for row, i in enumerate(ids):
             world, actor = self._worlds[i], self._actors[i]
             world.restore_state(self._snapshots[i], release_immediately=False)
@@ -381,15 +390,27 @@ class SuperDexBackend(SimBackend):
                 native_q[3:6] = np.asarray(
                     self._p.Quaternion(root_q[[4, 5, 6, 3]]).to_rotation_vector()
                 )
-                native_q[6:] = q[row, 7:]
+                native_q[6:] = q[row, 7:self.model.robot_nq]
                 native_v[:6] = root_v
-                native_v[6:] = v[row, 6:]
+                native_v[6:] = v[row, 6:self.model.robot_nv]
             else:
-                native_q[:] = q[row]
-                native_v[:] = v[row]
+                native_q[:] = q[row, :self.model.robot_nq]
+                native_v[:] = v[row, :self.model.robot_nv]
             actor.set_articulated_pose_from_joints(native_q)
             actor.set_articulated_joint_velocities(native_v)
             actor.set_external_forces_on_dofs(self._all_dofs, np.zeros_like(native_v))
+            for item, rigid in zip(self.model.rigids, self._rigids[i], strict=True):
+                if item.qpos_index is None:
+                    continue
+                qi, vi = item.qpos_index, item.qvel_index
+                quat = q[row, qi + 3:qi + 7]
+                rigid.set_root_transform(self._p.TransformRT(
+                    translation=q[row, qi:qi + 3], rotation=quat[[1, 2, 3, 0]]
+                ))
+                omega = rotate(quat, v[row, vi + 3:vi + 6])
+                offset = rotate(quat, self.model.body_ipos[item.body_id])
+                rigid.set_velocity(v[row, vi:vi + 3] + np.cross(omega, offset), omega)
+                rigid.clear_external_forces()
             self._ctrl[i] = 0
             self._pending_wrench[i] = 0
             world.step(0)
@@ -415,6 +436,7 @@ class SuperDexBackend(SimBackend):
             self._ctrl[:] = np.clip(
                 values, m.actuator_ctrl_ranges[:, 0], m.actuator_ctrl_ranges[:, 1]
             )
+            self._apply_rigid_wrenches()
             assert self._batch_executor is not None
             self._batch_executor.step_control(
                 self._dt,
@@ -441,6 +463,7 @@ class SuperDexBackend(SimBackend):
         for substep in range(nsteps):
             full_readback = substep == nsteps - 1
             converted = self._apply_pre_step_control(values)
+            self._apply_rigid_wrenches()
             if not np.isfinite(converted).all():
                 raise ValueError("pre-step control returned non-finite values")
             self._ctrl[:] = np.clip(
@@ -464,8 +487,12 @@ class SuperDexBackend(SimBackend):
                 for i in active_envs:
                     generalized = self._batch_forces[i]
                     for body in np.flatnonzero(np.any(self._pending_wrench[i] != 0, axis=1)):
+                        if m.body_link_indices[body] < 0:
+                            continue
                         link = self._links[i][m.body_link_indices[body]]
-                        jacobian = np.asarray(link.get_articulated_jacobian()).reshape(6, m.nv)
+                        jacobian = np.asarray(link.get_articulated_jacobian()).reshape(
+                        6, m.robot_nv
+                    )
                         generalized += jacobian.T @ self._pending_wrench[i, body]
             np.add.at(
                 self._batch_forces,
@@ -493,6 +520,16 @@ class SuperDexBackend(SimBackend):
             )
         self._pending_wrench.fill(0)
 
+    def _apply_rigid_wrenches(self) -> None:
+        for i, actors in enumerate(self._rigids):
+            for item, actor in zip(self.model.rigids, actors, strict=True):
+                if item.qpos_index is None:
+                    continue
+                # Standalone rigid DoFs are world-frame COM force and torque.
+                actor.set_external_forces_on_dofs(
+                    np.arange(6, dtype=np.int32), self._pending_wrench[i, item.body_id]
+                )
+
     def _reject_if_debugger_attached(self) -> None:
         """Fail closed when a native debugger session meets executor-owned scenes.
 
@@ -516,6 +553,7 @@ class SuperDexBackend(SimBackend):
         m = self.model
         for _ in range(nsteps):
             converted = self._apply_pre_step_control(values)
+            self._apply_rigid_wrenches()
             if not np.isfinite(converted).all():
                 raise ValueError("pre-step control returned non-finite values")
             self._ctrl[:] = np.clip(
@@ -536,10 +574,14 @@ class SuperDexBackend(SimBackend):
                 )
             force = force * m.actuator_gear
             for i, (world, actor) in enumerate(zip(self._worlds, self._actors)):
-                generalized = np.zeros(m.nv, dtype=self._dtype)
+                generalized = np.zeros(m.robot_nv, dtype=self._dtype)
                 for body in np.flatnonzero(np.any(self._pending_wrench[i] != 0, axis=1)):
+                    if m.body_link_indices[body] < 0:
+                        continue
                     link = self._links[i][m.body_link_indices[body]]
-                    jacobian = np.asarray(link.get_articulated_jacobian()).reshape(6, m.nv)
+                    jacobian = np.asarray(link.get_articulated_jacobian()).reshape(
+                        6, m.robot_nv
+                    )
                     generalized += jacobian.T @ self._pending_wrench[i, body]
                 np.add.at(generalized, m.actuator_qvel_indices, force[i])
                 actor.set_external_forces_on_dofs(self._all_dofs, generalized)
@@ -574,12 +616,12 @@ class SuperDexBackend(SimBackend):
                 self._qpos[ids, :3] = self._native_q[ids, :3]
                 self._qpos[ids, 3] = np.cos(half_angle)
                 self._qpos[ids, 4:7] = native_rot * scale[:, None]
-                self._qpos[ids, 7:] = self._native_q[ids, 6:]
+                self._qpos[ids, 7:m.robot_nq] = self._native_q[ids, 6:]
                 self._qvel[ids, :3] = self._native_v[ids, :3]
-                self._qvel[ids, 6:] = self._native_v[ids, 6:]
+                self._qvel[ids, 6:m.robot_nv] = self._native_v[ids, 6:]
             else:
-                self._qpos[ids] = self._native_q[ids]
-                self._qvel[ids] = self._native_v[ids]
+                self._qpos[ids, :m.robot_nq] = self._native_q[ids]
+                self._qvel[ids, :m.robot_nv] = self._native_v[ids]
             if full_state_ready:
                 for body_id, link_index in self._body_sources:
                     state = self._native_link_state[ids, link_index]
@@ -597,12 +639,12 @@ class SuperDexBackend(SimBackend):
                     self._qpos[i, :3] = self._native_q[i, :3]
                     quat = self._p.Quaternion.from_rotation_vector(self._native_q[i, 3:6])
                     self._qpos[i, 3:7] = np.asarray(quat)[[3, 0, 1, 2]]
-                    self._qpos[i, 7:] = self._native_q[i, 6:]
+                    self._qpos[i, 7:m.robot_nq] = self._native_q[i, 6:]
                     self._qvel[i, :3] = self._native_v[i, :3]
-                    self._qvel[i, 6:] = self._native_v[i, 6:]
+                    self._qvel[i, 6:m.robot_nv] = self._native_v[i, 6:]
                 else:
-                    self._qpos[i] = self._native_q[i]
-                    self._qvel[i] = self._native_v[i]
+                    self._qpos[i, :m.robot_nq] = self._native_q[i]
+                    self._qvel[i, :m.robot_nv] = self._native_v[i]
                 if full_state_ready:
                     for body_id, link_index in self._body_sources:
                         link = self._links[i][link_index]
@@ -623,6 +665,28 @@ class SuperDexBackend(SimBackend):
                 )
                 self._qpos[ids, :7] = root_q
                 self._qvel[ids, :6] = root_v
+        # Standalone objects are not owned by the articulation's batch readback.
+        # Read after the worker barrier; never query metadata on the hot path.
+        for i in ids:
+            for item, actor in zip(m.rigids, self._rigids[i], strict=True):
+                body = item.body_id
+                pose = actor.get_root_transform()
+                quat = np.asarray(pose.rotation)[[3, 0, 1, 2]]
+                omega = np.asarray(actor.get_angular_velocity())
+                com = (
+                    np.asarray(pose.translation) if item.qpos_index is None else
+                    np.asarray(actor.get_center_of_mass_transform().translation)
+                )
+                linear = np.asarray(actor.get_linear_velocity())
+                if item.qpos_index is not None:
+                    qi, vi = item.qpos_index, item.qvel_index
+                    self._qpos[i, qi:qi + 3] = pose.translation
+                    self._qpos[i, qi + 3:qi + 7] = quat
+                    self._qvel[i, vi:vi + 3] = linear - np.cross(omega, com - pose.translation)
+                    self._qvel[i, vi + 3:vi + 6] = unrotate(quat, omega)
+                if full_state_ready:
+                    self._pos[i, body], self._quat[i, body] = pose.translation, quat
+                    self._com[i, body], self._lin[i, body], self._ang[i, body] = com, linear, omega
         if full_state_ready:
             self._lin[ids] -= np.cross(self._ang[ids], self._com[ids] - self._pos[ids])
             self._refresh_sensor_batches(ids)
@@ -731,6 +795,8 @@ class SuperDexBackend(SimBackend):
         return self.model.keyframes[name].copy()
 
     def get_init_qvel(self) -> np.ndarray:
+        if self.model.default_qvel is not None:
+            return self.model.default_qvel.astype(self._dtype, copy=True)
         return np.zeros(self.model.nv, dtype=self._dtype)
 
     def get_joint_range(self) -> np.ndarray:
@@ -766,6 +832,12 @@ class SuperDexBackend(SimBackend):
 
     def get_root_state_layout(self, root_body_name: str) -> BackendRootStateLayout:
         body = self.get_body_id(root_body_name)
+        for item in self.model.rigids:
+            if item.body_id == body and item.qpos_index is not None:
+                return BackendRootStateLayout(
+                    qpos_indices=tuple(range(item.qpos_index, item.qpos_index + 7)),
+                    qvel_indices=tuple(range(item.qvel_index, item.qvel_index + 6)),
+                )
         if not self.model.floating or body != self.model.root_body_id:
             raise NotImplementedError(
                 f"superdex body {root_body_name!r} does not own a floating root"
@@ -1024,7 +1096,10 @@ class SuperDexBackend(SimBackend):
         if body_ids.ndim != 1 or not np.issubdtype(body_ids.dtype, np.integer):
             raise ValueError("body_ids must be an integer vector")
         if np.any(body_ids <= 0) or np.any(body_ids >= len(self.model.body_names)):
-            raise ValueError("body force must target an articulated body")
+            raise ValueError("body force must target an in-range non-world body")
+        static_ids = {item.body_id for item in self.model.rigids if item.qpos_index is None}
+        if any(int(body) in static_ids for body in body_ids):
+            raise ValueError("body force cannot target a static prefab body")
         for column, body_id in enumerate(body_ids):
             self._pending_wrench[:, body_id, :3] += f[:, column]
             self._pending_wrench[:, body_id, 3:] += t[:, column]
@@ -1069,6 +1144,7 @@ class SuperDexBackend(SimBackend):
         self._worlds.clear()
         self._actors.clear()
         self._links.clear()
+        self._rigids.clear()
         self._actor_cleanups.clear()
         self._snapshots.clear()
         self._sensor_sources.clear()

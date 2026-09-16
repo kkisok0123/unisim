@@ -427,3 +427,73 @@ rotation alongside a bounded finger sweep. Reset restores the full root and
 joint state. The numerical qualification uses ordinary gravity without this
 viewer compensation. The offscreen runner records numerical movement/reset
 reports and logs without saving images.
+
+## Rigid objects and nested prefabs (stage 5)
+
+A native `.superdex_bot` can now own independent rigid objects alongside its
+articulation. Pass `.mochi_prefab` files in `SceneCfg.fragment_files`; their path
+resolution follows the existing scene-fragment rule. The SDK resolves nested
+prefabs, names, transforms, collision shapes and render models on the cold path.
+Use named nested instances to disambiguate repeated actors. Body names must be
+unique across the robot and all prefab instances.
+
+```python
+scene = SceneCfg(
+    str(assets / "bots/arms/fr3_v2/fr3_v2.superdex_bot"),
+    fragment_files=[str(assets / "prefabs/sphere/sphere.mochi_prefab")],
+)
+```
+
+That minimal example preserves the sphere's authored origin. For a placed
+contact fixture, use the runnable example below, which writes temporary nested
+wrappers around the unchanged FR3, sphere and nine-hole peg-board assets.
+
+The existing public state interfaces cover the whole scene:
+
+- Robot coordinates and action indices retain their existing order. Each dynamic
+  rigid body then appends seven `qpos` entries (world xyz and wxyz quaternion)
+  and six `qvel` entries (world body-origin velocity and body-frame angular
+  velocity). Use `get_root_state_layout(body_name)` to obtain the indices.
+- `get_state`, `set_state`, `get_default_qpos`, `get_init_qvel` and
+  `get_physics_state` include all dynamic objects. Authored object velocities
+  are preserved. Body getters include static and dynamic prefab bodies; static
+  objects have no generalized coordinates and report mass/COM offset as zero.
+  Joint/actuator getters continue to describe only the robot.
+- `reset()` restores every actor, including the static fixtures. `reset(env_ids)`
+  and `set_state(env_ids, qpos, qvel)` touch only the selected scenes. A state
+  round trip restores pose and velocity, not the solver's internal history:
+  `set_state` first restores the initial native snapshot, then applies the
+  supplied coordinates and clears controls/pending forces, as for robot-only
+  scenes. Static transforms remain authored and are not independently mutable.
+- `apply_body_force` accepts dynamic rigid objects with world-frame COM forces
+  and torques. Static prefab targets are rejected. Each scene owns its rigid
+  actors, including partially constructed instances on failure; closing destroys
+  the scenes and releases the loaded prefab resources before runtime shutdown.
+
+Both serial and batch execution are supported. Object readback happens after the
+native worker barrier; each environment has independent actor handles. Native
+interactive playback renders the complete scene in serial mode with one
+environment. MuJoCo offline video requires a separately authored visual twin
+whose generalized coordinates match this expanded state layout.
+
+Run the numerical qualification and the viewer with the verified local bundle:
+
+```bash
+SUPERDEX_ASSETS_PATH="$PWD/assets/superdex" uv run scripts/superdex_prefab_qualify.py
+SUPERDEX_ASSETS_PATH="$PWD/assets/superdex" uv run scripts/superdex_prefab_qualify.py --viewer
+SUPERDEX_ASSETS_PATH="$PWD/assets/superdex" uv run pytest -q tests/test_superdex_prefabs.py
+```
+
+The viewer holds the initial state for two seconds, simulates contact for four
+seconds, and restores the whole scene for inspection. Closing before reset is
+reported as an incomplete demonstration. `--viewer --frames 420` runs the same
+phases offscreen and records a renderer smoke report without saving images.
+Reports and exact qualification limits are in
+[`superdex-prefab-qualification/README.md`](superdex-prefab-qualification/README.md).
+
+This profile accepts only rigid actors and nested prefab references. Scene
+settings, authored contact-filter overrides, constraints, controllers, sensors,
+actuators, extra articulations and soft bodies are rejected instead of dropped.
+Full `.mochi_scene` dispatch remains stage 7. SDK support for another prefab does
+not qualify it automatically; the stage-5 evidence covers the sphere and peg
+board listed in the report. No assets or SDK downloads enter the normal tests.

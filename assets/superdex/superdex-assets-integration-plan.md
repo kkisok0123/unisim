@@ -1,11 +1,11 @@
 # Superdex asset integration plan
 
-Status: revised on 2026-09-15. Stages 1 (local asset copy and inventory), 2A
-(FR3 visualization through UniSim), 2B (FR3 adapter qualification) and 3
-(compatible robots and compositions) are complete. The next step is stage 4
-native floating roots, followed by capability extensions. This document
-describes planned work; it does not establish runtime support for additional
-assets.
+Status: revised on 2026-09-16. Stages 1–4 are complete. Stage 5 rigid-object
+and nested-prefab support is implemented and numerically qualified with FR3,
+a sphere and a nine-hole peg board. Its native renderer smoke passed; manual
+visual inspection remains outstanding. Stage 6 actuator/sensor components is
+the next capability extension. Qualification applies only to the recorded
+fixtures, not automatically to every asset in the bundle.
 
 ## Objective and approach
 
@@ -26,7 +26,7 @@ produce a usable result and fit into a small set of reviewable pull requests.
 The first milestone ends after stages 1–3: the existing asset baseline, a runnable
 FR3 viewer demonstration, a qualified FR3 adapter path, and a tested compatibility
 table for other bots. Stage 2 is split into visualization (2A, complete) and full
-adapter qualification (2B, next).
+adapter qualification (2B, complete).
 
 ## Contribution workflow
 
@@ -84,9 +84,11 @@ evidence establishes dependency completeness, not any robot's runtime behavior.
 This historical import record does not change the current decision to keep
 `assets/` ignored; do not force-add payloads or rewrite history as part of this plan.
 
-The existing loader accepts native bots with a fixed HARD root and
-fixed/revolute/prismatic joints. Native free roots, sensor/actuator components,
-mechanical cycles and general scene assembly need additional adapter work.
+The current loader accepts native bots with HARD or FREE roots and
+fixed/revolute/prismatic child joints. Stage 5 adds independent rigid actors
+and nested `.mochi_prefab` fragments beside one native bot. Sensor/actuator
+components, mechanical cycles and full `.mochi_scene` dispatch still need
+additional adapter work.
 See the [current Superdex profile](../../docs/superdex.md) and
 [materialization implementation](../../src/unisim/backend/superdex/materialization.py).
 
@@ -223,7 +225,7 @@ Built as `scripts/superdex_bot_qualify.py` with `scripts/superdex_bot_profiles.p
 compatible-bots section in `docs/superdex.md`. Eleven bots qualified with every
 adapter-vs-SDK deviation exactly 0.0; no adapter extension was needed because
 the SDK compiles recipes into the native loader's supported profile. Every
-remaining bot has a precise recorded blocker. Proceed to stage 4.
+remaining bot has a precise recorded blocker. Stages 4 and 5 extend this baseline below.
 
 - Qualify other fixed-base arms and simple bots using a parameterized runner.
 - Resolve Mod Bot recipes through the SDK and inspect the compiled robot,
@@ -252,7 +254,45 @@ whose remaining features fit the adapter, then expand to other candidates.
 **Done when:** a representative standalone hand works with correct root and
 joint state, and existing fixed-base behavior remains covered.
 
-### 5. Extend the adapter for rigid objects and prefab assembly
+### 5. Extend the adapter for rigid objects and prefab assembly — implemented and qualified
+
+**Completed result:** `SceneCfg.fragment_files` now composes rigid
+`.mochi_prefab` files, including nested dependencies and transforms, beside a
+native bot. Dynamic objects append canonical free-body coordinates to the
+existing `qpos`/`qvel` state; robot controls keep their indices. Body queries,
+object root layouts, forces, full/selective reset and scene-owned cleanup use
+the existing public interfaces. Static fixtures retain authored transforms.
+State round trips restore kinematics, not hidden solver history. Unsupported
+prefab components and scene settings are rejected rather than dropped.
+
+`scripts/superdex_prefab_qualify.py` qualifies unchanged FR3 plus a sphere and
+nine-hole peg board: 11 standalone rigid actors, including nine dynamic pegs,
+one sphere and one static board. Both serial and batch execution passed 1,000
+steps at 0.002 s with two environments and zero measured deviation from direct
+SDK execution. Actor inventories, robot–sphere contact, moved-object state
+round trips, full/selective reset, isolation and cleanup/recreation passed.
+Tests also cover partial-instantiation failure cleanup. No additional bot or
+prefab is promoted by these results.
+
+```bash
+SUPERDEX_ASSETS_PATH="$PWD/assets/superdex" uv run --no-sync scripts/superdex_prefab_qualify.py
+SUPERDEX_ASSETS_PATH="$PWD/assets/superdex" uv run --no-sync pytest -q tests/test_superdex_prefabs.py
+SUPERDEX_ASSETS_PATH="$PWD/assets/superdex" uv run --no-sync scripts/superdex_prefab_qualify.py --viewer
+```
+
+The separate `--viewer --frames 420` smoke completed initial pose, contact and
+whole-scene reset with zero reset error and clean teardown, without saving
+images. **Manual visual inspection remains outstanding.** The focused suite
+passed 15 tests; `make check` passed Ruff and 329 tests with 19 skips;
+`make package` built the sdist and wheel with the ignored assets excluded.
+See the [Stage 5 report](../../docs/superdex-prefab-qualification/README.md),
+[numerical results](../../docs/superdex-prefab-qualification/report.json),
+[viewer smoke](../../docs/superdex-prefab-qualification/viewer.json) and
+[current guide](../../docs/superdex.md). These reports preserve the source and
+asset digests of their original runs; later documentation-only inventory
+refreshes do not rewrite that evidence.
+
+The stage's acceptance criteria are retained below:
 
 Extend scene ownership beyond one articulation. Start with a sphere or block
 beside a qualified robot, then add a peg/board or cup fixture.
@@ -332,15 +372,17 @@ For each new capability, follow the same process:
 
 The immediate sequence is **stage 1 complete → stage 2A visualization
 complete → stage 2B FR3 adapter qualification complete → stage 3 compatible
-robots complete → stage 4 native floating roots**.
+robots complete → stage 4 native floating roots complete → stage 5 rigid
+prefabs qualified → stage 6 actuator/sensor components**. Manual visual
+inspection of the stage-5 fixture remains a separate follow-up.
 
-Stage 4 extends robot state support; stage 5 can build on the qualified fixed-base
-route independently of floating roots. The Wuji target in stage 6 depends on
+Stage 4 supplies floating robot state; stage 5 supplies independent rigid
+objects and whole-scene state/reset on the qualified fixed-base route. The Wuji target in stage 6 depends on
 stage 4, and its object interaction checks also depend on stage 5. Stage 7 depends
 on stage 5 and any component capabilities required by its selected scenes.
 Stage 8 is scheduled per capability. All extensions reuse the viewer workflow.
 
-The next three pull requests are:
+The first milestone's completed work packages were:
 
 1. **FR3 visualization through UniSim (2A): complete** — see
    `scripts/superdex_bot_viewer.py` and `docs/superdex-fr3-viewer/`.

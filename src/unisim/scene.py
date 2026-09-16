@@ -43,6 +43,7 @@ class SceneCfg:
 
     model_file: str
     fragment_files: list[str] = field(default_factory=list)
+    """MJCF XML fragments, or rigid .mochi_prefab files for native SuperDex bots."""
     terrain: TerrainSceneCfg | None = None
     entities: dict[str, object] = field(default_factory=dict)
     """Logical entity partitions materialized by the base-owned manager facade."""

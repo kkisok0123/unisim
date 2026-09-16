@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Add stage-5 native SuperDex rigid prefab composition through
+  `SceneCfg.fragment_files`, including nested transforms, complete robot/object
+  qpos/qvel state, per-object floating-root layouts, body queries and forces,
+  whole-scene/selective reset, and scene-owned cleanup. Reject unsupported
+  prefab components before SDK loading. Add synthetic regression fixtures,
+  FR3/sphere/peg-board direct-SDK qualification and a native viewer example.
+
 - Complete the native floating-model audit across all 22 FREE-root bots: ten
   hands/grippers pass direct-SDK state/lifecycle qualification in serial and
   batch modes; twelve retain later-stage component/joint/cycle blockers.

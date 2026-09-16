@@ -1,9 +1,11 @@
 # SuperDex assets
 
-Stage 4 is complete for this local bundle: **10 floating models and 11
-fixed-base models qualify**. Native FREE roots support authored parent-joint
-and joint-link translations and rotations. The remaining models require
-later-stage capabilities; see the compatibility details below.
+Stages 4 and 5 are implemented for this local bundle: **10 floating models and
+11 fixed-base models qualify**, and FR3 with a sphere and nine-hole peg board
+passes rigid-prefab qualification. Stage 5 adds nested prefab assembly,
+robot/object state, contact, whole-scene reset and selective reset. Its native
+viewer smoke passed; manual visual inspection remains outstanding. Other
+models and prefabs retain their recorded capability or qualification limits.
 
 This directory is local and ignored by Git. The tracked qualification code
 and reports live under `scripts/`, `tests/`, and `docs/` in the repository.
@@ -123,8 +125,8 @@ uv run --no-sync scripts/superdex_floating_qualify.py --bots wuji_hand2_beta1_le
 ```
 
 All 37 bot models are accounted for: 21 qualify and 16 have recorded blockers,
-including four fixed-base models. Stage 5 covers independent objects and
-object contact.
+including four fixed-base models. Stage 5 adds independent objects and object
+contact alongside a qualified robot; it does not promote additional bot models.
 
 ## Run floating-model viewer smoke checks
 
@@ -146,6 +148,55 @@ See the [Stage 4 completion report](../../docs/superdex-floating-qualification/R
 and [viewer measurements](../../docs/superdex-floating-qualification/viewers/summary.json).
 The recorded completion run had **23 focused tests passed**, **315 passed and
 18 skipped** in the full suite, and a successful package build.
+
+## Run the Stage 5 rigid-prefab checks
+
+With `SUPERDEX_ASSETS_PATH` configured as above, run:
+
+```sh
+uv run --no-sync scripts/superdex_prefab_qualify.py
+uv run --no-sync pytest -q -rs tests/test_superdex_prefabs.py
+uv run --no-sync scripts/superdex_prefab_qualify.py --viewer
+```
+
+The fixture combines unchanged FR3, sphere and nine-hole peg-board assets
+through temporary, translated and rotated nested prefab wrappers. It contains
+11 independent rigid actors: one sphere, one static board and nine dynamic
+pegs. Both serial and batch modes passed 1,000 steps at 0.002 s with two
+environments and zero measured deviation from independently constructed SDK
+scenes. Robot–sphere contact, moved-object state round trips, whole-scene and
+selective reset, environment isolation, cleanup and recreation passed. The
+sphere later falls away because this fixture has no ground plane; this is a
+contact check, not a sustained grasp or manipulation task.
+
+Use `SceneCfg.fragment_files` to add `.mochi_prefab` files to a native bot.
+Dynamic objects append world xyz/wxyz pose and world origin/body angular
+velocity coordinates to the existing robot `qpos`/`qvel` arrays. Robot action
+indices stay unchanged. `get_root_state_layout(body_name)` exposes object
+indices; static fixtures keep their authored transforms and have no state
+coordinates. State round trips restore pose and velocity, not solver history.
+
+The viewer holds the initial pose, simulates contact, and resets the complete
+scene for inspection. For the repeatable offscreen smoke check, run:
+
+```sh
+uv run --no-sync scripts/superdex_prefab_qualify.py --viewer --frames 420
+```
+
+The 420-frame smoke completed all phases with zero reset error and successful
+cleanup; no images were saved. It does not replace manual visual inspection of
+geometry, scale and alignment. The recorded validation passed **15 focused
+tests**, **329 passed and 19 skipped** in the full suite, and the package build.
+
+See the [Stage 5 report](../../docs/superdex-prefab-qualification/README.md),
+[numerical results](../../docs/superdex-prefab-qualification/report.json),
+[viewer smoke results](../../docs/superdex-prefab-qualification/viewer.json),
+and [adapter guide](../../docs/superdex.md#rigid-objects-and-nested-prefabs-stage-5).
+Other prefabs are not automatically qualified. Scene settings, contact-filter
+overrides, constraints, controllers, sensor/actuator components, extra
+articulations and soft bodies remain outside this rigid-prefab profile.
+Stage 6 is the next capability extension; full `.mochi_scene` dispatch remains
+stage 7.
 
 ## Bundle verification
 

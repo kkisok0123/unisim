@@ -46,9 +46,12 @@ def materialize_model(
     if not path.is_file():
         raise FileNotFoundError(path)
     if path.suffix == ".superdex_bot":
+        plan = _native_plan(physics, robotics, path, effort_limits)
         if scene.fragment_files:
-            raise NotImplementedError("superdex native bot does not accept MJCF fragments")
-        return _native_plan(physics, robotics, path, effort_limits)
+            from .prefabs import compose_rigid_prefabs
+
+            return compose_rigid_prefabs(physics, plan, scene)
+        return plan
     if path.suffix != ".xml":
         raise NotImplementedError("superdex model must be .superdex_bot or audited .xml MJCF")
     return _mjcf_plan(physics, path, scene, effort_limits, allow_contact_approximation)
