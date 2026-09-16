@@ -1,0 +1,113 @@
+{
+  "bot": "bots/hands/allegro_v5/right/allegro_v5_right.superdex_bot",
+  "checks": {
+    "serial": {
+      "steps": 1040,
+      "max_state_error": 2.384185791015625e-07,
+      "roundtrip_reset_isolation": "passed",
+      "joints": 16,
+      "bodies": 21,
+      "effort_limits": [
+        15.0,
+        15.0,
+        15.0,
+        15.0,
+        15.0,
+        15.0,
+        15.0,
+        15.0,
+        15.0,
+        15.0,
+        15.0,
+        15.0,
+        15.0,
+        15.0,
+        15.0,
+        15.0
+      ]
+    },
+    "batch": {
+      "steps": 1040,
+      "max_state_error": 2.384185791015625e-07,
+      "roundtrip_reset_isolation": "passed",
+      "joints": 16,
+      "bodies": 21,
+      "effort_limits": [
+        15.0,
+        15.0,
+        15.0,
+        15.0,
+        15.0,
+        15.0,
+        15.0,
+        15.0,
+        15.0,
+        15.0,
+        15.0,
+        15.0,
+        15.0,
+        15.0,
+        15.0,
+        15.0
+      ]
+    }
+  },
+  "asset_verification": {
+    "tree_digest": "decf1b36a59a3479cd5efa40057b76e3e82e653eeeb3a0ef37ff9254bd598010",
+    "file_count": 893,
+    "total_bytes": 260336568,
+    "dependency_errors": [],
+    "warnings": [
+      "bots/arm_hand_combos/fr3_dg5f_short/left/fr3_dg5f_short_left.superdex_bot: no LICENSE/NOTICE found in directory chain",
+      "bots/arm_hand_combos/fr3_dg5f_short/right/fr3_dg5f_short_right.superdex_bot: no LICENSE/NOTICE found in directory chain",
+      "bots/arm_hand_combos/fr3_dg5f_short_seed/right/fr3_dg5f_short_seed_right.superdex_bot: no LICENSE/NOTICE found in directory chain",
+      "bots/arm_hand_combos/fr3_v2_2f_85/fr3_v2_2f_85.superdex_bot: no LICENSE/NOTICE found in directory chain",
+      "bots/arm_hand_combos/openarm_v20/openarm_v20.superdex_bot: no LICENSE/NOTICE found in directory chain",
+      "bots/arm_hand_combos/openarm_v20/openarm_v20_wuji.superdex_bot: no LICENSE/NOTICE found in directory chain",
+      "bots/fun/arm_eyes_combos/fr3_v2_with_eyes.superdex_bot: no LICENSE/NOTICE found in directory chain",
+      "bots/hands/dg5f_long_seed/left/dg5f_long_seed_left.superdex_bot: no LICENSE/NOTICE found in directory chain",
+      "bots/hands/dg5f_long_seed/right/dg5f_long_seed_right.superdex_bot: no LICENSE/NOTICE found in directory chain",
+      "bots/hands/dg5f_short_seed/left/dg5f_short_seed_left.superdex_bot: no LICENSE/NOTICE found in directory chain",
+      "bots/hands/dg5f_short_seed/right/dg5f_short_seed_right.superdex_bot: no LICENSE/NOTICE found in directory chain"
+    ]
+  },
+  "code_commit": "a92fc3f2ef8994139c3bd7cedb2b65df8e0a267d",
+  "working_tree": "M CHANGELOG.md\n M docs/superdex.md\n M scripts/superdex_bot_profiles.py\n M scripts/superdex_bot_qualify.py\n M scripts/superdex_fr3_viewer.py\n M src/unisim/backend/superdex/materialization.py\n?? docs/superdex-floating-qualification/\n?? scripts/superdex_floating_qualify.py\n?? tests/test_superdex_native_floating.py",
+  "diff_sha256": "322c6668183d69cb6592836fb854f4ba39fc4b19d3d490993c0dae8fe21409ba",
+  "asset_provenance": {
+    "source_repo": "/home/pc829/UniFamily/project_superdex",
+    "source_branch": "wuji-actuated-asset",
+    "source_revision": "6b0541bd41adb39afe4e13fd6c45d9e9288f3021",
+    "source_clean": true,
+    "source_initial_commit": "1d7150946fa3f3d3fb09c2bff07eaa138cbfdee6",
+    "local_derivative_paths": [
+      "bots/hands/wuji_hand2_beta1_actuated/LICENSE",
+      "bots/hands/wuji_hand2_beta1_actuated/NOTICE",
+      "bots/hands/wuji_hand2_beta1_actuated/README.md",
+      "bots/hands/wuji_hand2_beta1_actuated/left/wuji_hand2_beta1_actuated_left.superdex_bot",
+      "bots/hands/wuji_hand2_beta1_actuated/right/wuji_hand2_beta1_actuated_right.superdex_bot"
+    ],
+    "historical_upstream_sha": "ed30ce16361329cbbed956173d6a4f5842815d24",
+    "generated_utc": "2026-09-15T08:09:59Z"
+  },
+  "sdk_version": "1.0.0",
+  "sdk_precision": "float32",
+  "code_file_sha256": {
+    "scripts/superdex_floating_qualify.py": "cf1e3638b15f0acd46efd8d7a3a4f3662a0ba5456765f6ab35ccaed327d35b79",
+    "src/unisim/backend/superdex/materialization.py": "f550f32df7a35895f19c8adcd6fe333f79d4914716737bb2e56654861749688d",
+    "src/unisim/backend/superdex/backend.py": "a0b14de08da2608204cc4c9a19625cf887afd9f46484e6e3ab1d966e2e1248f2"
+  },
+  "tolerance": {
+    "state_atol": 2e-06,
+    "state_rtol": 1e-06
+  },
+  "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.43",
+  "python": "3.12.14",
+  "dt": 0.002,
+  "gravity": [
+    0,
+    0,
+    -9.81
+  ],
+  "visual_verification": "not performed by this headless command"
+}

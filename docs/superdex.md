@@ -80,12 +80,13 @@ actionable error otherwise. `record`/`auto` playback still uses the shared
 MuJoCo offline renderer and works in both modes. UniLab's interactive superdex
 eval injects both settings (`serial` + `training.play_env_num=1`).
 
-## Native fixed-base robot
+## Native robots
 
 Preprocessed SuperDex assets stay outside the code repositories. The FR3 example
 uses the upstream `assets/bots/arms/fr3_v2` directory including its HDF5 collision
 and GLB render files. Preserve its LICENSE/NOTICE. The native bot must have a
-HARD root and fixed/hinge/slide joints; components, cycles, tendons and
+HARD or FREE root and fixed/hinge/slide child joints;
+components, cycles, tendons and
 transmissions outside this profile fail closed.
 
 The local asset copy lives at `assets/superdex` (ignored by git; cloning UniSim
@@ -132,7 +133,7 @@ Polyscope >= 2.5.0 and a graphical session:
 
 ```sh
 export SUPERDEX_ASSETS_PATH="$PWD/assets/superdex"
-uv run scripts/superdex_fr3_viewer.py
+uv run scripts/superdex_bot_viewer.py
 ```
 
 The script verifies the asset tree against the recorded inventory (use
@@ -159,9 +160,9 @@ torque the FR3 collapses under gravity within half a second, and the earlier
 `[20,20,20,20,5,5,5]` research profile visibly sags at the elbow.
 
 Closing the window releases the viewer and backend (verified for window close,
-Ctrl-C and error paths); captures and the run report land in
+Ctrl-C and error paths); the run report lands in
 `docs/superdex-fr3-viewer/`. Use `--frames N` for an offscreen smoke run on a
-headless host. This is visual verification only; physics and lifecycle
+headless host. The viewer does not save images. Physics and lifecycle
 qualification of the unchanged FR3 follows below.
 
 ## FR3 adapter qualification (stage 2B)
@@ -224,7 +225,7 @@ for the same assets:
 export SUPERDEX_ASSETS_PATH="$PWD/assets/superdex"
 uv run scripts/superdex_bot_qualify.py                  # all candidates + blocked probes
 uv run scripts/superdex_bot_qualify.py --bots openarm_v20_wuji,googly_eyes
-uv run scripts/superdex_fr3_viewer.py --bot openarm_v20 # visual check, serial + 1 env
+uv run scripts/superdex_bot_viewer.py --bot openarm_v20 # visual check, serial + 1 env
 ```
 
 Candidate selection and per-asset control profiles live in
@@ -263,9 +264,9 @@ armature of 0 needs a damping floor (`armature_floor=0.05` in the profile) —
 with the default floor the viewer sweep diverges the solver deterministically
 around frame 141 of the demo.
 
-Every non-registered bot has a precise recorded blocker (see
+The historical stage-3 report records the blockers before floating-root support (see
 `docs/superdex-bots-qualification/blocked-probes.json`): floating FREE roots
-(stage 4), actuator/sensor components (stage 6; the dg5f *seed* variants and
+(superseded for the qualified hands below), actuator/sensor components (stage 6; the dg5f *seed* variants and
 `fr3_dg5f_short_seed` carry 5 each), mechanical cycles (`fr3_v2_2f_85`
 compiles 2 from its 2f_85 attachment; `2f_85` also has a FREE root),
 SPHERICAL joints (oculus_xr hands), and the 0-DoF `openarm_v20_torso`, which
@@ -318,6 +319,11 @@ derivative of that vector. With an identity native reference transform, native
 free qvel uses world origin linear velocity and world angular velocity. The
 adapter rotates the angular component at the state barrier and verifies body
 origin/COM velocity against authored MuJoCo kinematics at nontrivial poses.
+Native bots may also author parent-joint and joint-link reference transforms.
+For those roots the adapter composes both transforms, rotates native velocities
+from the parent joint's axes, and accounts for the root-origin velocity induced
+by angular motion around a translated joint. Both translations and rotations
+are covered by independent SDK transform/Jacobian checks.
 
 The pre-step control callback runs once per physics substep. Motor/position
 controls respect authored order, gains, gear and limits. Pending body forces
@@ -368,3 +374,56 @@ checkout. Other numerical tests use small authored models
 and require the optional Python 3.12 runtime. Contract/import tests also run
 without it. UniLab owns task rollouts, training checkpoints and sim2sim policy
 I/O validation; those outcomes are tracked in the roadmap's integration child.
+
+
+## Native floating hands (stage 4)
+
+The native loader supports a FREE root with authored `parentLinkFromJoint`
+and `parentJointFromLink` translations and rotations, followed by fixed, revolute
+or prismatic joints. Root position is world xyz; orientation is a wxyz
+quaternion. Root velocity stores world linear velocity and body-frame angular
+velocity. Scalar joint positions start at index 7, velocities at index 6;
+controls exclude the six unactuated root degrees of freedom. Additional free
+joints, spherical joints, components and
+cycles still fail explicitly.
+
+Run the local, manifest-verified qualification (SDK required):
+
+```bash
+uv run scripts/superdex_floating_qualify.py --all-floating \
+  --out docs/superdex-floating-qualification/all-models
+SUPERDEX_ASSETS_PATH="$PWD/assets/superdex" uv run pytest -q tests/test_superdex_native_floating.py
+```
+
+Allegro V5 right (16 joints) and DG5F Short left (20 joints) passed 1,040
+steps in each of serial and batch modes against independent SDK scenes,
+including nonidentity root orientation, nonzero root/joint velocities, state
+round trips, full/selective reset, two-environment isolation and recreation.
+The command fails if the runtime, asset tree or any check is missing/failing.
+These checks qualify floating state and lifecycle; they do not qualify
+robot–object contact or sensor/actuator components.
+See [the report and current compatibility limits](superdex-floating-qualification/README.md).
+
+The expanded audit (`--all-floating`) discovers all 22 compiled FREE-root
+models in the local bundle. Ten pass: Allegro V5 left/right, DG5F Short and
+Long left/right, unactuated Wuji left/right, and OpenArm V20 left/right grippers.
+Twelve retain explicit later-stage
+blockers; see the [full table](superdex-floating-qualification/all-models/compatibility-table.md).
+The pytest qualification is parameterized over all ten passing models. Separate
+offscreen viewer smoke checks cover all ten; the standalone runner is
+`uv run scripts/superdex_floating_viewers.py`. SDK-free tests also cover root
+frame math and viewer cleanup on window-close events and initialization errors.
+
+The existing viewer accepts all ten floating profiles, for example:
+
+```bash
+uv run scripts/superdex_bot_viewer.py --bot allegro_v5_right
+uv run scripts/superdex_bot_viewer.py --bot wuji_hand2_beta1_left
+```
+
+Its viewer profile applies per-link gravity compensation through UniSim's
+force API to keep the hand in frame, then starts a slow root translation and
+rotation alongside a bounded finger sweep. Reset restores the full root and
+joint state. The numerical qualification uses ordinary gravity without this
+viewer compensation. The offscreen runner records numerical movement/reset
+reports and logs without saving images.

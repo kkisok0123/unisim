@@ -7,6 +7,8 @@ from typing import Any, Callable
 
 import numpy as np
 
+from unisim.backend.superdex.root_state import RootReference
+
 
 @dataclass(frozen=True)
 class SensorPlan:
@@ -27,10 +29,11 @@ class ModelPlan:
     """Canonical arrays and a native scene constructor; no hot-path XML access.
 
     Body zero is the world. ``body_link_indices`` maps every other canonical
-    body to the native articulation's nested link actors. Free roots use an
-    identity native reference transform: qpos is world xyz + wxyz followed by
+    body to the native articulation's nested link actors. Free-root
+    qpos is world xyz + wxyz followed by
     single-DoF joints; qvel is world origin velocity + body angular velocity
-    followed by single-DoF joints. Native free qvel uses world angular velocity.
+    followed by single-DoF joints. Native free qvel uses the parent joint's axes;
+    ``root_reference`` maps authored offsets (None for identity references).
     """
 
     source_file: str
@@ -65,3 +68,4 @@ class ModelPlan:
     cleanup: Callable[[], None]
     actuator_force_ranges: np.ndarray | None = None
     dof_armature: np.ndarray | None = None
+    root_reference: RootReference | None = None

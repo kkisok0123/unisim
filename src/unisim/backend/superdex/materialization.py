@@ -12,6 +12,7 @@ import numpy as np
 
 from unisim.backend.superdex.geometry import primitive_shape, rotation_matrix
 from unisim.backend.superdex.plans import ModelPlan, SensorPlan
+from unisim.backend.superdex.root_state import RootReference
 from unisim.scene import SceneCfg
 
 
@@ -63,8 +64,30 @@ def _native_plan(p: Any, r: Any, path: Path, efforts: Sequence[float] | None) ->
         )
     if any(len(link.sensors) or len(link.actuators) for link in links):
         raise NotImplementedError("superdex native bot sensor/actuator components are unsupported")
-    if joints[0].type != p.ArticulatedJointType.HARD:
-        raise NotImplementedError("superdex native bot currently requires a fixed HARD root")
+    if not joints or len(joints) != len(links):
+        raise ValueError("superdex native bot requires one joint per link")
+    floating = joints[0].type == p.ArticulatedJointType.FREE
+    if joints[0].type not in (p.ArticulatedJointType.HARD, p.ArticulatedJointType.FREE):
+        raise NotImplementedError("superdex native bot requires a HARD or FREE root")
+    root_reference = None
+    if floating:
+        transforms = (joints[0].parent_link_from_joint, links[0].parent_joint_from_link)
+        if any(
+            not np.array_equal(np.asarray(t.translation), [0, 0, 0])
+            or not np.array_equal(np.asarray(t.rotation), [0, 0, 0, 1])
+            for t in transforms
+        ):
+            values = []
+            for transform in transforms:
+                pos = np.asarray(transform.translation, dtype=float).copy()
+                quat = np.asarray(transform.rotation, dtype=float)[[3, 0, 1, 2]]
+                if not np.isfinite(pos).all() or not np.isfinite(quat).all():
+                    raise ValueError("superdex native root transforms must be finite")
+                norm = np.linalg.norm(quat)
+                if norm == 0:
+                    raise ValueError("superdex native root quaternion must be nonzero")
+                values.extend((pos, quat / norm))
+            root_reference = RootReference(*values)
     if any(
         j.type
         not in (
@@ -72,10 +95,14 @@ def _native_plan(p: Any, r: Any, path: Path, efforts: Sequence[float] | None) ->
             p.ArticulatedJointType.REVOLUTE,
             p.ArticulatedJointType.PRISMATIC,
         )
-        for j in joints
+        for j in joints[1:]
     ):
         raise NotImplementedError("superdex native bot supports only fixed/hinge/slide joints")
-    active = [i for i, joint in enumerate(joints) if joint.type != p.ArticulatedJointType.HARD]
+    active = [
+        i for i, joint in enumerate(joints)
+        if joint.type in (p.ArticulatedJointType.REVOLUTE, p.ArticulatedJointType.PRISMATIC)
+    ]
+    qoffset, voffset = (7, 6) if floating else (0, 0)
     n = len(active)
     if efforts is None:
         efforts = [float(joints[i].effort_limit) for i in active]
@@ -116,8 +143,17 @@ def _native_plan(p: Any, r: Any, path: Path, efforts: Sequence[float] | None) ->
                 pose.translation
             )
             coms.append(rotation.T @ world_offset)
-        q0 = np.empty(n, dtype=np.float64 if p.uses_double_precision() else np.float32)
-        actor.get_articulated_pose(q0)
+        native_q = np.empty(
+            n + voffset, dtype=np.float64 if p.uses_double_precision() else np.float32
+        )
+        actor.get_articulated_pose(native_q)
+        if floating:
+            quat = p.Quaternion.from_rotation_vector(native_q[3:6])
+            q0 = np.concatenate((native_q[:3], np.asarray(quat)[[3, 0, 1, 2]], native_q[6:]))
+            if root_reference is not None:
+                q0[:7], _ = root_reference.to_world(q0[:7], np.zeros(6))
+        else:
+            q0 = native_q
     finally:
         if bot is not None:
             r.destroy_bot(temp, bot)
@@ -142,23 +178,23 @@ def _native_plan(p: Any, r: Any, path: Path, efforts: Sequence[float] | None) ->
     names = tuple(str(joints[i].name) for i in active)
     return ModelPlan(
         source_file=str(path),
-        nq=n,
-        nv=n,
+        nq=n + qoffset,
+        nv=n + voffset,
         root_body_id=1,
-        floating=False,
+        floating=floating,
         body_names=("world", *(str(link.name) for link in links)),
         body_parent_ids=np.array([0, *(int(link.parent_link) + 1 for link in links)]),
         body_link_indices=np.array([-1, *range(len(links))]),
         body_mass=np.asarray(masses),
         body_ipos=np.asarray(coms),
         joint_names=names,
-        joint_qpos_indices=np.arange(n),
-        joint_qvel_indices=np.arange(n),
+        joint_qpos_indices=np.arange(n) + qoffset,
+        joint_qvel_indices=np.arange(n) + voffset,
         joint_ranges=np.asarray(ranges).reshape(n, 2),
         actuator_names=names,
         actuator_joint_names=names,
-        actuator_qpos_indices=np.arange(n),
-        actuator_qvel_indices=np.arange(n),
+        actuator_qpos_indices=np.arange(n) + qoffset,
+        actuator_qvel_indices=np.arange(n) + voffset,
         actuator_ctrl_ranges=ctrl_ranges,
         actuator_gear=np.ones(n),
         actuator_kp=np.zeros(n),
@@ -170,7 +206,8 @@ def _native_plan(p: Any, r: Any, path: Path, efforts: Sequence[float] | None) ->
         spawn_actor=spawn,
         cleanup=_noop,
         actuator_force_ranges=ctrl_ranges.copy(),
-        dof_armature=np.array([float(joints[i].inertia or 0) for i in active]),
+        dof_armature=np.array([0.0] * voffset + [float(joints[i].inertia or 0) for i in active]),
+        root_reference=root_reference,
     )
 
 

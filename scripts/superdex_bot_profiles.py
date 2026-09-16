@@ -1,6 +1,6 @@
 """Shared stage-3 bot registry: candidate assets and their control profiles.
 
-Both ``superdex_bot_qualify.py`` and ``superdex_fr3_viewer.py`` resolve
+Both ``superdex_bot_qualify.py`` and ``superdex_bot_viewer.py`` resolve
 per-bot control data from this module, so the qualification profile and the
 viewer demonstration cannot drift apart. Each profile defines a research
 control profile (not hardware ratings): joint-position targets in radians,
@@ -46,6 +46,7 @@ class BotProfile:
     # (googly_eyes, hand/finger combos) legitimately oscillate far faster
     # while staying adapter-vs-SDK exact, so their profiles carry no bound.
     max_qvel_bound: float | None = None
+    camera_direction: tuple[float, float, float] | None = None
 
 
 PROFILES: dict[str, BotProfile] = {}
@@ -176,6 +177,25 @@ _register(
 
 DEFAULT_KEY = "fr3_v2"
 
+# Stage-4 viewer profiles are kept separate from the fixed-base qualification
+# registry. The floating runner records its independent small-effort profile.
+FLOATING_PROFILES: dict[str, BotProfile] = {}
+for _side in ("left", "right"):
+    for _kind in ("allegro_v5", "dg5f_short", "dg5f_long", "wuji_hand2_beta1"):
+        _key = f"{_kind}_{_side}"
+        FLOATING_PROFILES[_key] = BotProfile(
+            key=_key, relpath=f"bots/hands/{_kind}/{_side}/{_key}.superdex_bot",
+            effort_limits=(1.0,) * 20 if _kind.startswith("dg5f") else None,
+            kp=0.03, armature_floor=1e-6, sweep_amplitude=0.1,
+        )
+    _key = f"openarm_v20_{_side}_gripper"
+    FLOATING_PROFILES[_key] = BotProfile(
+        key=_key,
+        relpath=f"bots/grippers/openarm_v20/{_side}/{_key}.superdex_bot",
+        effort_limits=None, kp=0.03, armature_floor=1e-6, sweep_amplitude=0.1,
+        camera_direction=(1.0, 1.0, 1.0),
+    )
+
 # Bots with known later-capability blockers, probed for precise evidence
 # instead of qualification (stage-4/5/6 work).
 BLOCKED_KEYS: dict[str, str] = {
@@ -191,8 +211,6 @@ BLOCKED_KEYS: dict[str, str] = {
     "2f_85": "bots/grippers/2f_85/2f_85.superdex_bot",
     "example_bot_2dof": "bots/fun/example_bot_2dof/example_bot_2dof.superdex_bot",
     "dg5f_short_left": "bots/hands/dg5f_short/left/dg5f_short_left.superdex_bot",
-    "allegro_v5_right": "bots/hands/allegro_v5/right/allegro_v5_right.superdex_bot",
-    "wuji_hand2_beta1_left": "bots/hands/wuji_hand2_beta1/left/wuji_hand2_beta1_left.superdex_bot",
     "wuji_hand2_beta1_actuated_left": (
         "bots/hands/wuji_hand2_beta1_actuated/left/wuji_hand2_beta1_actuated_left.superdex_bot"
     ),

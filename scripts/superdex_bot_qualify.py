@@ -141,7 +141,7 @@ def authored_joint_metadata(cfg) -> tuple[tuple[str, ...], np.ndarray, np.ndarra
     jt = physics.ArticulatedJointType
     names, ranges, efforts, armature = [], [], [], []
     for joint in cfg.joints:
-        if joint.type == jt.HARD:
+        if joint.type in (jt.HARD, jt.FREE):
             continue
         names.append(str(joint.name))
         if joint.type == jt.REVOLUTE and joint.min_limit is not None:
@@ -801,7 +801,7 @@ def probe_blocked(bot_path: Path, key: str, assets_root: Path) -> dict:
         unsupported = sorted(
             {
                 str(j.type).split(".")[-1]
-                for j in cfg.joints
+                for j in list(cfg.joints)[1:]
                 if j.type not in (jt.HARD, jt.REVOLUTE, jt.PRISMATIC)
             }
         )
@@ -839,8 +839,8 @@ def probe_blocked(bot_path: Path, key: str, assets_root: Path) -> dict:
 
     blockers: list[str] = []
     if isinstance(load, dict) and "error" not in load:
-        if load["root_joint"] != "HARD":
-            blockers.append(f"native floating root ({load['root_joint']} root)")
+        if load["root_joint"] not in ("HARD", "FREE"):
+            blockers.append(f"unsupported root ({load['root_joint']} root)")
         if load["cycles"]:
             blockers.append(f"mechanical cycles ({load['cycles']})")
         if load["components"]:
@@ -927,7 +927,7 @@ def run_one(profile: BotProfile, assets_root: Path, out: Path, tree_digest: str 
             "tree_digest": tree_digest,
             "sdk_precision": _sdk_precision(),
             "gravity": [0, 0, -9.81],
-            "visual_verification": "separate (scripts/superdex_fr3_viewer.py --bot <key>)",
+            "visual_verification": "separate (scripts/superdex_bot_viewer.py --bot <key>)",
         }
         out.mkdir(parents=True, exist_ok=True)
         (out / f"{profile.key}.json").write_text(
@@ -948,7 +948,7 @@ def write_compatibility_table(out: Path, qualified: list[dict], blocked: list[di
         "reports in this directory. Qualified means every check passed with the",
         "adapter matched against a direct SuperDex SDK scene driven with",
         "identical inputs in the same process. Visual verification is separate",
-        "(`scripts/superdex_fr3_viewer.py --bot <key>`).",
+        "(`scripts/superdex_bot_viewer.py --bot <key>`).",
         "",
         "## Qualified candidates",
         "",

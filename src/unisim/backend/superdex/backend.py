@@ -371,13 +371,18 @@ class SuperDexBackend(SimBackend):
             world.restore_state(self._snapshots[i], release_immediately=False)
             native_q, native_v = self._native_q[i], self._native_v[i]
             if self.model.floating:
-                native_q[:3] = q[row, :3]
+                root_q, root_v = q[row, :7], v[row, :6]
+                if self.model.root_reference is not None:
+                    root_q, root_v = self.model.root_reference.from_world(root_q, root_v)
+                else:
+                    root_v = root_v.copy()
+                    root_v[3:6] = rotate(root_q[3:7], root_v[3:6])
+                native_q[:3] = root_q[:3]
                 native_q[3:6] = np.asarray(
-                    self._p.Quaternion(q[row, [4, 5, 6, 3]]).to_rotation_vector()
+                    self._p.Quaternion(root_q[[4, 5, 6, 3]]).to_rotation_vector()
                 )
                 native_q[6:] = q[row, 7:]
-                native_v[:3] = v[row, :3]
-                native_v[3:6] = rotate(q[row, 3:7], v[row, 3:6])
+                native_v[:6] = root_v
                 native_v[6:] = v[row, 6:]
             else:
                 native_q[:] = q[row]
@@ -610,7 +615,14 @@ class SuperDexBackend(SimBackend):
                         )
                         self._lin[i, body_id] = np.asarray(link.get_linear_velocity())
         if m.floating:
-            self._qvel[ids, 3:6] = unrotate(self._qpos[ids, 3:7], self._native_v[ids, 3:6])
+            if m.root_reference is None:
+                self._qvel[ids, 3:6] = unrotate(self._qpos[ids, 3:7], self._native_v[ids, 3:6])
+            else:
+                root_q, root_v = m.root_reference.to_world(
+                    self._qpos[ids, :7], self._native_v[ids, :6]
+                )
+                self._qpos[ids, :7] = root_q
+                self._qvel[ids, :6] = root_v
         if full_state_ready:
             self._lin[ids] -= np.cross(self._ang[ids], self._com[ids] - self._pos[ids])
             self._refresh_sensor_batches(ids)
@@ -885,16 +897,14 @@ class SuperDexBackend(SimBackend):
         from unisim.backend.playback_common import env_cfg_value
 
         viewer = Viewer(ViewerCfg(offscreen=offscreen))
-        viewer.set_scene(self._worlds[0])
-        # Polyscope's camera view matrix is uninitialized (NaN) until the first
-        # explicit camera placement, and the viewer's navigation gizmo reads it
-        # while building the first ImGui frame. Frame the scene up front so the
-        # first frame_tick sees a finite camera.
-        viewer.frame_scene()
-        ctrl_dt = float(env_cfg_value(env, "ctrl_dt", 1.0 / 60.0))
-        obs = initialize()
-        steps = 0
         try:
+            viewer.set_scene(self._worlds[0])
+            # Frame the scene before the first render; Polyscope's initial
+            # camera matrix is otherwise NaN. Initialization must also clean up.
+            viewer.frame_scene()
+            ctrl_dt = float(env_cfg_value(env, "ctrl_dt", 1.0 / 60.0))
+            obs = initialize()
+            steps = 0
             while num_steps is None or steps < num_steps:
                 started = time.perf_counter()
                 obs = step(obs)

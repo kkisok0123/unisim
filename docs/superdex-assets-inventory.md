@@ -17,12 +17,24 @@ SDK-free inventory of the repository-local asset copy under
 
 - Files: 893
 - Total size: 248.3 MiB
-- Tree digest (SHA-256 over path+file hashes): `decf1b36a59a3479cd5efa40057b76e3e82e653eeeb3a0ef37ff9254bd598010`
+- Tree digest (SHA-256 over path+file hashes): `6e0b81825cabe2e39f6b95a98cdddd8391ed67629cf7718fad5b0bf5424e6489`
 - Root markers: bots, prefabs, test
 - Entries by kind: {'bot': 37, 'controller': 1, 'prefab': 15, 'scene': 2}
 - Dispositions: {'control-profile': 1, 'profile-candidate': 6, 'recipe-candidate': 12, 'unsupported-features': 36}
 
 ## Compatibility table
+
+Documentation updates through 2026-09-16 marked Stage 4 complete, changed the
+local `README.md` for that completion, and updated viewer-command references
+in the README and integration plan for the generic bot-viewer filename. Viewer
+smoke checks retain numerical reports without saving images. Per-file hashes
+confirmed all other bundle files were unchanged. The bundle contains
+260,340,720 bytes across the same 893 files.
+Original qualification reports retain the previous tree digest
+`decf1b36a59a3479cd5efa40057b76e3e82e653eeeb3a0ef37ff9254bd598010`.
+Source provenance above is unchanged. This inventory's classifications are
+the initial capability inventory; current qualification results are in the
+[Stage 4 report](superdex-floating-qualification/README.md).
 
 | Entrypoint | Kind | Disposition | Blockers / required capabilities |
 | --- | --- | --- | --- |

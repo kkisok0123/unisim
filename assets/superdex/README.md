@@ -1,5 +1,14 @@
 # SuperDex assets
 
+Stage 4 is complete for this local bundle: **10 floating models and 11
+fixed-base models qualify**. Native FREE roots support authored parent-joint
+and joint-link translations and rotations. The remaining models require
+later-stage capabilities; see the compatibility details below.
+
+This directory is local and ignored by Git. The tracked qualification code
+and reports live under `scripts/`, `tests/`, and `docs/` in the repository.
+Run the commands below from the repository root.
+
 UniSim does not require SuperDex assets to live in this directory. Set
 `SUPERDEX_ASSETS_PATH` to the root of your own SuperDex asset bundle. The root
 must contain the `bots`, `prefabs`, or `test` directories and their
@@ -69,6 +78,83 @@ compatibility table are in `docs/superdex-bots-qualification/` at the
 repository root. One guard test compares the candidate lists against the
 inventory, so a bot can never silently disappear from testing: it must be
 either qualified or listed with a precise blocker.
+
+## Run the Stage 4 floating-model checks
+
+The ten qualified floating models are:
+
+| Family | Qualified variants |
+| --- | --- |
+| Allegro V5 | Left and right |
+| DG5F Short | Left and right |
+| DG5F Long | Left and right |
+| Wuji Hand2 Beta1 | Unactuated left and right |
+| OpenArm V20 grippers | Left and right |
+
+Run the focused tests, audit all 22 floating models, and repeat the eleven
+fixed-base regression profiles:
+
+```sh
+uv run --no-sync pytest -q -rs tests/test_superdex_native_floating.py
+uv run --no-sync scripts/superdex_floating_qualify.py --all-floating --out docs/superdex-floating-qualification/all-models
+uv run --no-sync scripts/superdex_bot_qualify.py --out docs/superdex-floating-qualification/fixed-base-regression
+```
+
+The check code is in `scripts/superdex_floating_qualify.py` and
+`tests/test_superdex_native_floating.py`. It checks each model against a direct
+SDK scene in serial and batch modes: default pose, geometry, joint ordering,
+root-state conversion, 1,040-step trajectories, state round trips, effort
+clipping, full/selective reset, environment isolation, and cleanup. Separate
+tests cover translated/rotated root frames and viewer exit/error paths.
+
+Canonical root state uses world xyz and a wxyz quaternion. Linear velocity is
+measured at the root-link origin in world axes; angular velocity uses root-link
+axes. Scalar joint positions follow the seven root position entries, and
+scalar joint velocities follow the six root velocity entries.
+
+The all-floating audit records **10 passes and 12 explicit blockers**: seven
+models have sensor/actuator components, four Oculus XR models have spherical
+child joints, and the 2f_85 gripper has mechanical cycles. These require stages
+6 and 8. Expected blockers do not fail the audit; unexpected or numerical
+failures do. To require a particular model to pass, select it explicitly:
+
+```sh
+uv run --no-sync scripts/superdex_floating_qualify.py --bots wuji_hand2_beta1_left --out /tmp/superdex-wuji-qualification
+```
+
+All 37 bot models are accounted for: 21 qualify and 16 have recorded blockers,
+including four fixed-base models. Stage 5 covers independent objects and
+object contact.
+
+## Run floating-model viewer smoke checks
+
+Open one interactive native viewer, or run movement and reset through the
+native viewer for all ten qualified floating models:
+
+```sh
+uv run --no-sync scripts/superdex_bot_viewer.py --bot wuji_hand2_beta1_left
+uv run --no-sync scripts/superdex_floating_viewers.py
+```
+
+Viewer profiles use gravity compensation, bounded joint motion, and slow root
+motion to keep each model visible. Numerical qualification uses ordinary
+gravity. The commands record numerical reports and logs without saving images.
+A real interactive window-close check passed.
+
+See the [Stage 4 completion report](../../docs/superdex-floating-qualification/README.md),
+[floating compatibility table](../../docs/superdex-floating-qualification/all-models/compatibility-table.md),
+and [viewer measurements](../../docs/superdex-floating-qualification/viewers/summary.json).
+The recorded completion run had **23 focused tests passed**, **315 passed and
+18 skipped** in the full suite, and a successful package build.
+
+## Bundle verification
+
+Qualification runners verify the local tree against
+`docs/superdex-assets-inventory.json` before loading models. That checksum
+includes local documentation such as this README. Updating documentation
+therefore requires refreshing the recorded inventory, even when model files
+are unchanged. Qualification reports retain the bundle digest from their
+original run; the inventory documents subsequent documentation-only updates.
 
 ## Known SuperDex SDK phenomena observed during qualification
 

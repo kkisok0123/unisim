@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Visualize the unchanged FR3 through UniSim's SuperDex adapter (stage 2A).
+"""Visualize a qualified robot through UniSim's SuperDex adapter.
 
-One standalone command loads ``bots/arms/fr3_v2/fr3_v2.superdex_bot`` from the
-repository-local asset copy, verifies it against the recorded inventory, and
-opens the native Polyscope viewer through the adapter's ``run_playback``
-interactive path (serial execution, one environment, no recording). The
-demonstration runs three distinct, observable phases:
+The command loads the selected profile from the repository-local asset copy,
+verifies it against the recorded inventory, and opens the native Polyscope
+viewer through the adapter's ``run_playback`` path. The default profile remains
+``fr3_v2``. Fixed-base and floating profiles are registered in
+``scripts/superdex_bot_profiles.py``. The demonstration runs three observable
+phases:
 
 1. Initial pose: hold the authored default pose so the geometry, scale and
    link alignment can be inspected.
@@ -14,9 +15,8 @@ demonstration runs three distinct, observable phases:
 3. Reset: ``backend.reset()`` restores the authored default pose in view, and
    the restored joint state is checked numerically.
 
-Stage 3 adds ``--bot <key>`` to reuse the same demonstration for any bot
-registered in ``scripts/superdex_bot_profiles.py`` (fixed-base arms and
-recipe compositions), each with its explicit per-asset control profile.
+Each profile supplies explicit per-asset control and camera settings. Floating
+profiles additionally demonstrate bounded root translation and rotation.
 
 Close the window to exit; the viewer and backend are released in ``finally``
 blocks, including on errors. Requires the optional SuperDex runtime, Polyscope
@@ -24,8 +24,8 @@ blocks, including on errors. Requires the optional SuperDex runtime, Polyscope
 run). Asset setup:
 
     export SUPERDEX_ASSETS_PATH="$PWD/assets/superdex"
-    uv run scripts/superdex_fr3_viewer.py                     # fr3_v2
-    uv run scripts/superdex_fr3_viewer.py --bot openarm_v20_wuji
+    uv run scripts/superdex_bot_viewer.py                     # fr3_v2
+    uv run scripts/superdex_bot_viewer.py --bot openarm_v20_wuji
 """
 
 from __future__ import annotations
@@ -34,10 +34,8 @@ import argparse
 import json
 import math
 import os
-import struct
 import sys
 import time
-import zlib
 from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -46,12 +44,15 @@ sys.path.insert(0, str(REPOSITORY_ROOT / "scripts"))
 
 from superdex_bot_profiles import (  # noqa: E402
     DEFAULT_KEY,
+    FLOATING_PROFILES,
     PROFILES,
     resolve_gains,
     sweep_amplitudes,
 )
 
 from unisim.backend.superdex.assets import verify_asset_bundle  # noqa: E402
+
+PROFILES = {**PROFILES, **FLOATING_PROFILES}
 
 INVENTORY_REPORT = REPOSITORY_ROOT / "docs" / "superdex-assets-inventory.json"
 
@@ -68,30 +69,6 @@ MOVE_PERIOD = 2.0
 # Fraction of the reachable range around the default pose used when bounding
 # the requested sweep amplitude (kept identical to the qualification runner).
 REACHABLE_FRACTION = 0.6
-
-
-def _png_chunk(tag: bytes, data: bytes) -> bytes:
-    body = tag + data
-    return len(data).to_bytes(4, "big") + body + (zlib.crc32(body) & 0xFFFFFFFF).to_bytes(4, "big")
-
-
-def write_png(path: Path, rgb: "object") -> None:
-    """Write one (H, W, 3|4) uint8 screenshot buffer as an RGB PNG, stdlib only."""
-    import numpy as np
-
-    frame = np.flipud(np.ascontiguousarray(rgb))
-    if frame.ndim != 3 or frame.shape[2] not in (3, 4):
-        raise ValueError(f"unsupported screenshot buffer shape {frame.shape}")
-    if frame.shape[2] == 4:
-        frame = frame[:, :, :3]
-    height, width, _ = frame.shape
-    raw = b"".join(b"\x00" + frame[row].tobytes() for row in range(height))
-    path.write_bytes(
-        b"\x89PNG\r\n\x1a\n"
-        + _png_chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
-        + _png_chunk(b"IDAT", zlib.compress(raw, 6))
-        + _png_chunk(b"IEND", b"")
-    )
 
 
 def resolve_assets_root(cli_value: str | None) -> Path:
@@ -135,7 +112,7 @@ def _authored_joint_metadata(bot_path: Path):
     jt = physics.ArticulatedJointType
     names, ranges, efforts, armature = [], [], [], []
     for joint in cfg.joints:
-        if joint.type == jt.HARD:
+        if joint.type in (jt.HARD, jt.FREE):
             continue
         names.append(str(joint.name))
         if joint.type == jt.REVOLUTE and joint.min_limit is not None:
@@ -170,7 +147,7 @@ def main(argv: list[str] | None = None) -> int:
         "--out",
         type=Path,
         default=None,
-        help="directory for captures and the run report "
+        help="directory for the run report "
         "(default docs/superdex-bots-viewer/<key> or docs/superdex-fr3-viewer for fr3_v2)",
     )
     parser.add_argument(
@@ -195,6 +172,7 @@ def main(argv: list[str] | None = None) -> int:
             if args.bot == "fr3_v2"
             else REPOSITORY_ROOT / "docs" / "superdex-bots-viewer" / args.bot
         )
+    args.out = args.out.expanduser().resolve()
     if args.skip_verification:
         print("asset verification: skipped")
     else:
@@ -232,10 +210,20 @@ def main(argv: list[str] | None = None) -> int:
         superdex_effort_limits=list(resolved.effort_limits),
     )
 
-    q0 = backend.get_default_qpos()
+    default_state = backend.get_default_qpos()
+    q0 = backend.get_dof_pos()[0].copy()
+    floating = backend.model.floating
+    body_ids = np.arange(1, len(backend.model.body_names))
+    # Apply gravity compensation at each link's COM through the public API.
+    # This viewer profile keeps a free hand in frame; qualification uses gravity.
+    support = -backend.get_body_mass()[body_ids, None] * backend.get_gravity()[None, :]
     joint_ranges = backend.get_joint_range()
     # Movement stays inside the authored joint ranges around the default pose.
     amplitudes = np.asarray(sweep_amplitudes(profile, q0, joint_ranges, REACHABLE_FRACTION))
+    if floating:
+        # A joint authored at its limit needs a one-sided sweep. Targets are
+        # clipped below instead of assigning that joint zero amplitude.
+        amplitudes = np.minimum(profile.sweep_amplitude, .3 * np.diff(joint_ranges)[:, 0])
     kp, kd, effort = (
         np.asarray(v, dtype=float) for v in (resolved.kp, resolved.kd, resolved.effort_limits)
     )
@@ -265,30 +253,14 @@ def main(argv: list[str] | None = None) -> int:
         "effort_limits_nm": list(resolved.effort_limits),
         "pd_gains": {"kp": list(resolved.kp), "kd": list(resolved.kd)},
         "move_amplitudes_rad": [round(float(a), 4) for a in amplitudes],
+        "floating_root": floating,
+        "root_profile": "per-link gravity compensation; movement starts with world linear "
+                        "velocity [0.015,0,0.005] m/s and body angular [0,0.04,0] rad/s",
         "phases": {},
     }
-    captures: list[tuple[str, Path]] = []
-    pending_capture: list[str] = []
-
-    def grab_pending() -> None:
-        if not pending_capture:
-            return
-        from superdex.physics.viewer.backend import polyscope as ps
-
-        name = pending_capture.pop(0)
-        path = args.out / f"{profile.key}_{name}.png"
-        write_png(path, ps.screenshot_to_buffer())
-        captures.append((name, path))
-
-    def mark_capture(name: str) -> None:
-        # The buffer holds the last rendered frame; capture one callback later.
-        if pending_capture:
-            grab_pending()
-        pending_capture.append(name)
-
     movement_peak = 0.0
+    root_movement_peak = 0.0
     reset_error = None
-    movement_captured = False
 
     def enter_phase(name: str) -> bool:
         """Run one-time phase entry; True exactly on each phase's first callback."""
@@ -298,24 +270,36 @@ def main(argv: list[str] | None = None) -> int:
         if phase_time > 0.0:
             return False
         if name == "initial-pose":
+            if profile.camera_direction is not None:
+                from superdex.physics.viewer.backend import polyscope as ps
+
+                boxes = [link.get_aabb_world() for link in backend._links[0]]
+                lo = np.min([box.min for box in boxes], axis=0)
+                hi = np.max([box.max for box in boxes], axis=0)
+                center = (lo + hi) / 2
+                direction = np.asarray(profile.camera_direction)
+                eye = center + direction / np.linalg.norm(direction) * np.linalg.norm(hi - lo) * 2
+                ps.look_at(eye, center)
             print(f"[{name}] holding authored default pose (inspect geometry)")
-            mark_capture("initial_pose")
         elif name == "bounded-movement":
+            if floating:
+                state = backend.get_state()
+                state["qvel"][0, :3] = [0.015, 0, 0.005]
+                state["qvel"][0, 3:6] = [0, 0.04, 0]
+                backend.set_state(np.array([0]), state["qpos"], state["qvel"])
             print(f"[{name}] sine sweep, amplitudes {[round(float(a), 3) for a in amplitudes]} rad")
         elif name == "reset":
             backend.reset()
-            reset_error = float(np.max(np.abs(backend.get_state()["qpos"][0] - q0)))
+            reset_error = float(np.max(np.abs(backend.get_state()["qpos"][0] - default_state)))
             report["phases"]["reset"] = {"restored_qpos_max_error_rad": reset_error}
             print(
                 f"[{name}] backend.reset() restored default pose "
                 f"(max qpos error {reset_error:.2e} rad)"
             )
-            mark_capture("reset")
         return True
 
     def demo_step(obs):
-        nonlocal phase, phase_time, movement_peak, movement_captured
-        grab_pending()
+        nonlocal phase, phase_time, movement_peak, root_movement_peak
         target = q0.copy()
         enter_phase(phase)
         if phase == "initial-pose":
@@ -326,13 +310,16 @@ def main(argv: list[str] | None = None) -> int:
                 2.0 * math.pi * phase_time / MOVE_PERIOD
                 + np.linspace(0.0, 3.0 * math.pi / 2.0, len(q0))
             )
+            if floating:
+                target = np.clip(target, joint_ranges[:, 0], joint_ranges[:, 1])
+                root_movement_peak = max(root_movement_peak, float(np.linalg.norm(
+                    backend.get_state()["qpos"][0, :3] - default_state[:3]
+                )))
             movement_peak = max(movement_peak, float(np.max(np.abs(backend.get_dof_pos()[0] - q0))))
-            if not movement_captured and phase_time >= MOVE_SECONDS / 2.0:
-                mark_capture("movement")
-                movement_captured = True
             if phase_time >= MOVE_SECONDS:
                 report["phases"]["bounded-movement"] = {
                     "peak_abs_deviation_rad": movement_peak,
+                    "peak_root_displacement_m": root_movement_peak,
                 }
                 phase, phase_time = "reset", -CTRL_DT
         elif phase == "reset":
@@ -344,6 +331,8 @@ def main(argv: list[str] | None = None) -> int:
                     "close the window to exit"
                 )
                 phase, phase_time = "done", -CTRL_DT
+        if floating:
+            backend.apply_body_force(body_ids, support[None], np.zeros_like(support)[None])
         backend.step(target[None, :], DECIMATION)
         phase_time += CTRL_DT
         return obs
@@ -365,13 +354,8 @@ def main(argv: list[str] | None = None) -> int:
         # blocks below; treat it as a clean interactive exit.
         interrupted = True
     finally:
-        try:
-            grab_pending()
-        except Exception:
-            pass
         backend.cleanup_scene_assets()
         report["elapsed_seconds"] = round(time.perf_counter() - started, 2)
-        report["captures"] = [str(path.relative_to(REPOSITORY_ROOT)) for _, path in captures]
         report["viewer"] = "offscreen" if frames is not None else "interactive"
         (args.out / "report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
 
@@ -379,8 +363,6 @@ def main(argv: list[str] | None = None) -> int:
         print("interrupted: viewer and backend released")
         return 0 if reset_error is not None else 1
     print(f"report: {args.out / 'report.json'}")
-    for name, path in captures:
-        print(f"capture[{name}]: {path}")
     if reset_error is None:
         print("error: the reset phase never ran (closed too early?)", file=sys.stderr)
         return 1

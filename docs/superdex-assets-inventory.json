@@ -16,8 +16,14 @@
     "generated_utc": "2026-09-15T08:09:59Z"
   },
   "file_count": 893,
-  "total_bytes": 260336568,
-  "tree_digest": "decf1b36a59a3479cd5efa40057b76e3e82e653eeeb3a0ef37ff9254bd598010",
+  "total_bytes": 260340720,
+  "tree_digest": "6e0b81825cabe2e39f6b95a98cdddd8391ed67629cf7718fad5b0bf5424e6489",
+  "local_documentation_update": {
+    "date": "2026-09-16",
+    "paths": ["README.md", "superdex-assets-integration-plan.md"],
+    "previous_tree_digest": "decf1b36a59a3479cd5efa40057b76e3e82e653eeeb3a0ef37ff9254bd598010",
+    "note": "Updated local Stage 4 completion documentation and generic bot-viewer commands; viewer smoke checks retain numerical reports without saving images. Per-file hashes confirmed every other bundle file unchanged. Source provenance and original qualification report digests are preserved."
+  },
   "root_markers": [
     "bots",
     "prefabs",

@@ -1,0 +1,113 @@
+{
+  "bot": "bots/fun/googly_eyes/googly_eyes.superdex_bot",
+  "key": "googly_eyes",
+  "sim_dt": 0.002,
+  "decimation": 8,
+  "actuator_order": [
+    "joint_eye"
+  ],
+  "effort_limits_nm": [
+    2.0
+  ],
+  "pd_gains": {
+    "kp": [
+      5.0
+    ],
+    "kd": [
+      0.1414213562373095
+    ],
+    "dof_armature": [
+      0.0
+    ],
+    "armature_floor": 0.001
+  },
+  "sweep_amplitudes_rad": [
+    0.5
+  ],
+  "tolerances": {
+    "structure": 1e-06,
+    "trajectory": 1e-07,
+    "reset": 1e-06
+  },
+  "checks": {
+    "recipe_accounting": {
+      "passed": true,
+      "recipe": false
+    },
+    "structure": {
+      "passed": true,
+      "body_inventory_ok": true,
+      "joint_inventory_ok": true,
+      "control_order_ok": true,
+      "default_qpos_max_dev_rad": 0.0,
+      "dynamic_body_mass_max_dev_kg": 0.0,
+      "body_pos_max_dev_m": 0.0,
+      "aabb_max_dev_m": 0.0,
+      "joint_range_max_dev_rad": 0.0
+    },
+    "control": {
+      "passed": true,
+      "probe_torque_nm": 1.0,
+      "control_columns_reach_own_joint": true,
+      "response_matrix_vs_sdk_max_dev_rad_s": 0.0,
+      "response_matrix_diagonal": [
+        480.009827
+      ],
+      "effort_clip_exact": true,
+      "effort_clip_max_dev_rad": 0.0
+    },
+    "trajectory_equivalence": {
+      "passed": true,
+      "physics_steps": 1040,
+      "sweep_amplitudes_rad": [
+        0.5
+      ],
+      "batch_vs_sdk_max_dev_rad": 0.0,
+      "serial_vs_sdk_max_dev_rad": 0.0,
+      "reference_max_abs_qvel_rad_s": 461.1885070800781,
+      "max_abs_qvel_bound_rad_s": null,
+      "finite_state": true
+    },
+    "contact_recovery": {
+      "passed": true,
+      "skipped": "no representative self-contact geometry"
+    },
+    "reset": {
+      "passed": true,
+      "whole_reset_max_dev_rad": 0.0,
+      "reset_matches_sdk_default_rad": 0.0,
+      "selective_reset_env0_dev_rad": 0.0,
+      "selective_reset_env1_untouched": true,
+      "roundtrip_qpos_dev_rad": 1.4901161138336505e-09,
+      "roundtrip_qvel_dev_rad": 7.450580569168253e-10
+    },
+    "isolation": {
+      "passed": true,
+      "env0_vs_single_max_dev_rad": 0.0,
+      "env1_vs_single_max_dev_rad": 0.0
+    },
+    "lifecycle": {
+      "passed": true,
+      "cycles": 3,
+      "reset_deviations_rad": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  },
+  "elapsed_seconds": 0.58,
+  "provenance": {
+    "code_commit": "a92fc3f2ef8994139c3bd7cedb2b65df8e0a267d",
+    "branch": "superdex-assets-import",
+    "asset_root": "/home/pc829/UniFamily/unisim/assets/superdex",
+    "tree_digest": "decf1b36a59a3479cd5efa40057b76e3e82e653eeeb3a0ef37ff9254bd598010",
+    "sdk_precision": "float32",
+    "gravity": [
+      0,
+      0,
+      -9.81
+    ],
+    "visual_verification": "separate (scripts/superdex_fr3_viewer.py --bot <key>)"
+  }
+}

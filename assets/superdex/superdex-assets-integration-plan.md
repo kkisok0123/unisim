@@ -143,7 +143,7 @@ and adapter development. Runtime qualification remains in the following stages.
 
 ### 2A. Visualize the unchanged FR3 through the existing adapter — complete
 
-Built as `scripts/superdex_fr3_viewer.py` with the run report and captures
+Built as `scripts/superdex_bot_viewer.py` with a numerical run report
 under `docs/superdex-fr3-viewer/`; see the FR3 viewer demonstration section
 in `docs/superdex.md`. Asset pre-verification uses
 `verify_asset_bundle()` against the recorded inventory JSON. Demonstrated
@@ -172,7 +172,7 @@ adapter's native `run_playback` path. The example must work without UniLab.
 - Fix demonstrated adapter or viewer problems in asset materialization, scene
   binding, stepping, state synchronization, camera framing and cleanup. Preserve
   the original asset bytes and reject unsupported features explicitly.
-- Supply one documented `uv run` command and representative captures. Verify
+- Supply one documented `uv run` command and a numerical run report. Verify
   that closing the window releases the viewer and backend, including error paths.
   Retain focused regression coverage for any adapter/viewer fixes.
 
@@ -239,7 +239,7 @@ remaining bot has a precise recorded blocker. Proceed to stage 4.
 **Done when:** every candidate in this stage either passes qualification or has
 a specific blocker, and the first milestone's compatibility table is available.
 
-### 4. Extend the adapter for native floating roots
+### 4. Extend the adapter for native floating roots — complete
 
 Extend native bot state translation for free-root robots. Begin with one hand
 whose remaining features fit the adapter, then expand to other candidates.
@@ -343,7 +343,7 @@ Stage 8 is scheduled per capability. All extensions reuse the viewer workflow.
 The next three pull requests are:
 
 1. **FR3 visualization through UniSim (2A): complete** — see
-   `scripts/superdex_fr3_viewer.py` and `docs/superdex-fr3-viewer/`.
+   `scripts/superdex_bot_viewer.py` and `docs/superdex-fr3-viewer/`.
 2. **Untouched FR3 adapter qualification (2B): complete** — numerical,
    contact, reset, isolation and lifecycle checks against direct SDK
    execution; see `scripts/superdex_fr3_qualify.py`,
@@ -376,7 +376,7 @@ qualify an asset.
 | Reset | State round trips and whole-scene/selective reset restore the intended state. |
 | Isolation | Stepping or resetting one environment leaves another unchanged. |
 | Lifecycle | Repeated creation, cleanup and recreation succeed. |
-| Visuals | Native UniSim playback shows complete geometry, correct scale and link alignment, bounded movement and visible reset; captures and results are recorded. |
+| Visuals | Native UniSim playback shows complete geometry, correct scale and link alignment, bounded movement and visible reset; numerical results are recorded without saving images. |
 
 Use direct Superdex execution with the same inputs as the adapter reference.
 Record the asset source revision and local derivatives, UniSim code commit, manifest digest,

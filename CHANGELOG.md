@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Complete the native floating-model audit across all 22 FREE-root bots: ten
+  hands/grippers pass direct-SDK state/lifecycle qualification in serial and
+  batch modes; twelve retain later-stage component/joint/cycle blockers.
+  Add `--all-floating`, per-model reports, a ten-model pytest set and native
+  viewer demonstrations for every qualified floating model.
+
+- Add native SuperDex FREE roots with authored reference transforms, canonical
+  world-position/wxyz-orientation state, body-frame angular velocity, and
+  corrected joint/control offsets. Add SDK-free metadata/rejection tests,
+  direct-SDK transform/Jacobian qualification, translated/rotated reference
+  regression fixtures, and floating viewer profiles with full-state reset.
+  Close native viewers on scene-binding, camera and initialization failures.
+
 - Add the stage-3 compatible-bots qualification:
   `uv run scripts/superdex_bot_qualify.py` runs the stage-2B check set for
   eleven registered candidates — the fr3/fr3_v2 arms, both openarm_v20 arms,
@@ -38,7 +51,7 @@
   subset is `tests/test_superdex_fr3_qualification.py` (opt-in via
   `SUPERDEX_ASSETS_PATH`). See `docs/superdex.md`.
 - Add the stage-2A FR3 viewer demonstration:
-  `uv run scripts/superdex_fr3_viewer.py` opens the unchanged
+  `uv run scripts/superdex_bot_viewer.py` opens the unchanged
   `bots/arms/fr3_v2/fr3_v2.superdex_bot` from the local asset copy through the
   SuperDex adapter's native `run_playback` interactive path (serial mode, one
   environment) and runs three observable phases — authored initial-pose hold,
@@ -47,7 +60,7 @@
   in radians (`fr3_joint1..7`); a pre-step PD converter clips to explicit
   87/87/87/87/12/12/12 N·m effort limits (demonstration profile, not hardware
   ratings). Window close, Ctrl-C and error paths release the viewer and
-  backend; captures and the run report are written to
+  backend; the run report is written to
   `docs/superdex-fr3-viewer/`. See `docs/superdex.md`.
 - Add `verify_asset_bundle()` to `unisim.backend.superdex.assets`: it
   re-hashes a local asset tree against the recorded inventory JSON and
