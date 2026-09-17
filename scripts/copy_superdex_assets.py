@@ -27,6 +27,7 @@ import json
 import shutil
 import subprocess
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -35,6 +36,7 @@ sys.path.insert(0, str(REPOSITORY_ROOT / "src"))
 from unisim.backend.superdex.assets import (  # noqa: E402
     Provenance,
     build_inventory,
+    load_recorded_inventory,
     now_utc,
     sha256_file,
     verify_bundle,
@@ -189,8 +191,8 @@ def write_reports(inventory_json: dict, report_dir: Path) -> None:
         "",
         "## Verification",
         "",
-        "All dependency references resolve inside `assets/superdex`; per-file",
-        "SHA-256 hashes match the source checkout. See the JSON record for the",
+        "Dependency verification results and the local tree checksum are recorded",
+        "in the JSON inventory. See that record for the",
         "full dependency-edge and hash detail.",
         "",
     ]
@@ -212,7 +214,8 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="re-copy files even if identical content is already present",
     )
-    parser.add_argument(
+    reporting = parser.add_mutually_exclusive_group()
+    reporting.add_argument(
         "--report-only",
         action="store_true",
         help=(
@@ -220,11 +223,37 @@ def main(argv: list[str] | None = None) -> int:
             "against the source without modifying either tree"
         ),
     )
+    reporting.add_argument(
+        "--inventory-only",
+        action="store_true",
+        help="refresh the local inventory without copying or consulting the source checkout",
+    )
     args = parser.parse_args(argv)
 
     source = args.source.resolve()
     destination = args.destination.resolve()
     report_dir = args.report_dir.resolve()
+    if args.inventory_only:
+        recorded = load_recorded_inventory(report_dir / INVENTORY_JSON_NAME)
+        provenance = Provenance(**recorded["provenance"])
+        derivatives = frozenset(
+            path for path in provenance.local_derivative_paths
+            if (destination / path).is_file()
+        )
+        provenance = replace(
+            provenance, local_derivative_paths=tuple(sorted(derivatives)), generated_utc=now_utc()
+        )
+        inventory = build_inventory(destination, provenance, derivatives)
+        errors, warnings = verify_bundle(inventory, destination)
+        if errors:
+            for error in errors:
+                print(f"error: {error}", file=sys.stderr)
+            return 1
+        payload = inventory.to_json()
+        payload["verify"] = {"errors": errors, "warnings": warnings}
+        write_reports(payload, report_dir)
+        print(f"tree digest:  {inventory.tree_digest}")
+        return 0
     if not source.is_dir():
         print(f"error: source directory not found: {source}", file=sys.stderr)
         return 1

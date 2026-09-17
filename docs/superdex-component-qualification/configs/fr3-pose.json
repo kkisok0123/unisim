@@ -1,0 +1,5 @@
+{
+  "type_name": "MOCHI_ARTICULATED_POSE",
+  "param_args": "../../../assets/superdex/bots/arms/fr3_v2/control/fr3_v2_pose.superdex_controller",
+  "init_args": "{}"
+}

@@ -125,10 +125,10 @@ def test_floating_root_and_components_are_blocked_not_dropped(tmp_path):
         (bundle / "bots" / "hands" / "hand.superdex_bot").read_text()
     )
     hand["links"][0]["actuators"] = [
-        {"name": "a0", "type": "WUJI_POSITION_SERVO", "params": {}}
+        {"name": "a0", "type": "CUSTOM_POSITION_SERVO", "params": {}}
     ]
     hand["links"][0]["sensors"] = [
-        {"name": "s0", "type": "WUJI_CONTACT_FORCE_SENSOR"}
+        {"name": "s0", "type": "CUSTOM_CONTACT_FORCE_SENSOR"}
     ]
     _write(bundle / "bots" / "hands" / "hand.superdex_bot", hand)
     inventory = build_inventory(bundle, _provenance())
@@ -523,6 +523,31 @@ def test_copy_script_report_only_detects_modified_destination(tmp_path):
     assert "comparison failed" in result.stderr
 
 
+def test_inventory_only_refreshes_local_bundle_without_source(tmp_path):
+    source = _seed_source_repo(tmp_path / "src-repo")
+    destination = tmp_path / "dest" / "assets"
+    reports = tmp_path / "reports"
+    assert _run_copy(source, destination, reports).returncode == 0
+    (destination / "README.md").write_text("Local bundle documentation.\n")
+    result = _run_copy(tmp_path / "absent", destination, reports, "--inventory-only")
+    assert result.returncode == 0, result.stderr
+    summary = verify_asset_bundle(destination, reports / "superdex-assets-inventory.json")
+    assert summary["dependency_errors"] == []
+
+
+def test_inventory_only_preserves_report_on_missing_dependency(tmp_path):
+    source = _seed_source_repo(tmp_path / "src-repo")
+    destination = tmp_path / "dest" / "assets"
+    reports = tmp_path / "reports"
+    assert _run_copy(source, destination, reports).returncode == 0
+    report = reports / "superdex-assets-inventory.json"
+    before = report.read_bytes()
+    (destination / "bots" / "arms" / "collision" / "base.mochi.h5").unlink()
+    result = _run_copy(tmp_path / "absent", destination, reports, "--inventory-only")
+    assert result.returncode == 1
+    assert report.read_bytes() == before
+
+
 def _recorded_report(bundle: Path, tmp_path: Path) -> Path:
     inventory = build_inventory(bundle, _provenance())
     report = tmp_path / "recorded-inventory.json"
@@ -577,4 +602,3 @@ def test_verify_asset_bundle_rejects_broken_report(tmp_path):
         verify_asset_bundle(bundle, report)
     with pytest.raises(SuperdexAssetError, match="schema_unexpected"):
         verify_asset_bundle(bundle, tmp_path / "absent.json")
-

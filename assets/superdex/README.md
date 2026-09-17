@@ -1,11 +1,13 @@
 # SuperDex assets
 
-Stages 4 and 5 are implemented for this local bundle: **10 floating models and
-11 fixed-base models qualify**, and FR3 with a sphere and nine-hole peg board
-passes rigid-prefab qualification. Stage 5 adds nested prefab assembly,
-robot/object state, contact, whole-scene reset and selective reset. Its native
-viewer smoke passed; manual visual inspection remains outstanding. Other
-models and prefabs retain their recorded capability or qualification limits.
+Stages 1–6 are implemented for the recorded profiles in this local bundle.
+**10 floating models and 11 fixed-base models qualify**, and FR3 with a sphere
+and nine-hole peg board passes rigid-prefab qualification. Stage 6 adds
+built-in camera metadata/poses, explicit controllers and universal
+qualification against the direct SDK. Its bundle audit records **21 passed,
+14 blocked and no failed checks**; it does not qualify every component or asset.
+Stage 5's native viewer smoke passed; manual visual inspection remains
+outstanding. Complete `.mochi_scene` dispatch is planned for Stage 7.
 
 This directory is local and ignored by Git. The tracked qualification code
 and reports live under `scripts/`, `tests/`, and `docs/` in the repository.
@@ -115,16 +117,18 @@ axes. Scalar joint positions follow the seven root position entries, and
 scalar joint velocities follow the six root velocity entries.
 
 The all-floating audit records **10 passes and 12 explicit blockers**: seven
-models have sensor/actuator components, four Oculus XR models have spherical
-child joints, and the 2f_85 gripper has mechanical cycles. These require stages
-6 and 8. Expected blockers do not fail the audit; unexpected or numerical
-failures do. To require a particular model to pass, select it explicitly:
+models have unsupported sensor/actuator components, four Oculus XR models have
+spherical child joints, and the 2f_85 gripper has mechanical cycles. Stage 6's
+built-in support does not remove these blockers; they require further component
+or Stage 8 capability work. Expected blockers do not fail the Stage 4 audit;
+unexpected or numerical failures do. To require a particular model to pass,
+select it explicitly:
 
 ```sh
 uv run --no-sync scripts/superdex_floating_qualify.py --bots wuji_hand2_beta1_left --out /tmp/superdex-wuji-qualification
 ```
 
-All 37 bot models are accounted for: 21 qualify and 16 have recorded blockers,
+All 35 bot models are accounted for: 21 qualify and 14 have recorded blockers,
 including four fixed-base models. Stage 5 adds independent objects and object
 contact alongside a qualified robot; it does not promote additional bot models.
 
@@ -195,8 +199,91 @@ and [adapter guide](../../docs/superdex.md#rigid-objects-and-nested-prefabs-stag
 Other prefabs are not automatically qualified. Scene settings, contact-filter
 overrides, constraints, controllers, sensor/actuator components, extra
 articulations and soft bodies remain outside this rigid-prefab profile.
-Stage 6 is the next capability extension; full `.mochi_scene` dispatch remains
-stage 7.
+Stage 6 adds built-in cameras/controllers below; full `.mochi_scene` dispatch
+remains stage 7.
+
+## Run the Stage 6 universal qualification checks
+
+Stage 6 is complete for the supported profiles. The qualification tool works
+with fixed/floating bots and optional rigid prefab fragments, comparing UniSim
+with direct SDK execution in serial and batch modes.
+
+| Capability | Verified coverage and limits |
+| --- | --- |
+| `SENSOR_CAMERA` | Link-attached settings and world poses, including translated/rotated mounts; no image rendering |
+| `BASIC_JSC_PD` | Explicit controller execution on fixed and floating roots |
+| `BASIC_OSC_PD` | Fixed-base execution; the current SDK rejects initialization on the tested floating-base bot because of effort-limit indexing |
+| `MOCHI_ARTICULATED_POSE` | Fixed/floating execution and both scalar-joint and per-link-transform target forms |
+
+Controllers have independent instances per environment, selective reset and
+cleanup. Automatic controller selection, arbitrary custom components and full
+`.mochi_scene` dispatch are outside this stage.
+
+Models including `wuji_hand2_beta1` support ordinary joint-torque control.
+Custom actuator/sensor components are reported as unsupported.
+
+### Compare the Stage 6 adapter and SDK viewers
+
+Use `--absolute-target` with its matching controller configuration to hold an
+explicit command. Add `--visualize` to open synchronized `UniSim adapter` and
+`Native SuperDex SDK` windows for side-by-side inspection:
+
+```sh
+uv run --no-sync scripts/superdex_component_qualify.py \
+  --bots bots/arms/fr3_v2/fr3_v2.superdex_bot \
+  --effort-limit 87,87,87,87,12,12,12 \
+  --controller-config docs/superdex-component-qualification/configs/fr3-jsc.json \
+  --absolute-target docs/superdex-component-qualification/targets/fr3-jsc-absolute.json \
+  --visualize
+```
+
+This requires the optional SuperDex viewer with Polyscope >= 2.5.0 and exactly
+one bot. Close either window or press Ctrl+C to stop both. For OSC or
+articulated-pose control, replace `fr3-jsc.json` and `fr3-jsc-absolute.json` with
+the matching `fr3-osc` or `fr3-pose` files in the same directories.
+
+Visual mode writes neither a qualification report nor a GIF. Remove
+`--visualize` and supply a separate `--out` directory to record numerical
+qualification with the same absolute target. Visual inspection and numerical
+qualification remain separate evidence.
+
+### Run numerical qualification and regression tests
+
+```sh
+uv run --no-sync scripts/superdex_component_qualify.py \
+    --bots bots/arms/fr3_v2/fr3_v2.superdex_bot --effort-limit 87,87,87,87,12,12,12
+uv run --no-sync scripts/superdex_component_qualify.py \
+    --bots bots/hands/wuji_hand2_beta1/left/wuji_hand2_beta1_left.superdex_bot \
+    --effort-limit 1 --scene prefabs/sphere/sphere.mochi_prefab
+uv run --no-sync scripts/superdex_component_qualify.py --all --effort-limit 1
+uv run --no-sync scripts/superdex_component_qualify.py \
+    --bots bots/arms/fr3_v2/fr3_v2.superdex_bot --effort-limit 87,87,87,87,12,12,12 \
+    --controller-config docs/superdex-component-qualification/configs/fr3-jsc.json \
+    --absolute-target docs/superdex-component-qualification/targets/fr3-jsc-absolute.json \
+    --out /tmp/fr3-jsc-qualification
+uv run --no-sync pytest -q tests/test_superdex_component_qualification.py
+```
+
+Supply `--bots` or `--all`; models with missing authored effort limits require
+`--effort-limit`. This fallback is a qualification input, not hardware calibration.
+Without `--controller-config`, the runner uses bounded PD-generated torque
+commands. The tool checks direct-SDK equivalence in both execution
+modes, cameras, scene fragments, clipping, reset, isolation and lifecycle.
+Unsupported models are recorded as blocked and absent cameras as skipped;
+`--all` continues through the bundle and returns nonzero for failures/blockers.
+The recorded bundle audit used an effort-limit fallback of 1 and reports
+**21 passed, 14 blocked and no failed checks** across all 35 bots. Separate
+reports cover fixed/floating torque control, both non-actuated Wuji hands,
+each built-in controller on FR3, and a floating Wuji hand with a sphere.
+Camera mount and fixed/floating controller coverage also use synthetic test
+fixtures; a bot report with no cameras does not establish camera support.
+
+Reports and their exact coverage are listed in the
+[Stage 6 report](../../docs/superdex-component-qualification/README.md).
+Use separate `--out` directories for different controller configurations of the
+same bot, because report filenames are based on the bot filename. See the
+[adapter guide](../../docs/superdex.md#built-in-cameras-controllers-and-universal-qualification-stage-6)
+for the API, target conventions and all three controller configurations.
 
 ## Bundle verification
 
@@ -205,7 +292,13 @@ Qualification runners verify the local tree against
 includes local documentation such as this README. Updating documentation
 therefore requires refreshing the recorded inventory, even when model files
 are unchanged. Qualification reports retain the bundle digest from their
-original run; the inventory documents subsequent documentation-only updates.
+original run; the inventory describes the current local bundle.
+
+Refresh the local inventory without consulting the source checkout:
+
+```sh
+uv run --no-sync scripts/copy_superdex_assets.py --inventory-only
+```
 
 ## Known SuperDex SDK phenomena observed during qualification
 

@@ -1,11 +1,11 @@
 # Superdex asset integration plan
 
-Status: revised on 2026-09-16. Stages 1–4 are complete. Stage 5 rigid-object
-and nested-prefab support is implemented and numerically qualified with FR3,
-a sphere and a nine-hole peg board. Its native renderer smoke passed; manual
-visual inspection remains outstanding. Stage 6 actuator/sensor components is
-the next capability extension. Qualification applies only to the recorded
-fixtures, not automatically to every asset in the bundle.
+Status: revised on 2026-09-16. Stages 1–5 are complete; stage 6 implements built-in cameras/controllers
+and universal qualification, with the floating OSC SDK limitation noted below. Stage 5's native
+renderer smoke passed; manual visual inspection remains outstanding. Stage 7
+complete `.mochi_scene` dispatch is the next capability extension.
+Qualification applies only to the recorded fixtures, not automatically to
+every asset in the bundle.
 
 ## Objective and approach
 
@@ -59,25 +59,21 @@ define this repository's validation and release requirements.
 
 ## Baseline and scope
 
-The initial local survey found approximately 248 MiB across 891 asset files:
+The local bundle contains approximately 248 MiB across 888 files:
 
 | Entrypoint format | Count |
 | --- | ---: |
-| `.superdex_bot` | 37 |
+| `.superdex_bot` | 35 |
 | `.mochi_prefab` | 15 |
 | `.mochi_scene` | 2 |
 | `.superdex_controller` | 1 |
 
-These figures describe the surveyed local checkout at
-`6b0541bd41adb39afe4e13fd6c45d9e9288f3021`. Earlier acquisition work pinned
-`ed30ce16361329cbbed956173d6a4f5842815d24`. The local revision includes actuated
-Wuji hands and removes some previously surveyed assets. Preserve this source
-revision and its local derivatives as the migration baseline. The historical
-pin is reference information; it does not replace that baseline.
+Source provenance is recorded in the inventory. The historical upstream pin
+`ed30ce16361329cbbed956173d6a4f5842815d24` is reference information.
 
 UniSim commit `475f0e4` contains the initial copy, acquisition script and
 SDK-free inventory tooling. The checked-in
-[inventory report](../../docs/superdex-assets-inventory.md) records 892 files,
+[inventory report](../../docs/superdex-assets-inventory.md) records 888 files,
 248.3 MiB and the same entrypoint counts above. Reuse its per-file hashes and
 source provenance for subsequent local asset verification. Inventory
 evidence establishes dependency completeness, not any robot's runtime behavior.
@@ -254,7 +250,7 @@ whose remaining features fit the adapter, then expand to other candidates.
 **Done when:** a representative standalone hand works with correct root and
 joint state, and existing fixed-base behavior remains covered.
 
-### 5. Extend the adapter for rigid objects and prefab assembly — implemented and qualified
+### 5. Extend the adapter for rigid objects and prefab assembly — complete
 
 **Completed result:** `SceneCfg.fragment_files` now composes rigid
 `.mochi_prefab` files, including nested dependencies and transforms, beside a
@@ -308,20 +304,30 @@ beside a qualified robot, then add a peg/board or cup fixture.
 reset restores moved objects, and selective reset leaves other environments
 unchanged.
 
-### 6. Extend the adapter for actuator and sensor components
+### 6. Built-in cameras/controllers and universal qualification - complete
 
-Use the local actuated Wuji hands as a concrete target after native floating-root
-support is available.
+Support link-attached `SENSOR_CAMERA` settings and world poses, plus explicit
+`BASIC_JSC_PD`, `BASIC_OSC_PD` and `MOCHI_ARTICULATED_POSE` controller execution.
+Use one controller type at a time, with independent instances per environment,
+substep evaluation, selective reset and complete cleanup. Keep these APIs
+SuperDex-specific; image rendering and full scene dispatch remain separate.
 
-- Audit component registration and reject missing or silently skipped types.
-- Define command units, gains, effort limits, update frequency and execution
-  order. Preserve the adapter's control semantics.
-- Define sensor identity, output frames and shapes, and reset of component state.
-- Account for all 20 actuators and 5 sensors per hand in the surveyed assets.
-- Test bounded target response, saturation, sensor response and repeatable reset.
+Include ordinary `wuji_hand2_beta1` torque qualification.
+The universal runner accepts `--bots`/`--all`, rigid scene fragments, explicit
+effort limits and an optional `--controller-config` using SDK settings.
 
-**Done when:** all expected components instantiate and behave correctly. An
-integrated hand–object fixture also requires stage 5.
+Acceptance evidence is recorded under `docs/superdex-component-qualification/`
+and in `tests/test_superdex_component_qualification.py`: compare mounted camera
+metadata/poses and all three controllers with direct SDK execution; test both
+execution modes, fixed/floating roots, effort clipping, reset, isolation and
+lifecycle. Unsupported components must fail explicitly, while models without
+cameras report that check as skipped. The current SDK's floating OSC
+initialization has a bot/actor effort-index mismatch; verify and report that
+blocker instead of claiming floating OSC support.
+
+**Done when:** the supported profiles pass qualification and documentation
+records the exact coverage and remaining SDK limitations. A complete scene
+or arbitrary custom component is not implied by this stage.
 
 ### 7. Extend adapter dispatch to complete native scenes
 
@@ -373,12 +379,13 @@ For each new capability, follow the same process:
 The immediate sequence is **stage 1 complete → stage 2A visualization
 complete → stage 2B FR3 adapter qualification complete → stage 3 compatible
 robots complete → stage 4 native floating roots complete → stage 5 rigid
-prefabs qualified → stage 6 actuator/sensor components**. Manual visual
-inspection of the stage-5 fixture remains a separate follow-up.
+prefabs qualified → stage 6 built-in cameras/controllers qualified → stage 7
+complete native scenes**. Manual visual inspection of the stage-5 fixture
+remains a separate follow-up.
 
 Stage 4 supplies floating robot state; stage 5 supplies independent rigid
-objects and whole-scene state/reset on the qualified fixed-base route. The Wuji target in stage 6 depends on
-stage 4, and its object interaction checks also depend on stage 5. Stage 7 depends
+objects and whole-scene state/reset on the qualified fixed-base route. Stage 6
+reuses these capabilities for component qualification. Stage 7 depends
 on stage 5 and any component capabilities required by its selected scenes.
 Stage 8 is scheduled per capability. All extensions reuse the viewer workflow.
 

@@ -72,7 +72,10 @@ def fixture_runtime(root="FREE", child="REVOLUTE", offset=False):
     robotics = SimpleNamespace(
         load_bot_prefab_from_file=lambda path: cfg,
         create_context=lambda: object(),
-        create_bot=lambda *args: SimpleNamespace(get_articulated_actor=lambda: actor),
+        create_bot=lambda *args: SimpleNamespace(
+            get_articulated_actor=lambda: actor, get_sensor_handles=lambda: [],
+            get_actuator_handles=lambda: [],
+        ),
         destroy_bot=lambda *args: None,
     )
     return physics, robotics

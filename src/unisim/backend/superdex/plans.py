@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable
 
 import numpy as np
@@ -85,6 +85,8 @@ class ModelPlan:
     rigids: tuple[RigidPlan, ...] = ()
     spawn_rigids: Callable[[Any], list[Any]] | None = None
     default_qvel: np.ndarray | None = None
+    native_bots: dict[Any, tuple[Any, Any, dict[str, Any]]] = field(default_factory=dict)
+    camera_params: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     @property
     def robot_nq(self) -> int:

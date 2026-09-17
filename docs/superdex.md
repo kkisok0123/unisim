@@ -497,3 +497,113 @@ actuators, extra articulations and soft bodies are rejected instead of dropped.
 Full `.mochi_scene` dispatch remains stage 7. SDK support for another prefab does
 not qualify it automatically; the stage-5 evidence covers the sphere and peg
 board listed in the report. No assets or SDK downloads enter the normal tests.
+
+## Built-in cameras, controllers and universal qualification (stage 6)
+
+The native adapter supports link-attached `SENSOR_CAMERA` metadata and world
+poses, plus explicitly configured `BASIC_JSC_PD`, `BASIC_OSC_PD` and
+`MOCHI_ARTICULATED_POSE` controllers. These are SuperDex-specific methods;
+`SimBackend` and the base package's optional-import boundary are unchanged.
+
+Models including `wuji_hand2_beta1` support ordinary joint-torque control.
+Unsupported actuator/sensor components are rejected before spawning and are
+never silently dropped.
+
+### Camera metadata and poses
+
+```python
+names = backend.get_camera_names()
+settings = backend.get_camera_parameters(names[0])
+poses = backend.get_camera_poses(names[0])          # (num_envs, 7): xyz + wxyz
+poses = backend.get_camera_poses(names[0], env_ids) # selected rows
+```
+
+Settings are detached dictionaries with SDK snake_case fields: `name`,
+`image_width`, `image_height`, `fov_vertical_deg`, `near_clip`, `far_clip`,
+`forward_axis`, `up_axis_local`, `offset_local`, `look_at`, `look_distance`.
+The returned pose is the mounted sensor frame, not an optical view matrix;
+renderers must interpret the axis/offset settings separately. Translated and
+rotated mounts are supported. Poses reflect stepping, state assignment and
+selective reset. `get_sensor_data(camera_name)` directs callers to these
+accessors. Image generation and scene-level camera authoring are out of scope.
+Every spawn verifies authored camera inventory, mounts, attachments and settings.
+
+### Explicit controller execution
+
+```python
+import json
+import superdex.robotics as robotics
+
+# A fixed-base robot: every array contains one entry per native actor DOF.
+n = backend.num_actuators
+backend.configure_controller(
+    "BASIC_JSC_PD",
+    param_args=json.dumps({"Kp": [10.] * n, "Kd": [1.] * n,
+                           "saturation": [2.] * n, "deadband": [0.] * n}),
+)
+targets = [robotics.ControllerBasicJscPdTarget(target_pose=q)
+           for q in backend.get_dof_pos()]
+backend.step_controller(targets, nsteps=8)
+backend.clear_controller()
+```
+
+`param_args` and `init_args` accept SDK inline JSON or parameter-file strings.
+File paths passed to this API follow the SDK's working-directory rules; the
+qualification CLI resolves its config-file references relative to that file.
+Controller instances and histories are independent per environment. One type
+is configured at a time; clear it before switching. While configured, ordinary
+`step(ctrl)` and user pre-step callbacks are rejected. Clearing restores ordinary
+torque stepping and removes any solver-side pose controller.
+
+| Type | SDK target and coordinate convention |
+| --- | --- |
+| `BASIC_JSC_PD` | `ControllerBasicJscPdTarget.target_pose`: native actor DOF order; radians for hinges, metres for slides. A free root contributes translation XYZ and rotation-vector XYZ before scalar joints. Gains, saturation and deadband arrays cover all native DOFs; use zero root gains for an unactuated base. |
+| `BASIC_OSC_PD` | `ControllerBasicOscPdTarget.root_from_target_ee`: end-effector pose relative to the root frame reported by SDK observations. `init_args` uses unprefixed `baseLinkName` and `eeLinkName`. |
+| `MOCHI_ARTICULATED_POSE` | `ControllerMochiArticulatedPoseTarget.world_from_root` plus exactly one of `pose_dofs` (non-root scalar joints) or `local_to_parent_transforms` (one per robot link). |
+
+SDK `TransformRT` quaternions use **xyzw**, unlike UniSim's camera-pose **wxyz**.
+JSC/OSC read fresh native observations each physics substep and their joint
+outputs are clipped to the adapter's effort limits. Nonzero free-root effort
+is rejected. The pose controller uses the native implicit solver: its
+saturation limits the elastic contribution, not total torque. No gravity
+compensation, IK, controller composition or policy logic is added.
+
+The current SDK cannot initialize OSC on the tested floating-base bot because
+its effort-limit lookup mixes bot and actor DOF indices. The adapter reports
+this as unsupported with the SDK cause; it does not change the model or solver.
+JSC and articulated-pose execution are tested on fixed and floating roots.
+
+Both execution modes compute controllers between completed physics steps;
+Python callbacks do not execute inside native workers. Reset/state assignment
+resets only selected controller instances, and targets are supplied afresh on
+every `step_controller` call. Parameter/target errors are validated before
+advancing physics; failed initialization releases partial controller instances.
+
+### Universal qualification
+
+Select explicit bots or the whole bundle. Optional rigid fragments and explicit
+effort limits work independently of camera/controller support:
+
+```bash
+uv run scripts/superdex_component_qualify.py \
+    --bots bots/arms/fr3_v2/fr3_v2.superdex_bot --effort-limit 87,87,87,87,12,12,12
+uv run scripts/superdex_component_qualify.py \
+    --bots bots/hands/wuji_hand2_beta1/left/wuji_hand2_beta1_left.superdex_bot \
+    --effort-limit 1 --scene prefabs/sphere/sphere.mochi_prefab
+uv run scripts/superdex_component_qualify.py --all
+uv run scripts/superdex_component_qualify.py \
+    --bots bots/arms/fr3_v2/fr3_v2.superdex_bot --effort-limit 87,87,87,87,12,12,12 \
+    --controller-config docs/superdex-component-qualification/configs/fr3-jsc.json \
+    --out /tmp/fr3-jsc-qualification
+uv run pytest -q tests/test_superdex_component_qualification.py
+```
+
+Controller configuration files contain `type_name`, `param_args` and `init_args`;
+the latter two are SDK JSON/file strings. Examples for all three controllers
+live in `superdex-component-qualification/configs/`. The runner builds its own
+SDK reference, compares 1,040 physics steps in batch and serial modes, checks
+camera metadata/poses, rigid fragments, effort clipping, reset, isolation and
+lifecycle. It reports absent cameras as skipped. Unsupported models are blocked;
+other exceptions and numerical mismatches fail. `--all` continues after either
+and exits nonzero if any model fails or is blocked. Qualification is evidence
+for the recorded fixtures, not a guarantee for every asset.

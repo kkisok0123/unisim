@@ -21,7 +21,7 @@ bytes or the public contract. Changes remain unstaged and uncommitted.
 
 ## Current compatibility
 
-All **37 bot models** are accounted for: **21 qualify and 16 have explicit
+All **35 bot models** are accounted for: **21 qualify and 14 have explicit
 blockers**. Of the 22 FREE-root models, ten qualify and twelve require
 later-stage capabilities. All eleven previously qualified HARD-root models
 still pass; four other HARD-root models retain their existing blockers.

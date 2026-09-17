@@ -176,21 +176,5 @@
     "blockers": [
       "batch-executor rejection: ValueError: SceneBatchExecutor requires articulated actors with DoFs"
     ]
-  },
-  {
-    "key": "wuji_hand2_beta1_actuated_left",
-    "bot": "bots/hands/wuji_hand2_beta1_actuated/left/wuji_hand2_beta1_actuated_left.superdex_bot",
-    "compiled": {
-      "root_joint": "FREE",
-      "cycles": 0,
-      "components": 25,
-      "unsupported_joint_types": [],
-      "active_joints": 20
-    },
-    "adapter_serial_error": "NotImplementedError: superdex native bot sensor/actuator components are unsupported",
-    "adapter_batch_error": null,
-    "blockers": [
-      "actuator/sensor components (25)"
-    ]
   }
 ]

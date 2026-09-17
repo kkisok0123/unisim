@@ -196,8 +196,7 @@ for _side in ("left", "right"):
         camera_direction=(1.0, 1.0, 1.0),
     )
 
-# Bots with known later-capability blockers, probed for precise evidence
-# instead of qualification (stage-4/5/6 work).
+# Bots with known unsupported native features, probed for precise evidence.
 BLOCKED_KEYS: dict[str, str] = {
     "fr3_v2_2f_85": "bots/arm_hand_combos/fr3_v2_2f_85/fr3_v2_2f_85.superdex_bot",
     "fr3_dg5f_short_seed_right": (
@@ -211,9 +210,6 @@ BLOCKED_KEYS: dict[str, str] = {
     "2f_85": "bots/grippers/2f_85/2f_85.superdex_bot",
     "example_bot_2dof": "bots/fun/example_bot_2dof/example_bot_2dof.superdex_bot",
     "dg5f_short_left": "bots/hands/dg5f_short/left/dg5f_short_left.superdex_bot",
-    "wuji_hand2_beta1_actuated_left": (
-        "bots/hands/wuji_hand2_beta1_actuated/left/wuji_hand2_beta1_actuated_left.superdex_bot"
-    ),
     "oculus_xr_hand_highpoly_left": (
         "bots/hands/oculus_xr/left/oculus_xr_hand_highpoly_left.superdex_bot"
     ),

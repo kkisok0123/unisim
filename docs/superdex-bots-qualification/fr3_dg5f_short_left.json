@@ -324,18 +324,18 @@
       ]
     }
   },
-  "elapsed_seconds": 10.96,
+  "elapsed_seconds": 11.19,
   "provenance": {
-    "code_commit": "b90249ac4487382af45830e069efddaaf9a60aa0",
+    "code_commit": "634a6ced7c1a7749d3d728f1f2fef199f3a90240",
     "branch": "superdex-assets-import",
     "asset_root": "/home/pc829/UniFamily/unisim/assets/superdex",
-    "tree_digest": "decf1b36a59a3479cd5efa40057b76e3e82e653eeeb3a0ef37ff9254bd598010",
+    "tree_digest": "f27cc193afd0313bdbf3a799e6ee3290f7279d2365f8c8e20a2f42f8d313d863",
     "sdk_precision": "float32",
     "gravity": [
       0,
       0,
       -9.81
     ],
-    "visual_verification": "separate (scripts/superdex_fr3_viewer.py --bot <key>)"
+    "visual_verification": "separate (scripts/superdex_bot_viewer.py --bot <key>)"
   }
 }

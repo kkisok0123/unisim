@@ -1,0 +1,5 @@
+{
+  "type_name": "BASIC_OSC_PD",
+  "param_args": "{\"Kp_p\": 100.0, \"Kd_p\": 10.0, \"Kp_r\": 10.0, \"Kd_r\": 1.0, \"maxTranslationError\": 0.05, \"maxRotationError\": 0.4}",
+  "init_args": "{\"baseLinkName\": \"fr3_link0\", \"eeLinkName\": \"fr3_link8\"}"
+}

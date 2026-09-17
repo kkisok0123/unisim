@@ -1,0 +1,8 @@
+{
+  "type_name": "MOCHI_ARTICULATED_POSE",
+  "world_from_root": {
+    "translation": [0.0, 0.0, 0.0],
+    "rotation_xyzw": [0.0, 0.0, 0.0, 1.0]
+  },
+  "pose_dofs": [0.15, -0.7, 0.1, -2.2, 0.1, 1.5, 1.4]
+}

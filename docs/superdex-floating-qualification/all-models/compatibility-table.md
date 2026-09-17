@@ -25,6 +25,4 @@ visual verification and object contact are separate.
 | `bots/hands/oculus_xr/right/oculus_xr_hand_lowpoly_right.superdex_bot` | blocked | [NotImplementedError: superdex native bot supports only fixed/hinge/slide joints](oculus_xr_hand_lowpoly_right.json) |
 | `bots/hands/wuji_hand2_beta1/left/wuji_hand2_beta1_left.superdex_bot` | passed | [1,040 steps per mode; state, reset and isolation passed](wuji_hand2_beta1_left.json) |
 | `bots/hands/wuji_hand2_beta1/right/wuji_hand2_beta1_right.superdex_bot` | passed | [1,040 steps per mode; state, reset and isolation passed](wuji_hand2_beta1_right.json) |
-| `bots/hands/wuji_hand2_beta1_actuated/left/wuji_hand2_beta1_actuated_left.superdex_bot` | blocked | [NotImplementedError: superdex native bot sensor/actuator components are unsupported](wuji_hand2_beta1_actuated_left.json) |
-| `bots/hands/wuji_hand2_beta1_actuated/right/wuji_hand2_beta1_actuated_right.superdex_bot` | blocked | [NotImplementedError: superdex native bot sensor/actuator components are unsupported](wuji_hand2_beta1_actuated_right.json) |
 | `bots/sensors/dg5f_seed/dg5f_seed.superdex_bot` | blocked | [NotImplementedError: superdex native bot sensor/actuator components are unsupported](dg5f_seed.json) |

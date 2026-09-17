@@ -1,14 +1,14 @@
 {
-  "code_commit": "61463dca98acfa8ffb0ef4a8232b378da6743f8c",
-  "working_tree": "M CHANGELOG.md\n M docs/superdex.md\n M src/unisim/backend/superdex/backend.py\n M src/unisim/backend/superdex/materialization.py\n M src/unisim/backend/superdex/plans.py\n M src/unisim/scene.py\n?? docs/superdex-prefab-qualification/\n?? scripts/superdex_prefab_qualify.py\n?? src/unisim/backend/superdex/prefabs.py\n?? tests/test_superdex_prefabs.py",
+  "code_commit": "634a6ced7c1a7749d3d728f1f2fef199f3a90240",
+  "working_tree": "M src/unisim/backend/superdex/backend.py\n M src/unisim/backend/superdex/materialization.py\n M src/unisim/backend/superdex/plans.py\n?? src/unisim/backend/superdex/components.py",
   "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.43",
   "python": "3.12.14",
   "sdk": "1.0.0",
-  "manifest_sha256": "cf6c203c1bfd5882c2f9951c5ddde6d05f0125517480bef916bb1117693ce8c0",
+  "manifest_sha256": "f47f44d1ba26e1ab693fe4cef3f289314a32ce7a997f1e76d1d30dd5ccdf3a21",
   "asset_verification": {
-    "tree_digest": "6e0b81825cabe2e39f6b95a98cdddd8391ed67629cf7718fad5b0bf5424e6489",
+    "tree_digest": "357ac924845e29217355e7947eaa9de38cb55dfc8fea24619eedbd7b4efcb3f8",
     "file_count": 893,
-    "total_bytes": 260340720,
+    "total_bytes": 260346303,
     "dependency_errors": [],
     "warnings": [
       "bots/arm_hand_combos/fr3_dg5f_short/left/fr3_dg5f_short_left.superdex_bot: no LICENSE/NOTICE found in directory chain",
@@ -30,13 +30,7 @@
     "source_revision": "6b0541bd41adb39afe4e13fd6c45d9e9288f3021",
     "source_clean": true,
     "source_initial_commit": "1d7150946fa3f3d3fb09c2bff07eaa138cbfdee6",
-    "local_derivative_paths": [
-      "bots/hands/wuji_hand2_beta1_actuated/LICENSE",
-      "bots/hands/wuji_hand2_beta1_actuated/NOTICE",
-      "bots/hands/wuji_hand2_beta1_actuated/README.md",
-      "bots/hands/wuji_hand2_beta1_actuated/left/wuji_hand2_beta1_actuated_left.superdex_bot",
-      "bots/hands/wuji_hand2_beta1_actuated/right/wuji_hand2_beta1_actuated_right.superdex_bot"
-    ],
+    "local_derivative_paths": [],
     "historical_upstream_sha": "ed30ce16361329cbbed956173d6a4f5842815d24",
     "generated_utc": "2026-09-15T08:09:59Z"
   },
@@ -44,23 +38,24 @@
   "source_sha256": {
     "src/unisim/backend/superdex/__init__.py": "69018e339c15fd56ee39cda9f43693cafa7435a9947f69af1abb2eeb120e1539",
     "src/unisim/backend/superdex/assets.py": "a1940acb9e171b9d9afcdde6b30060f086076389a797d31c29fdbf0352e682ca",
-    "src/unisim/backend/superdex/backend.py": "d51dacc78d14667e8d76b67be3a03accd9e41b1e6190a8d703e4e59187cf5457",
+    "src/unisim/backend/superdex/backend.py": "f3083dc5bc7543757583ef2c9a3648f62836dcc9f34596d1a7875aa582cf67a7",
+    "src/unisim/backend/superdex/components.py": "36d1325cb0498dbf38836da8f91cdbbcbc09f571283988c6f0e40aa687620750",
     "src/unisim/backend/superdex/cpu_topology.py": "d036af72b8268437c45edf959575f0a579e37f46f430b5a4fa492272d27aae41",
     "src/unisim/backend/superdex/dependencies.py": "d03747fcefb32256f62dc155266d2f7e5f94c22b70eb31ddf7f3aed261930fcc",
     "src/unisim/backend/superdex/geometry.py": "c33c4f1b8fc7a357b864ff785683c9a1365a8dd2bacf08d1fe8db50b14e8f50c",
-    "src/unisim/backend/superdex/materialization.py": "f0203214f34ebbe442ff1bd56069ed298c6598897b06dfba26be73cbedc37e7c",
-    "src/unisim/backend/superdex/plans.py": "5e293714c4a99e27f3eadf7226cfd54672dddeba6a65f175f936dc23a0978604",
+    "src/unisim/backend/superdex/materialization.py": "f748542963a32e00d8f2421198d6ec5169fca5e97af5d5c0580ff5f0e4e9d040",
+    "src/unisim/backend/superdex/plans.py": "256668c41e319b91ed22b4096cf552a47484a66d8eaa7c49f03ed579390a3eb4",
     "src/unisim/backend/superdex/prefabs.py": "e3c095febfff9f367cb8a89e4a9cf1ec0526b244c6617b6a7d42e3f90b6a8cea",
     "src/unisim/backend/superdex/root_state.py": "c0d26d8db9033fa3cad8e8fbb7f476cc1984703d9447c0e682d73f768d26e5fa",
     "src/unisim/backend/superdex/runtime.py": "f060db03ef04e9442db8ac25917be7c5e3978884c224896e29ee792eabb21121",
-    "scripts/superdex_prefab_qualify.py": "d3ba3f0e4fe2a3e050ebd9226f0768aba52d49254aeb61c9687af7436da961de"
+    "scripts/superdex_prefab_qualify.py": "508623f7d651eab905f016d2bf61b4d3ed8b603e71ff58dc2d0908b1433caeb1"
   },
   "assets": [
     "bots/arms/fr3_v2/fr3_v2.superdex_bot",
     "prefabs/sphere/sphere.mochi_prefab",
     "prefabs/nine_hole_peg_test/nine_hole_peg_test.mochi_prefab"
   ],
-  "dt": 0.002,
+  "dt": 0.001,
   "control": "PD effort: kp=80, kd=8; authored robot pose target",
   "effort_limits": [
     87.0,
@@ -73,8 +68,8 @@
   ],
   "tolerance": 3e-05,
   "results": {
-    "frames": 420,
-    "mode": "offscreen",
+    "frames": 622,
+    "mode": "interactive",
     "reset_max_error": 0.0,
     "cleanup": "passed",
     "phases": [

@@ -10,6 +10,11 @@ from typing import Any
 
 import numpy as np
 
+from unisim.backend.superdex.components import (
+    audit_components,
+    expected_parameters,
+    verify_cameras,
+)
 from unisim.backend.superdex.geometry import primitive_shape, rotation_matrix
 from unisim.backend.superdex.plans import ModelPlan, SensorPlan
 from unisim.backend.superdex.root_state import RootReference
@@ -65,8 +70,6 @@ def _native_plan(p: Any, r: Any, path: Path, efforts: Sequence[float] | None) ->
         raise NotImplementedError(
             "superdex native bot transmissions/cycles require a separate audit"
         )
-    if any(len(link.sensors) or len(link.actuators) for link in links):
-        raise NotImplementedError("superdex native bot sensor/actuator components are unsupported")
     if not joints or len(joints) != len(links):
         raise ValueError("superdex native bot requires one joint per link")
     floating = joints[0].type == p.ArticulatedJointType.FREE
@@ -105,6 +108,8 @@ def _native_plan(p: Any, r: Any, path: Path, efforts: Sequence[float] | None) ->
         i for i, joint in enumerate(joints)
         if joint.type in (p.ArticulatedJointType.REVOLUTE, p.ArticulatedJointType.PRISMATIC)
     ]
+    cameras = audit_components(links)
+    camera_params = {item.name: expected_parameters(r, item, path) for item in cameras}
     qoffset, voffset = (7, 6) if floating else (0, 0)
     n = len(active)
     if efforts is None:
@@ -129,6 +134,7 @@ def _native_plan(p: Any, r: Any, path: Path, efforts: Sequence[float] | None) ->
     bot = None
     try:
         bot = r.create_bot(temp, cfg, context)
+        verify_cameras(bot, cameras, camera_params)
         actor = bot.get_articulated_actor()
         native_links = [temp.get_actor(h) for h in actor.get_nested_link_actors()]
         masses = [0.0]
@@ -162,16 +168,28 @@ def _native_plan(p: Any, r: Any, path: Path, efforts: Sequence[float] | None) ->
             r.destroy_bot(temp, bot)
         p.destroy_scene(temp)
 
+    native_bots: dict[Any, tuple[Any, Any, dict[str, Any]]] = {}
+
     def spawn(native_scene: Any) -> tuple[Any, Any]:
         owner = r.create_context()
         instance = r.create_bot(native_scene, cfg, owner)
+        actor = instance.get_articulated_actor()
+        handle = actor.get_handle()
+        try:
+            native_bots[handle] = (
+                owner, instance, verify_cameras(instance, cameras, camera_params)
+            )
+        except BaseException:
+            r.destroy_bot(native_scene, instance)
+            raise
         live = True
 
         def close() -> None:
             nonlocal live, owner
             if live:
-                live = False
                 r.destroy_bot(native_scene, instance)
+                live = False
+                native_bots.pop(handle, None)
                 # Keep the explicit context wrapper alive until bot teardown. The
                 # SDK owns the process singleton; Python must not destroy it here.
                 owner = None
@@ -209,6 +227,8 @@ def _native_plan(p: Any, r: Any, path: Path, efforts: Sequence[float] | None) ->
         spawn_actor=spawn,
         cleanup=_noop,
         actuator_force_ranges=ctrl_ranges.copy(),
+        native_bots=native_bots,
+        camera_params=camera_params,
         dof_armature=np.array([0.0] * voffset + [float(joints[i].inertia or 0) for i in active]),
         root_reference=root_reference,
     )

@@ -9,35 +9,20 @@ SDK-free inventory of the repository-local asset copy under
 - Branch: `wuji-actuated-asset`
 - Revision: `6b0541bd41adb39afe4e13fd6c45d9e9288f3021`
 - Working tree clean under `assets/`: True
-- Local derivative files (changed after initial commit `1d7150946fa3): 5
+- Local derivative files (changed after initial commit `1d7150946fa3): 0
 - Historical upstream pin (reference only): `ed30ce16361329cbbed956173d6a4f5842815d24`
-- Generated: 2026-09-15T08:09:59Z
+- Generated: 2026-09-17T04:37:13Z
 
 ## Bundle summary
 
-- Files: 893
-- Total size: 248.3 MiB
-- Tree digest (SHA-256 over path+file hashes): `357ac924845e29217355e7947eaa9de38cb55dfc8fea24619eedbd7b4efcb3f8`
+- Files: 888
+- Total size: 248.2 MiB
+- Tree digest (SHA-256 over path+file hashes): `4caf02ededa02813199a7958e9b15601b55231d2214cd287307b5708e765e113`
 - Root markers: bots, prefabs, test
-- Entries by kind: {'bot': 37, 'controller': 1, 'prefab': 15, 'scene': 2}
-- Dispositions: {'control-profile': 1, 'profile-candidate': 6, 'recipe-candidate': 12, 'unsupported-features': 36}
+- Entries by kind: {'bot': 35, 'controller': 1, 'prefab': 15, 'scene': 2}
+- Dispositions: {'control-profile': 1, 'profile-candidate': 6, 'recipe-candidate': 12, 'unsupported-features': 34}
 
 ## Compatibility table
-
-Documentation updates on 2026-09-16 recorded Stage 4 completion and then
-Stage 5 rigid-prefab qualification in the local `README.md` and integration
-plan. Stage 5 commands, numerical results, viewer-smoke evidence and the
-outstanding manual visual inspection are now documented, with stage 6 next.
-Per-file hashes confirmed all other bundle files unchanged. The bundle contains
-260,346,303 bytes across the same 893 files. Documentation-update history is
-retained in the JSON inventory; source provenance is unchanged.
-
-Original qualification reports retain their run-time manifest and tree digests,
-including the pre-stage-5-documentation tree digest
-`6e0b81825cabe2e39f6b95a98cdddd8391ed67629cf7718fad5b0bf5424e6489`. This inventory's classifications are the
-initial capability inventory; current qualification results are in the
-[Stage 4 report](superdex-floating-qualification/README.md) and
-[Stage 5 report](superdex-prefab-qualification/README.md).
 
 | Entrypoint | Kind | Disposition | Blockers / required capabilities |
 | --- | --- | --- | --- |
@@ -78,8 +63,6 @@ initial capability inventory; current qualification results are in the
 | `bots/hands/oculus_xr/right/oculus_xr_hand_lowpoly_right.superdex_bot` | bot | unsupported-features | native floating root (native-floating-root); unsupported joint types: Spherical |
 | `bots/hands/wuji_hand2_beta1/left/wuji_hand2_beta1_left.superdex_bot` | bot | unsupported-features | native floating root (native-floating-root) |
 | `bots/hands/wuji_hand2_beta1/right/wuji_hand2_beta1_right.superdex_bot` | bot | unsupported-features | native floating root (native-floating-root) |
-| `bots/hands/wuji_hand2_beta1_actuated/left/wuji_hand2_beta1_actuated_left.superdex_bot` | bot | unsupported-features | native floating root (native-floating-root); actuator/sensor components (actuator-sensor-components) |
-| `bots/hands/wuji_hand2_beta1_actuated/right/wuji_hand2_beta1_actuated_right.superdex_bot` | bot | unsupported-features | native floating root (native-floating-root); actuator/sensor components (actuator-sensor-components) |
 | `bots/sensors/dg5f_seed/dg5f_seed.superdex_bot` | bot | unsupported-features | native floating root (native-floating-root) |
 | `bots/torsos/openarm_v20/openarm_v20_torso.superdex_bot` | bot | profile-candidate |  |
 | `prefabs/box_and_blocks/block_blue.mochi_prefab` | prefab | unsupported-features | prefab assembly pending (prefab-rigid-actors) |
@@ -99,6 +82,6 @@ initial capability inventory; current qualification results are in the
 
 ## Verification
 
-All dependency references resolve inside `assets/superdex`; per-file
-SHA-256 hashes match the source checkout. See the JSON record for the
+Dependency verification results and the local tree checksum are recorded
+in the JSON inventory. See that record for the
 full dependency-edge and hash detail.

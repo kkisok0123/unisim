@@ -6,36 +6,13 @@
       "root_joint": "FREE",
       "cycles": 2,
       "components": 0,
-      "unsupported_joint_types": [
-        "FREE"
-      ],
-      "active_joints": 7
+      "unsupported_joint_types": [],
+      "active_joints": 6
     },
     "adapter_serial_error": "NotImplementedError: superdex native bot transmissions/cycles require a separate audit",
     "adapter_batch_error": null,
     "blockers": [
-      "native floating root (FREE root)",
-      "mechanical cycles (2)",
-      "unsupported joint types: FREE"
-    ]
-  },
-  {
-    "key": "allegro_v5_right",
-    "bot": "bots/hands/allegro_v5/right/allegro_v5_right.superdex_bot",
-    "compiled": {
-      "root_joint": "FREE",
-      "cycles": 0,
-      "components": 0,
-      "unsupported_joint_types": [
-        "FREE"
-      ],
-      "active_joints": 17
-    },
-    "adapter_serial_error": "NotImplementedError: superdex native bot currently requires a fixed HARD root",
-    "adapter_batch_error": null,
-    "blockers": [
-      "native floating root (FREE root)",
-      "unsupported joint types: FREE"
+      "mechanical cycles (2)"
     ]
   },
   {
@@ -45,17 +22,13 @@
       "root_joint": "FREE",
       "cycles": 0,
       "components": 5,
-      "unsupported_joint_types": [
-        "FREE"
-      ],
-      "active_joints": 21
+      "unsupported_joint_types": [],
+      "active_joints": 20
     },
-    "adapter_serial_error": "NotImplementedError: superdex native bot sensor/actuator components are unsupported",
+    "adapter_serial_error": "NotImplementedError: superdex unsupported sensor component 'SENSOR_SEED_V1_MLP'",
     "adapter_batch_error": null,
     "blockers": [
-      "native floating root (FREE root)",
-      "actuator/sensor components (5)",
-      "unsupported joint types: FREE"
+      "actuator/sensor components (5)"
     ]
   },
   {
@@ -65,17 +38,13 @@
       "root_joint": "FREE",
       "cycles": 0,
       "components": 5,
-      "unsupported_joint_types": [
-        "FREE"
-      ],
-      "active_joints": 21
+      "unsupported_joint_types": [],
+      "active_joints": 20
     },
-    "adapter_serial_error": "NotImplementedError: superdex native bot sensor/actuator components are unsupported",
+    "adapter_serial_error": "NotImplementedError: superdex unsupported sensor component 'SENSOR_SEED_V1_MLP'",
     "adapter_batch_error": null,
     "blockers": [
-      "native floating root (FREE root)",
-      "actuator/sensor components (5)",
-      "unsupported joint types: FREE"
+      "actuator/sensor components (5)"
     ]
   },
   {
@@ -85,16 +54,13 @@
       "root_joint": "FREE",
       "cycles": 0,
       "components": 0,
-      "unsupported_joint_types": [
-        "FREE"
-      ],
-      "active_joints": 21
+      "unsupported_joint_types": [],
+      "active_joints": 20
     },
-    "adapter_serial_error": "NotImplementedError: superdex native bot currently requires a fixed HARD root",
+    "adapter_serial_error": "ValueError: superdex native bot requires explicit finite effort_limits",
     "adapter_batch_error": null,
     "blockers": [
-      "native floating root (FREE root)",
-      "unsupported joint types: FREE"
+      "adapter rejection: ValueError: superdex native bot requires explicit finite effort_limits"
     ]
   },
   {
@@ -104,17 +70,13 @@
       "root_joint": "FREE",
       "cycles": 0,
       "components": 5,
-      "unsupported_joint_types": [
-        "FREE"
-      ],
-      "active_joints": 21
+      "unsupported_joint_types": [],
+      "active_joints": 20
     },
-    "adapter_serial_error": "NotImplementedError: superdex native bot sensor/actuator components are unsupported",
+    "adapter_serial_error": "NotImplementedError: superdex unsupported sensor component 'SENSOR_SEED_V1_MLP'",
     "adapter_batch_error": null,
     "blockers": [
-      "native floating root (FREE root)",
-      "actuator/sensor components (5)",
-      "unsupported joint types: FREE"
+      "actuator/sensor components (5)"
     ]
   },
   {
@@ -124,17 +86,13 @@
       "root_joint": "FREE",
       "cycles": 0,
       "components": 5,
-      "unsupported_joint_types": [
-        "FREE"
-      ],
-      "active_joints": 21
+      "unsupported_joint_types": [],
+      "active_joints": 20
     },
-    "adapter_serial_error": "NotImplementedError: superdex native bot sensor/actuator components are unsupported",
+    "adapter_serial_error": "NotImplementedError: superdex unsupported sensor component 'SENSOR_SEED_V1_MLP'",
     "adapter_batch_error": null,
     "blockers": [
-      "native floating root (FREE root)",
-      "actuator/sensor components (5)",
-      "unsupported joint types: FREE"
+      "actuator/sensor components (5)"
     ]
   },
   {
@@ -147,7 +105,7 @@
       "unsupported_joint_types": [],
       "active_joints": 2
     },
-    "adapter_serial_error": "NotImplementedError: superdex native bot sensor/actuator components are unsupported",
+    "adapter_serial_error": "NotImplementedError: superdex unsupported actuator component 'MY_VELOCITY_SERVO_ACTUATOR'",
     "adapter_batch_error": null,
     "blockers": [
       "actuator/sensor components (3)"
@@ -163,7 +121,7 @@
       "unsupported_joint_types": [],
       "active_joints": 27
     },
-    "adapter_serial_error": "NotImplementedError: superdex native bot sensor/actuator components are unsupported",
+    "adapter_serial_error": "NotImplementedError: superdex unsupported sensor component 'SENSOR_SEED_V1_MLP'",
     "adapter_batch_error": null,
     "blockers": [
       "actuator/sensor components (5)"
@@ -193,16 +151,14 @@
       "cycles": 0,
       "components": 0,
       "unsupported_joint_types": [
-        "FREE",
         "SPHERICAL"
       ],
-      "active_joints": 18
+      "active_joints": 17
     },
-    "adapter_serial_error": "NotImplementedError: superdex native bot currently requires a fixed HARD root",
+    "adapter_serial_error": "NotImplementedError: superdex native bot supports only fixed/hinge/slide joints",
     "adapter_batch_error": null,
     "blockers": [
-      "native floating root (FREE root)",
-      "unsupported joint types: FREE, SPHERICAL"
+      "unsupported joint types: SPHERICAL"
     ]
   },
   {
@@ -219,45 +175,6 @@
     "adapter_batch_error": "ValueError: SceneBatchExecutor requires articulated actors with DoFs",
     "blockers": [
       "batch-executor rejection: ValueError: SceneBatchExecutor requires articulated actors with DoFs"
-    ]
-  },
-  {
-    "key": "wuji_hand2_beta1_actuated_left",
-    "bot": "bots/hands/wuji_hand2_beta1_actuated/left/wuji_hand2_beta1_actuated_left.superdex_bot",
-    "compiled": {
-      "root_joint": "FREE",
-      "cycles": 0,
-      "components": 25,
-      "unsupported_joint_types": [
-        "FREE"
-      ],
-      "active_joints": 21
-    },
-    "adapter_serial_error": "NotImplementedError: superdex native bot sensor/actuator components are unsupported",
-    "adapter_batch_error": null,
-    "blockers": [
-      "native floating root (FREE root)",
-      "actuator/sensor components (25)",
-      "unsupported joint types: FREE"
-    ]
-  },
-  {
-    "key": "wuji_hand2_beta1_left",
-    "bot": "bots/hands/wuji_hand2_beta1/left/wuji_hand2_beta1_left.superdex_bot",
-    "compiled": {
-      "root_joint": "FREE",
-      "cycles": 0,
-      "components": 0,
-      "unsupported_joint_types": [
-        "FREE"
-      ],
-      "active_joints": 21
-    },
-    "adapter_serial_error": "NotImplementedError: superdex native bot currently requires a fixed HARD root",
-    "adapter_batch_error": null,
-    "blockers": [
-      "native floating root (FREE root)",
-      "unsupported joint types: FREE"
     ]
   }
 ]

@@ -1,0 +1,7 @@
+{
+  "type_name": "BASIC_OSC_PD",
+  "root_from_target_ee": {
+    "translation": [0.33689055, 0.0, 0.59028196],
+    "rotation_xyzw": [0.70710868, -0.70710492, -0.00000191, -0.00000172]
+  }
+}

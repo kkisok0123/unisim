@@ -80,13 +80,7 @@
     "source_revision": "6b0541bd41adb39afe4e13fd6c45d9e9288f3021",
     "source_clean": true,
     "source_initial_commit": "1d7150946fa3f3d3fb09c2bff07eaa138cbfdee6",
-    "local_derivative_paths": [
-      "bots/hands/wuji_hand2_beta1_actuated/LICENSE",
-      "bots/hands/wuji_hand2_beta1_actuated/NOTICE",
-      "bots/hands/wuji_hand2_beta1_actuated/README.md",
-      "bots/hands/wuji_hand2_beta1_actuated/left/wuji_hand2_beta1_actuated_left.superdex_bot",
-      "bots/hands/wuji_hand2_beta1_actuated/right/wuji_hand2_beta1_actuated_right.superdex_bot"
-    ],
+    "local_derivative_paths": [],
     "historical_upstream_sha": "ed30ce16361329cbbed956173d6a4f5842815d24",
     "generated_utc": "2026-09-15T08:09:59Z"
   },

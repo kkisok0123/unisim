@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Add `--inventory-only` to refresh the local SuperDex asset inventory without
+  consulting the source checkout, while validating all asset dependencies.
+
+- Add SuperDex-specific built-in camera metadata/pose access and explicit JSC PD,
+  OSC PD and articulated-pose controller APIs, with per-environment ownership,
+  substep evaluation and reset/cleanup. Report the SDK's floating OSC indexing
+  limitation explicitly. Preserve ordinary torque and MJCF control behavior.
+- Keep universal bot/scene qualification with direct SDK references, explicit
+  bot selection, camera checks and optional controller configuration.
+
 - Add stage-5 native SuperDex rigid prefab composition through
   `SceneCfg.fragment_files`, including nested transforms, complete robot/object
   qpos/qvel state, per-object floating-root layouts, body queries and forces,

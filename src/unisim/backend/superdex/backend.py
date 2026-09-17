@@ -32,19 +32,20 @@ from unisim.utils.rotation import (
     np_quat_mul_batched as multiply,
 )
 
+from .builtin_api import BuiltinAPI
 from .cpu_topology import physical_cpu_count
 from .dependencies import load_superdex_dependencies
 from .plans import ModelPlan, SensorPlan
 from .runtime import acquire_runtime, release_runtime
 
 
-class SuperDexBackend(SimBackend):
+class SuperDexBackend(BuiltinAPI, SimBackend):
     """One independent CPU scene per environment, initialized in its owning process.
 
     Native engine state is translated at materialize/set_state/step barriers.
-    Public getters read detached NumPy caches; they never parse assets or query
-    native metadata. A source-built SceneBatchExecutor owns the hot-path CPU
-    barrier for independent scenes in the default "batch" execution mode;
+    State getters read detached NumPy caches; camera poses query cached native
+    sensor handles. Getters never parse assets. A source-built SceneBatchExecutor
+    owns the hot-path CPU barrier for independent scenes in the default "batch" execution mode;
     "serial" mode steps every scene on the environment thread so the native
     SuperDex debugger can attach without violating DebugDraw thread affinity.
     Reset and sensor ownership remain here.
@@ -88,6 +89,8 @@ class SuperDexBackend(SimBackend):
         )
         self._pid = os.getpid()
         self._pre_step_control_fn = None
+        self._controllers: list[Any] = []
+        self._controller_type: str | None = None
         self._closed = False
         self._acquired = False
         self._batch_executor = None
@@ -377,6 +380,7 @@ class SuperDexBackend(SimBackend):
                     raise ValueError("rigid quaternion must be normalized wxyz")
         for row, i in enumerate(ids):
             world, actor = self._worlds[i], self._actors[i]
+            self._suspend_controller(i)
             world.restore_state(self._snapshots[i], release_immediately=False)
             native_q, native_v = self._native_q[i], self._native_v[i]
             if self.model.floating:
@@ -414,9 +418,16 @@ class SuperDexBackend(SimBackend):
             self._ctrl[i] = 0
             self._pending_wrench[i] = 0
             world.step(0)
+            self._restore_controller(i)
         self._refresh(ids)
 
     def step(self, ctrl: np.ndarray, nsteps: int = 1) -> None:
+        self._check_open()
+        if self._controllers:
+            raise RuntimeError("use step_controller() or clear_controller() before step()")
+        self._step_physics(ctrl, nsteps)
+
+    def _step_physics(self, ctrl: np.ndarray, nsteps: int) -> None:
         self._check_open()
         values = np.asarray(ctrl, dtype=self._dtype)
         if values.shape != self._ctrl.shape or not np.isfinite(values).all():
@@ -1024,6 +1035,8 @@ class SuperDexBackend(SimBackend):
         return self.model.dof_armature.copy()
 
     def get_sensor_data(self, name: str) -> np.ndarray:
+        if name in self.model.camera_params:
+            raise ValueError("camera data uses get_camera_parameters() and get_camera_poses()")
         self._check_open()
         if name in self._unsupported_sensors:
             raise NotImplementedError(
@@ -1107,6 +1120,7 @@ class SuperDexBackend(SimBackend):
     def close(self) -> None:
         if self._pid != os.getpid() or (self._closed and not self._acquired):
             return
+        self._clear_controllers()
         self._closed = True
         # Cleanup must keep trying after an error so the remaining scenes do not leak.
         errors: list[Exception] = []
