@@ -11,24 +11,24 @@ SDK-free inventory of the repository-local asset copy under
 - Working tree clean under `assets/`: True
 - Local derivative files (changed after initial commit `1d7150946fa3): 0
 - Historical upstream pin (reference only): `ed30ce16361329cbbed956173d6a4f5842815d24`
-- Generated: 2026-09-17T04:37:13Z
+- Generated: 2026-09-17T06:31:43Z
 
 ## Bundle summary
 
 - Files: 888
 - Total size: 248.2 MiB
-- Tree digest (SHA-256 over path+file hashes): `4caf02ededa02813199a7958e9b15601b55231d2214cd287307b5708e765e113`
+- Tree digest (SHA-256 over path+file hashes): `10ba4bffff592c37619492fc19b5dcdb1a0147f903f8465f348e750cf278747b`
 - Root markers: bots, prefabs, test
 - Entries by kind: {'bot': 35, 'controller': 1, 'prefab': 15, 'scene': 2}
-- Dispositions: {'control-profile': 1, 'profile-candidate': 6, 'recipe-candidate': 12, 'unsupported-features': 34}
+- Dispositions: {'control-profile': 1, 'profile-candidate': 8, 'recipe-candidate': 12, 'unsupported-features': 32}
 
 ## Compatibility table
 
 | Entrypoint | Kind | Disposition | Blockers / required capabilities |
 | --- | --- | --- | --- |
 | `benchmarks/ant/ant.mochi_prefab` | prefab | unsupported-features | prefab assembly pending (prefab-articulated-actors) |
-| `benchmarks/cart_pole/cart_pole.mochi_scene` | scene | unsupported-features | scene assembly pending (scene-assembly) |
-| `benchmarks/half_cheetah/half_cheetah.mochi_scene` | scene | unsupported-features | scene assembly pending (scene-assembly) |
+| `benchmarks/cart_pole/cart_pole.mochi_scene` | scene | profile-candidate | prefab-articulated-actors, scene-assembly |
+| `benchmarks/half_cheetah/half_cheetah.mochi_scene` | scene | profile-candidate | prefab-articulated-actors, scene-assembly, scene-controllers |
 | `bots/arm_hand_combos/fr3_dg5f_short/left/fr3_dg5f_short_left.superdex_bot` | bot | recipe-candidate | recipe-composition |
 | `bots/arm_hand_combos/fr3_dg5f_short/right/fr3_dg5f_short_right.superdex_bot` | bot | recipe-candidate | recipe-composition |
 | `bots/arm_hand_combos/fr3_dg5f_short_seed/right/fr3_dg5f_short_seed_right.superdex_bot` | bot | recipe-candidate | recipe-composition |

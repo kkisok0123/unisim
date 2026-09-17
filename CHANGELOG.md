@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Add Stage 7 native `.mochi_scene` dispatch for one fixed/hinge/slide articulation
+  plus rigid objects and nested prefabs. Preserve authored scene settings,
+  contact filters and joint-tracking rest springs; keep the timestep caller-owned.
+  Require explicit `superdex_controlled_joints` and physical effort limits.
+  Add complete state/reset and partial-load cleanup coverage, Cart Pole and
+  Half Cheetah direct-SDK qualification, native viewer smoke and updated guidance.
+  Multiple articulations, soft bodies and scene camera/plugin components remain
+  unsupported. Asset bytes and existing bot/MJCF control behavior are preserved.
+
 - Add `--inventory-only` to refresh the local SuperDex asset inventory without
   consulting the source checkout, while validating all asset dependencies.
 

@@ -553,13 +553,34 @@ def _classify_scene(
     licenses: tuple[str, ...],
     dependencies: tuple[DependencyEdge, ...],
 ) -> AssetEntry:
-    capabilities = [CAPABILITY_SCENE_ASSEMBLY, CAPABILITY_PREFAB_RIGID_ACTORS]
+    capabilities = [CAPABILITY_SCENE_ASSEMBLY]
+    if data.get("actors", {}).get("rigid") or data.get("prefabs"):
+        capabilities.append(CAPABILITY_PREFAB_RIGID_ACTORS)
     if _joints_of(data):
         capabilities.append(CAPABILITY_PREFAB_ARTICULATED_ACTORS)
     if data.get("controllers"):
         capabilities.append(CAPABILITY_SCENE_CONTROLLERS)
+    # Inventory candidates are structural hints, not numerical qualification.
+    # The cold-path scene audit supplies detailed field/dependency diagnostics.
+    blockers = []
+    if set(data) - {"comment", "actors", "scene", "prefabs", "contactFilter", "controllers"}:
+        blockers.append("scene fields outside the stage-7 profile")
+    actors = data.get("actors", {})
+    if len(actors.get("articulated", [])) != 1 or set(actors) - {"comment", "rigid", "articulated"}:
+        blockers.append("stage 7 requires one articulation and optional rigid actors")
+    if any(j.get("type") not in PROFILE_JOINT_TYPES for j in _joints_of(data)):
+        blockers.append("scene joints outside the fixed/hinge/slide profile")
+    if any(a.get("cycles") or a.get("skin") for a in actors.get("articulated", [])):
+        blockers.append("scene mechanisms/skin require a separate capability audit")
+    if any(link.get("sensors") or link.get("actuators") for link in _links_of(data)):
+        blockers.append("scene link components require a separate capability audit")
+    if any(set(c) - {"comment", "articulatedActor", "jointTracking"}
+           for c in data.get("controllers", [])):
+        blockers.append("scene controller outside the joint-tracking profile")
     if any(not edge.resolved for edge in dependencies):
         disposition = DISPOSITION_UNRESOLVED_DEPENDENCY
+    elif not blockers:
+        disposition = DISPOSITION_PROFILE_CANDIDATE
     else:
         disposition = DISPOSITION_UNSUPPORTED_FEATURES
     joints = _joints_of(data)
@@ -568,7 +589,7 @@ def _classify_scene(
         kind="scene",
         name=str(data.get("name", entrypoint.stem)),
         disposition=disposition,
-        blockers=(f"scene assembly pending ({CAPABILITY_SCENE_ASSEMBLY})",),
+        blockers=tuple(blockers),
         required_capabilities=tuple(sorted(set(capabilities))),
         joint_counts=_joint_counts(joints),
         root_joint_type=_root_joint_type(joints),

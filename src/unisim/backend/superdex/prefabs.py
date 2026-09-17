@@ -136,47 +136,10 @@ def compose_rigid_prefabs(p: Any, plan: ModelPlan, scene: SceneCfg) -> ModelPlan
     temp = p.create_scene("superdex_prefab_metadata")
     try:
         actors = spawn(temp)
-        names = list(plan.body_names)
-        masses, coms = list(plan.body_mass), list(plan.body_ipos)
-        qpos, qvel = list(plan.default_qpos), [0.0] * plan.nv
-        rigids = []
-        for actor in actors:
-            name = actor.get_name()
-            if name in names:
-                raise ValueError(f"superdex duplicate body name {name!r}; name nested instances")
-            body = len(names)
-            names.append(name)
-            pose = actor.get_root_transform()
-            quat = np.asarray(pose.rotation)[[3, 0, 1, 2]]
-            offset = (
-                np.zeros(3)
-                if actor.is_static()
-                else np.asarray(actor.get_center_of_mass_transform().translation) - pose.translation
-            )
-            coms.append(rotation_matrix(quat).T @ offset)
-            masses.append(0.0 if actor.is_static() else actor.get_mass())
-            qi = vi = None
-            if not actor.is_static():
-                qi, vi = len(qpos), len(qvel)
-                qpos.extend([*pose.translation, *quat])
-                omega = np.asarray(actor.get_angular_velocity())
-                qvel.extend(np.asarray(actor.get_linear_velocity()) - np.cross(omega, offset))
-                qvel.extend(rotation_matrix(quat).T @ omega)
-            rigids.append(RigidPlan(name, body, qi, vi))
+        append_rigid_metadata(plan, actors)
     finally:
         p.destroy_scene(temp)
-    plan.body_names = tuple(names)
-    plan.body_mass = np.asarray(masses)
-    plan.body_ipos = np.asarray(coms)
-    plan.body_parent_ids = np.concatenate((plan.body_parent_ids, np.zeros(expected, dtype=int)))
-    plan.body_link_indices = np.concatenate((plan.body_link_indices, np.full(expected, -1)))
-    plan.rigids = tuple(rigids)
     plan.spawn_rigids = spawn
-    plan.default_qpos = np.asarray(qpos)
-    plan.default_qvel = np.asarray(qvel)
-    added = len(qvel) - plan.nv
-    plan.dof_armature = np.concatenate((plan.dof_armature, np.zeros(added)))
-    plan.nq, plan.nv = len(qpos), len(qvel)
     previous_cleanup = plan.cleanup
 
     def cleanup() -> None:
@@ -185,3 +148,47 @@ def compose_rigid_prefabs(p: Any, plan: ModelPlan, scene: SceneCfg) -> ModelPlan
 
     plan.cleanup = cleanup
     return plan
+
+
+def append_rigid_metadata(plan: ModelPlan, actors: list[Any]) -> None:
+    """Append native rigid actors using the shared canonical object state layout."""
+    expected = len(actors)
+    names = list(plan.body_names)
+    masses, coms = list(plan.body_mass), list(plan.body_ipos)
+    qpos = list(plan.default_qpos)
+    qvel = list(plan.default_qvel) if plan.default_qvel is not None else [0.0] * plan.nv
+    rigids = []
+    for actor in actors:
+        name = actor.get_name()
+        if name in names:
+            raise ValueError(f"superdex duplicate body name {name!r}; name nested instances")
+        body = len(names)
+        names.append(name)
+        pose = actor.get_root_transform()
+        quat = np.asarray(pose.rotation)[[3, 0, 1, 2]]
+        offset = (
+            np.zeros(3)
+            if actor.is_static()
+            else np.asarray(actor.get_center_of_mass_transform().translation) - pose.translation
+        )
+        coms.append(rotation_matrix(quat).T @ offset)
+        masses.append(0.0 if actor.is_static() else actor.get_mass())
+        qi = vi = None
+        if not actor.is_static():
+            qi, vi = len(qpos), len(qvel)
+            qpos.extend([*pose.translation, *quat])
+            omega = np.asarray(actor.get_angular_velocity())
+            qvel.extend(np.asarray(actor.get_linear_velocity()) - np.cross(omega, offset))
+            qvel.extend(rotation_matrix(quat).T @ omega)
+        rigids.append(RigidPlan(name, body, qi, vi))
+    plan.body_names = tuple(names)
+    plan.body_mass = np.asarray(masses)
+    plan.body_ipos = np.asarray(coms)
+    plan.body_parent_ids = np.concatenate((plan.body_parent_ids, np.zeros(expected, dtype=int)))
+    plan.body_link_indices = np.concatenate((plan.body_link_indices, np.full(expected, -1)))
+    plan.rigids = tuple(rigids)
+    plan.default_qpos = np.asarray(qpos)
+    plan.default_qvel = np.asarray(qvel)
+    added = len(qvel) - plan.nv
+    plan.dof_armature = np.concatenate((plan.dof_armature, np.zeros(added)))
+    plan.nq, plan.nv = len(qpos), len(qvel)

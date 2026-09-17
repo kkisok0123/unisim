@@ -87,6 +87,8 @@ class ModelPlan:
     default_qvel: np.ndarray | None = None
     native_bots: dict[Any, tuple[Any, Any, dict[str, Any]]] = field(default_factory=dict)
     camera_params: dict[str, dict[str, Any]] = field(default_factory=dict)
+    effective_scene_settings: dict[str, Any] | None = None
+    restore_scene_controller: Callable[[Any], None] | None = None
 
     @property
     def robot_nq(self) -> int:

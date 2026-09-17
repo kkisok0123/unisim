@@ -107,6 +107,36 @@ package/release tooling.  Out of scope: engine source/solver changes, task YAML,
 reward or rollout policy, training orchestration, distributed execution, and
 private SDK redistribution.
 
+## SuperDex native scene qualification
+
+Stage 7 supports `.mochi_scene` files with one root-file articulation containing
+fixed, revolute and prismatic joints, including a prismatic first joint, plus
+rigid actors and nested rigid prefabs. Callers must supply ordered
+`superdex_controlled_joints` and finite positive `superdex_effort_limits`.
+Actions are physical efforts; task action normalization remains with UniLab.
+Preserve authored gravity, solver settings, contact filters and supported native
+joint-tracking controllers. Use SDK defaults for missing scene settings and
+caller `sim_dt` for the timestep. Reject unsupported fields and nested setting
+conflicts. Do not add a ground plane or change scene coordinates implicitly.
+
+Use the repository-local assets; qualification must not read the SDK source
+checkout or modify asset payloads. Run:
+
+```bash
+SUPERDEX_ASSETS_PATH="$PWD/assets/superdex" uv run --no-sync scripts/superdex_scene_qualify.py
+SUPERDEX_ASSETS_PATH="$PWD/assets/superdex" uv run --no-sync pytest -q tests/test_superdex_scenes.py
+uv run --no-sync scripts/superdex_scene_qualify.py --viewer --frames 240
+```
+
+Only Cart Pole and Half Cheetah have Stage 7 benchmark qualification. Publish
+scene reports under `docs/superdex-scene-qualification/`; update the SuperDex
+guide, asset README, integration plan, inventory and changelog with the exact
+coverage. Inventory candidates are not automatic runtime qualifications. Keep
+older reports intact and distinguish renderer smoke from manual inspection;
+Stage 5's manual inspection remains outstanding. Multiple articulations, soft
+bodies, scene camera/plugin components and advanced mechanisms require separate
+work. Run `make check` and `make package` before completing a scene change.
+
 ## CI and automated release
 
 `.github/workflows/ci.yml` runs Ruff and pytest (including the pinned MuJoCo

@@ -63,6 +63,7 @@ class SuperDexBackend(BuiltinAPI, SimBackend):
         num_workers: int = 0,
         execution_mode: str = "batch",
         effort_limits: Sequence[float] | None = None,
+        controlled_joints: Sequence[str] | None = None,
         allow_contact_approximation: bool = False,
         **unexpected: Any,
     ) -> None:
@@ -118,6 +119,7 @@ class SuperDexBackend(BuiltinAPI, SimBackend):
                 self._r,
                 scene,
                 effort_limits=effort_limits,
+                controlled_joints=controlled_joints,
                 allow_contact_approximation=allow_contact_approximation,
             )
             self._body_lookup = {name: i for i, name in enumerate(self._plan.body_names)}

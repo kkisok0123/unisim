@@ -50,6 +50,7 @@ def create_backend(
     superdex_num_workers = kwargs.pop("superdex_num_workers", 0)
     superdex_execution_mode = kwargs.pop("superdex_execution_mode", "batch")
     superdex_effort_limits = kwargs.pop("superdex_effort_limits", None)
+    superdex_controlled_joints = kwargs.pop("superdex_controlled_joints", None)
     superdex_allow_contact_approximation = kwargs.pop("superdex_allow_contact_approximation", False)
     drake_backend_mode = kwargs.pop("drake_backend_mode", "batch")
     drake_nthread = kwargs.pop("drake_nthread", None)
@@ -159,6 +160,7 @@ def create_backend(
         kwargs["num_workers"] = superdex_num_workers
         kwargs["execution_mode"] = superdex_execution_mode
         kwargs["effort_limits"] = superdex_effort_limits
+        kwargs["controlled_joints"] = superdex_controlled_joints
         kwargs["allow_contact_approximation"] = superdex_allow_contact_approximation
         return SuperDexBackend(scene, num_envs, sim_dt, **kwargs)
     if backend_type == "genesis":

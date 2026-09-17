@@ -63,6 +63,8 @@ class BuiltinAPI:
     def configure_controller(self, type_name: str, *, param_args="", init_args="") -> None:
         """Configure one native controller per environment using SDK JSON/file arguments."""
         self._check_open()
+        if self.model.restore_scene_controller is not None:
+            raise NotImplementedError("superdex cannot replace an authored scene controller")
         if type_name not in CONTROLLERS:
             raise NotImplementedError(f"superdex unsupported controller {type_name!r}")
         if self._controllers:
@@ -139,6 +141,8 @@ class BuiltinAPI:
                 actor.remove_articulated_pose_controller()
 
     def _restore_controller(self, i: int) -> None:
+        if self.model.restore_scene_controller is not None:
+            self.model.restore_scene_controller(self._actors[i])
         if self._controllers and self._controller_type == POSE_CONTROLLER:
             self._controllers[i][2].initialize(False)
 

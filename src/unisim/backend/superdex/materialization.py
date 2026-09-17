@@ -42,6 +42,7 @@ def materialize_model(
     scene: SceneCfg,
     *,
     effort_limits: Sequence[float] | None = None,
+    controlled_joints: Sequence[str] | None = None,
     allow_contact_approximation: bool = False,
 ) -> ModelPlan:
     """Resolve all model metadata and shapes before any rollout begins."""
@@ -50,6 +51,12 @@ def materialize_model(
     path = Path(scene.model_file).expanduser().resolve()
     if not path.is_file():
         raise FileNotFoundError(path)
+    if path.suffix == ".mochi_scene":
+        from .scenes import materialize_native_scene
+
+        return materialize_native_scene(physics, path, scene, controlled_joints, effort_limits)
+    if controlled_joints is not None:
+        raise ValueError("superdex controlled_joints applies only to .mochi_scene inputs")
     if path.suffix == ".superdex_bot":
         plan = _native_plan(physics, robotics, path, effort_limits)
         if scene.fragment_files:
@@ -58,7 +65,9 @@ def materialize_model(
             return compose_rigid_prefabs(physics, plan, scene)
         return plan
     if path.suffix != ".xml":
-        raise NotImplementedError("superdex model must be .superdex_bot or audited .xml MJCF")
+        raise NotImplementedError(
+            "superdex model must be .superdex_bot, .mochi_scene or audited .xml MJCF"
+        )
     return _mjcf_plan(physics, path, scene, effort_limits, allow_contact_approximation)
 
 

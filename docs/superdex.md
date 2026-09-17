@@ -21,7 +21,7 @@ carrying the native batch executor, published from
 upstream project_superdex PR merges; they install into the same `superdex/`
 namespace as the upstream packages and must not be co-installed with them. The
 extra also supplies MuJoCo 3.11 as a **cold MJCF parser**; SuperDex executes every
-physics step. Native `.superdex_bot` loading does not use that parser.
+physics step. Native `.superdex_bot` and `.mochi_scene` loading do not use that parser.
 Importing `unisim` or its `SuperDexBackend` class does not load either engine.
 SuperDex Lab, Gymnasium and a learner are not adapter dependencies.
 
@@ -494,8 +494,8 @@ Reports and exact qualification limits are in
 This profile accepts only rigid actors and nested prefab references. Scene
 settings, authored contact-filter overrides, constraints, controllers, sensors,
 actuators, extra articulations and soft bodies are rejected instead of dropped.
-Full `.mochi_scene` dispatch remains stage 7. SDK support for another prefab does
-not qualify it automatically; the stage-5 evidence covers the sphere and peg
+Full `.mochi_scene` dispatch is covered separately by Stage 7 below. SDK support
+for another prefab does not qualify it automatically; the stage-5 evidence covers the sphere and peg
 board listed in the report. No assets or SDK downloads enter the normal tests.
 
 ## Built-in cameras, controllers and universal qualification (stage 6)
@@ -607,3 +607,90 @@ lifecycle. It reports absent cameras as skipped. Unsupported models are blocked;
 other exceptions and numerical mismatches fail. `--all` continues after either
 and exits nonzero if any model fails or is blocked. Qualification is evidence
 for the recorded fixtures, not a guarantee for every asset.
+
+
+## Native scenes (stage 7)
+
+`SceneCfg.model_file` accepts `.mochi_scene` files with one root-file articulation
+containing fixed/revolute/prismatic joints, including a prismatic first joint,
+plus independent rigid actors and nested rigid prefabs. Additional rigid
+`SceneCfg.fragment_files` use the existing path-resolution rule. Set
+`SUPERDEX_ASSETS_PATH` to the local bundle root for bundle-relative mesh references.
+
+```python
+import os
+from pathlib import Path
+
+from unisim import create_backend
+from unisim.scene import SceneCfg
+
+assets = Path(os.environ["SUPERDEX_ASSETS_PATH"])
+backend = create_backend(
+    "superdex",
+    SceneCfg(str(assets / "benchmarks/cart_pole/cart_pole.mochi_scene")),
+    num_envs=2,
+    sim_dt=0.002,
+    superdex_controlled_joints=["Cart"],
+    superdex_effort_limits=[3.0],
+)
+try:
+    import numpy as np
+
+    backend.step(np.zeros((2, 1)))  # Physical force along the Cart joint axis.
+    backend.reset()
+finally:
+    backend.close()
+```
+
+`superdex_controlled_joints` is required for scene inputs and determines action
+order. Names must uniquely select active authored hinge/slide joints; fixed or
+unknown joints are rejected. `superdex_effort_limits` supplies one finite
+positive limit per input. Controls are clipped physical forces/torques; passive
+joints remain in state but receive no selected effort. These options do not
+change native bot or MJCF controls; `controlled_joints` is rejected for those inputs.
+
+| Qualified scene | Physical effort inputs | Limits | State dimensions |
+| --- | --- | --- | --- |
+| Cart Pole | `Cart` | 3 | nq=nv=2 |
+| Half Cheetah | `BackThigh`, `BackShin`, `BackFoot`, `FrontThigh`, `FrontShin`, `FrontFoot` | 120, 90, 60, 120, 60, 30 | nq=nv=9 |
+
+Scene gravity and solver settings are preserved; absent values use SDK defaults.
+These two scenes use gravity `[0, -9.8, 0]`, not the bot loader's negative-Z
+convention. `sim_dt` remains caller-owned: the SDK scene schema has no timestep
+field, and such fields are rejected. Nested scene settings must match the root's
+explicit values; conflicting or otherwise unresolved settings fail. No gravity
+or solver override options are added. Effective settings appear in the report.
+
+The SDK loader retains actor names, shapes, transforms and authored layer-contact
+filters. Half Cheetah's joint-tracking controller supplies rest springs while
+`step()` applies external efforts. Reset restores the initial spring targets and
+velocities without destroying snapshot-owned controller entities. The explicit
+bot controller API cannot replace an authored scene controller. Native coordinates
+are preserved, and there is no implicit ground plane: the benchmark application
+adds ground separately. UniLab owns action normalization, rewards and training.
+
+All articulation DoFs precede dynamic rigid-object coordinates. Each dynamic
+rigid object adds world xyz/wxyz qpos and world-origin linear/body-angular qvel;
+static fixtures add body entries but no coordinates. Existing body, force,
+full/selective reset and state-roundtrip APIs apply to the complete scene.
+State round trips restore kinematics, not hidden solver history. Each environment
+owns its actors/controllers; failed partial instantiation is cleaned up.
+
+This profile rejects multiple articulations, FREE/spherical scene joints,
+mechanical cycles, soft bodies, scene cameras/plugins, arbitrary constraints,
+non-rigid nested prefabs and controllers other than joint-tracking pose springs.
+Scene support does not change the separate native-bot FREE-root support.
+Unsupported fields/components are rejected rather than silently discarded.
+
+```bash
+SUPERDEX_ASSETS_PATH="$PWD/assets/superdex" uv run --no-sync scripts/superdex_scene_qualify.py
+SUPERDEX_ASSETS_PATH="$PWD/assets/superdex" uv run --no-sync pytest -q tests/test_superdex_scenes.py
+uv run --no-sync scripts/superdex_scene_qualify.py --viewer --scenes half_cheetah
+uv run --no-sync scripts/superdex_scene_qualify.py --viewer --frames 240
+```
+
+The [Stage 7 report](superdex-scene-qualification/README.md) records 1,000 steps
+per scene in each execution mode, with two environments, zero measured SDK
+state/body-position deviation and passing reset/isolation/control/lifecycle checks.
+Both 240-frame renderer smokes passed with zero reset error. Manual visual
+inspection remains outstanding; no other scene is qualified by these results.

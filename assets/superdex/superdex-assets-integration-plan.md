@@ -1,11 +1,11 @@
 # Superdex asset integration plan
 
-Status: revised on 2026-09-16. Stages 1–5 are complete; stage 6 implements built-in cameras/controllers
-and universal qualification, with the floating OSC SDK limitation noted below. Stage 5's native
-renderer smoke passed; manual visual inspection remains outstanding. Stage 7
-complete `.mochi_scene` dispatch is the next capability extension.
-Qualification applies only to the recorded fixtures, not automatically to
-every asset in the bundle.
+Status: revised on 2026-09-17. Stages 1–7 are complete for their recorded
+profiles. Stage 7 qualifies unchanged Cart Pole and Half Cheetah `.mochi_scene`
+files, including authored contact filters and Half Cheetah rest springs.
+Stage 6's floating OSC SDK limitation remains. Stage 5 and Stage 7 native
+renderer smoke passed; manual visual inspection remains outstanding.
+Qualification applies only to the recorded fixtures, not every asset in the bundle.
 
 ## Objective and approach
 
@@ -82,9 +82,10 @@ This historical import record does not change the current decision to keep
 
 The current loader accepts native bots with HARD or FREE roots and
 fixed/revolute/prismatic child joints. Stage 5 adds independent rigid actors
-and nested `.mochi_prefab` fragments beside one native bot. Sensor/actuator
-components, mechanical cycles and full `.mochi_scene` dispatch still need
-additional adapter work.
+and nested `.mochi_prefab` fragments beside one native bot. Stage 6 supports the
+qualified built-in camera/controller profiles. Stage 7 adds complete native
+scenes containing one fixed/hinge/slide articulation and rigid actors. Custom
+components, mechanical cycles and multiple articulations still need additional work.
 See the [current Superdex profile](../../docs/superdex.md) and
 [materialization implementation](../../src/unisim/backend/superdex/materialization.py).
 
@@ -329,17 +330,53 @@ blocker instead of claiming floating OSC support.
 records the exact coverage and remaining SDK limitations. A complete scene
 or arbitrary custom component is not implied by this stage.
 
-### 7. Extend adapter dispatch to complete native scenes
+### 7. Extend adapter dispatch to complete native scenes — complete
 
-- Add `.mochi_scene` dispatch after scene assembly is available.
-- Define explicit precedence for authored gravity, timestep and solver settings
-  versus caller configuration; reject unresolved conflicts.
-- Bind robot actions and retain all scene actors and supported components.
-- Qualify benchmark scenes individually against direct SDK execution.
+`SceneCfg.model_file` now dispatches `.mochi_scene` through the native SDK
+prefab loader. The profile supports one root-file articulation with fixed,
+revolute and prismatic joints (including a prismatic first joint), standalone
+rigid actors, nested rigid prefabs and additional rigid `fragment_files`.
+Audits reject unsupported content before loading; asset bytes remain unchanged.
+
+- Callers provide ordered `superdex_controlled_joints` and matching finite
+  positive `superdex_effort_limits`. Inputs are physical efforts. Cart Pole
+  controls `Cart` (limit 3); Half Cheetah controls six leg joints (limits
+  120, 90, 60, 120, 60, 30). These are tooling profiles, not loader special cases.
+- Authored gravity and solver settings take effect; absent settings retain SDK
+  defaults. `sim_dt` belongs to the caller. Timestep fields and conflicting
+  nested settings fail explicitly. Preserve negative-Y SDK gravity in these
+  scenes; do not add a ground plane or convert coordinate systems.
+- Preserve actor names, geometry, transforms, contact filters and Half Cheetah's
+  authored joint-tracking rest springs. Full/selective reset restores initial
+  state and spring targets without changing controller ownership.
+- Whole-scene body/state/force interfaces and serial/batch execution are reused.
+  Multiple articulations, soft bodies, scene camera/plugin components, non-rigid
+  nested prefabs and advanced mechanisms remain unsupported.
+
+Both unchanged benchmarks passed 1,000 steps at 0.002 s with two environments
+in each of serial and batch execution. State and body-position deviation from
+independently loaded SDK scenes was zero. Checks cover initial state, actor
+inventories, effective settings, action routing, clipping, moved-state round
+trips, reset, isolation, controller preservation and cleanup/recreation.
+Synthetic regressions exercise authored settings, rigid contact/filtering,
+additional fragments and partial-instantiation cleanup.
+
+```bash
+SUPERDEX_ASSETS_PATH="$PWD/assets/superdex" uv run --no-sync scripts/superdex_scene_qualify.py
+SUPERDEX_ASSETS_PATH="$PWD/assets/superdex" uv run --no-sync pytest -q tests/test_superdex_scenes.py
+uv run --no-sync scripts/superdex_scene_qualify.py --viewer --frames 240
+```
+
+Each scene completed 240 offscreen frames covering initial pose, controlled
+motion and reset, with zero reset error. Manual visual inspection remains
+outstanding and is separate from numerical qualification. See the
+[Stage 7 report](../../docs/superdex-scene-qualification/README.md),
+[numerical evidence](../../docs/superdex-scene-qualification/report.json) and
+[viewer smoke](../../docs/superdex-scene-qualification/viewer.json).
 
 **Done when:** actor inventories, effective settings, controls and whole-scene
-reset match the intended SDK behavior. Benchmark task rewards and training
-remain with UniLab.
+reset match direct SDK behavior for both selected benchmarks. This numerical
+and lifecycle gate passed. Benchmark rewards and training remain with UniLab.
 
 ### 8. Extend advanced adapter capabilities individually
 
@@ -380,13 +417,13 @@ The immediate sequence is **stage 1 complete → stage 2A visualization
 complete → stage 2B FR3 adapter qualification complete → stage 3 compatible
 robots complete → stage 4 native floating roots complete → stage 5 rigid
 prefabs qualified → stage 6 built-in cameras/controllers qualified → stage 7
-complete native scenes**. Manual visual inspection of the stage-5 fixture
+complete native scenes qualified**. Manual visual inspection of the stage-5 fixture
 remains a separate follow-up.
 
 Stage 4 supplies floating robot state; stage 5 supplies independent rigid
 objects and whole-scene state/reset on the qualified fixed-base route. Stage 6
-reuses these capabilities for component qualification. Stage 7 depends
-on stage 5 and any component capabilities required by its selected scenes.
+reuses these capabilities for component qualification. Stage 7 reuses
+stage 5 state/ownership and qualifies both selected scenes, including native rest springs.
 Stage 8 is scheduled per capability. All extensions reuse the viewer workflow.
 
 The first milestone's completed work packages were:

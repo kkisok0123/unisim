@@ -275,6 +275,14 @@ def test_scene_bundle_root_relative_resolution(tmp_path):
     assert "scene-assembly" in scene.required_capabilities
     errors, _ = verify_bundle(inventory, bundle)
     assert errors == []
+    # A structural candidate has no obsolete blanket scene-loading blocker.
+    path = bundle / "benchmarks" / "cart.mochi_scene"
+    data = json.loads(path.read_text())
+    data.pop("name")  # Top-level names are not part of the native scene schema.
+    _write(path, data)
+    scene = next(e for e in build_inventory(bundle, _provenance()).entries if e.kind == "scene")
+    assert scene.disposition == DISPOSITION_PROFILE_CANDIDATE
+    assert scene.blockers == ()
 
 
 def test_prefab_nested_references(tmp_path):

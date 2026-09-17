@@ -62,6 +62,7 @@ def test_factory_routes_only_superdex_options(monkeypatch):
         superdex_num_workers=1,
         superdex_execution_mode="serial",
         superdex_effort_limits=[3.0],
+        superdex_controlled_joints=["joint"],
         superdex_allow_contact_approximation=True,
         newton_device="cuda:0",
         body_state_required=True,
@@ -71,6 +72,7 @@ def test_factory_routes_only_superdex_options(monkeypatch):
         "num_workers": 1,
         "execution_mode": "serial",
         "effort_limits": [3.0],
+        "controlled_joints": ["joint"],
         "allow_contact_approximation": True,
     }
 
@@ -94,4 +96,3 @@ def test_invalid_execution_mode_is_rejected_before_loading_engine():
         SuperDexBackend(SceneCfg("unused"), 1, 0.01, execution_mode=True)
     with pytest.raises(ValueError, match="serial"):
         SuperDexBackend(SceneCfg("unused"), 1, 0.01, execution_mode="serial", num_workers=2)
-

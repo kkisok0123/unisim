@@ -7,7 +7,8 @@ built-in camera metadata/poses, explicit controllers and universal
 qualification against the direct SDK. Its bundle audit records **21 passed,
 14 blocked and no failed checks**; it does not qualify every component or asset.
 Stage 5's native viewer smoke passed; manual visual inspection remains
-outstanding. Complete `.mochi_scene` dispatch is planned for Stage 7.
+outstanding. Stage 7 qualifies complete Cart Pole and Half Cheetah `.mochi_scene` loading;
+its renderer smoke passed, with manual inspection outstanding.
 
 This directory is local and ignored by Git. The tracked qualification code
 and reports live under `scripts/`, `tests/`, and `docs/` in the repository.
@@ -199,8 +200,8 @@ and [adapter guide](../../docs/superdex.md#rigid-objects-and-nested-prefabs-stag
 Other prefabs are not automatically qualified. Scene settings, contact-filter
 overrides, constraints, controllers, sensor/actuator components, extra
 articulations and soft bodies remain outside this rigid-prefab profile.
-Stage 6 adds built-in cameras/controllers below; full `.mochi_scene` dispatch
-remains stage 7.
+Stage 6 adds built-in cameras/controllers below; Stage 7 scene dispatch is
+qualified separately for Cart Pole and Half Cheetah.
 
 ## Run the Stage 6 universal qualification checks
 
@@ -359,3 +360,41 @@ the crash with margin; 0.01 also passed. The setting is `armature_floor`,
 recorded per bot in `scripts/superdex_bot_profiles.py`. If another
 zero-inertia robot crashes the same way, raise its floor first and compare
 against a direct SDK scene before suspecting the adapter.
+
+
+## Run the Stage 7 native scene checks
+
+Stage 7 qualifies `benchmarks/cart_pole/cart_pole.mochi_scene` and
+`benchmarks/half_cheetah/half_cheetah.mochi_scene` without changing their bytes.
+Each uses one articulation; Half Cheetah's authored rest springs stay active
+alongside explicit physical effort inputs. Native negative-Y gravity, solver
+settings and contact filters are preserved. No ground plane is added implicitly.
+
+```bash
+export SUPERDEX_ASSETS_PATH="$PWD/assets/superdex"
+uv run --no-sync scripts/superdex_scene_qualify.py
+uv run --no-sync pytest -q tests/test_superdex_scenes.py
+uv run --no-sync scripts/superdex_scene_qualify.py --viewer --scenes cart_pole
+uv run --no-sync scripts/superdex_scene_qualify.py --viewer --scenes half_cheetah
+uv run --no-sync scripts/superdex_scene_qualify.py --viewer --frames 240
+```
+
+Both benchmarks passed 1,000 steps at 0.002 s with two environments in serial
+and batch modes, with zero measured state/body-position deviation from direct
+SDK execution. Both viewer smokes completed initial pose, motion and reset
+with zero reset error. Manual visual inspection remains outstanding, as does
+Stage 5's separate manual inspection.
+
+Use `SceneCfg.model_file` with the scene path, ordered
+`superdex_controlled_joints` and matching `superdex_effort_limits`.
+`sim_dt` is caller-owned; authored gravity/solver settings win over SDK defaults.
+Unknown fields, timestep declarations, conflicting nested settings and unsupported
+components fail explicitly. Rigid objects and nested rigid prefabs share the
+existing complete state/reset APIs. Multiple articulations, soft bodies and
+scene camera/plugin components remain outside this profile. Task normalization,
+observations, rewards and training remain in UniLab.
+
+See the [scene API guide](../../docs/superdex.md#native-scenes-stage-7),
+[Stage 7 report](../../docs/superdex-scene-qualification/README.md) and
+[integration plan](superdex-assets-integration-plan.md). Inventory candidates
+still require individual qualification; these results do not promote other assets.
