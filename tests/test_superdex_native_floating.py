@@ -51,7 +51,13 @@ def fixture_runtime(root="FREE", child="REVOLUTE", offset=False):
     )
     pose = np.array([0.2, -0.3, 0.4, 0, 0, 0, 0.1]) if root == "FREE" else np.array([0.1])
     actor = SimpleNamespace(
-        get_nested_link_actors=lambda: [0, 1], get_articulated_pose=lambda out: np.copyto(out, pose)
+        get_nested_link_actors=lambda: [0, 1],
+        get_articulated_pose=lambda out: np.copyto(out, pose),
+        get_num_dofs=lambda: len(pose),
+        get_articulated_shape_info=lambda: SimpleNamespace(dof_info=[
+            SimpleNamespace(offset=0, get_size=lambda: 6 if root == "FREE" else 0),
+            SimpleNamespace(offset=6 if root == "FREE" else 0, get_size=lambda: 1),
+        ]),
     )
     link = SimpleNamespace(
         is_static=lambda: False,
@@ -62,7 +68,8 @@ def fixture_runtime(root="FREE", child="REVOLUTE", offset=False):
     scene = SimpleNamespace(get_actor=lambda h: link)
     physics = SimpleNamespace(
         ArticulatedJointType=SimpleNamespace(
-            HARD="HARD", FREE="FREE", REVOLUTE="REVOLUTE", PRISMATIC="PRISMATIC"
+            HARD="HARD", FREE="FREE", REVOLUTE="REVOLUTE",
+            PRISMATIC="PRISMATIC", SPHERICAL="SPHERICAL"
         ),
         create_scene=lambda name: scene,
         destroy_scene=lambda s: None,

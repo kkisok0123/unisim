@@ -610,3 +610,17 @@ def test_verify_asset_bundle_rejects_broken_report(tmp_path):
         verify_asset_bundle(bundle, report)
     with pytest.raises(SuperdexAssetError, match="schema_unexpected"):
         verify_asset_bundle(bundle, tmp_path / "absent.json")
+
+
+def test_stage8_candidates_do_not_retain_completed_feature_blockers(tmp_path):
+    bundle = _seed_bundle(tmp_path / "bundle")
+    path = bundle / "bots/hands/hand.superdex_bot"
+    data = json.loads(path.read_text())
+    data["joints"].append({"name": "ball", "type": "Spherical"})
+    data["cycles"] = [{"parentLink": 0, "childLink": 1}]
+    _write(path, data)
+    entry = next(e for e in build_inventory(bundle, _provenance()).entries
+                 if "hand" in e.entrypoint)
+    assert entry.disposition == DISPOSITION_PROFILE_CANDIDATE
+    assert entry.blockers == ()
+    assert {"spherical-joints", "mechanical-cycles"} <= set(entry.required_capabilities)

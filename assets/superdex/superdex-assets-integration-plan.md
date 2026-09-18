@@ -6,15 +6,24 @@ files, including authored contact filters and Half Cheetah rest springs.
 Stage 6's floating OSC SDK limitation remains. Stage 5 and Stage 7 native
 renderer smoke passed; manual visual inspection remains outstanding.
 Qualification applies only to the recorded fixtures, not every asset in the bundle.
+Stage 8 is complete for the declared native rigid-body profile and target matrix:
+54 model/prefab/scene files plus the authored FR3 controller profile qualify.
+The 21 previously qualified robots remain covered. New capabilities target one
+serial environment. Stage 8 renderer smoke is separate from outstanding manual
+inspection; deferred features and SDK limitations remain explicit below.
 
 ## Objective and approach
 
 Keep the existing Superdex assets local under `assets/superdex/` and preserve
 the existing `assets/` ignore rule. Preserve the source directory structure and
 asset bytes. Once the local copy is available, running it must not require access
-to `/home/pc829/UniFamily/project_superdex/`. Make those assets usable through
-UniSim's Superdex adapter, including geometry, controls, state and reset. Asset
-distribution is outside this plan; a Git clone does not provide the ignored files.
+to `/home/pc829/UniFamily/project_superdex/`. Use the bundle as qualification
+fixtures, not as the definition of supported assets. The Stage 8 objective is
+to load and operate externally authored rigid-body assets supported by SuperDex's
+public runtime, including assets outside this bundle, with correct geometry,
+controls, state and reset. Users author assets and scenes in SuperDex tools or
+their own scripts; UniSim owns loading, validation and runtime translation.
+Asset distribution is outside this plan; a Git clone does not provide the ignored files.
 
 Start by making the unchanged FR3 visible and controllable through UniSim so
 adapter changes can be inspected as they are developed. Then prove its numerical
@@ -84,8 +93,10 @@ The current loader accepts native bots with HARD or FREE roots and
 fixed/revolute/prismatic child joints. Stage 5 adds independent rigid actors
 and nested `.mochi_prefab` fragments beside one native bot. Stage 6 supports the
 qualified built-in camera/controller profiles. Stage 7 adds complete native
-scenes containing one fixed/hinge/slide articulation and rigid actors. Custom
-components, mechanical cycles and multiple articulations still need additional work.
+scenes containing one fixed/hinge/slide articulation and rigid actors. Stage 8 adds mechanical
+cycles, spherical joints, general rigid prefab/scene ownership and the authored
+rigid behavior qualified below.
+Custom-component adaptation and deformables remain deferred.
 See the [current Superdex profile](../../docs/superdex.md) and
 [materialization implementation](../../src/unisim/backend/superdex/materialization.py).
 
@@ -378,25 +389,127 @@ outstanding and is separate from numerical qualification. See the
 reset match direct SDK behavior for both selected benchmarks. This numerical
 and lifecycle gate passed. Benchmark rewards and training remain with UniLab.
 
-### 8. Extend advanced adapter capabilities individually
+### 8. Complete native rigid-body asset compatibility — qualified
 
-Create separate work packages for closed mechanisms, spherical joints, multiple
-articulations, specialized controllers and soft bodies. Add archive loading and
-offline CAD/URDF conversion when a concrete use case requires them.
+Load and operate externally authored rigid-body assets supported by the selected
+public SuperDex runtime, regardless of their location or whether the original
+bundle contains an example. Derive compatibility from public loaders, schemas
+and installed SDK capabilities rather than filenames. Record the source revision
+and installed SDK/build separately; distinguish adapter gaps from SDK/build
+blockers and deferred features. Scene authoring remains outside the adapter.
 
-Select each package using the stage 1 inventory and user priorities. Keep these
-features outside the first milestone's critical path.
+Preserve existing `SceneCfg` and factory usage. Extend state/control metadata
+where required, without introducing a scene-building API. Keep this as one stage
+with the following completed work items in implementation order:
 
-**Done when:** each promoted capability has a representative fixture, explicit
-state/control/reset semantics, repeatable tests and documented limits. Other
-assets retain precise unsupported statuses.
+| Order | Adaptation | Target assets and acceptance |
+| --- | --- | --- |
+| 1 | Closed-loop mechanisms | Qualify 2F85 and FR3–2F85. Preserve cycle-closing constraints, coupled motion, controls and reset without adding spurious action coordinates. |
+| 2 | Spherical joints | Qualify Oculus variants, mixed articulation and rail pendulum. Use native DOF layouts for orientation/state conversion, effort mapping, limits and controller targets. |
+| 3 | General prefab and scene loading | Support standalone rigid/articulated prefabs, object-only scenes, floating articulations, nested scenes and multiple articulations. Maintain per-actor ownership and advance each scene once per timestep. |
+| 4 | Rigid constraints and coupled actuation | Preserve scene-level rigid constraints, linear transmissions and spatial tendons. Use the constrained pendulum and additional serialized SDK-derived fixtures. |
+| 5 | Remaining authored scene behavior | Preserve joint/link-position/link-rotation tracking and articulated skin contact behavior. Qualify the pose-controller and skinned pendulum assets. |
+| 6 | Asset portability and qualification gaps | Support bot archives and external dependency roots. Fix passive-model qualification for OpenArm torso, which already loads, steps and resets. Record runtime URDF limitations separately. |
+
+**Asset coverage:** retain the 21 qualified robots as regression coverage and
+target the following 55 native files across `project_superdex/assets/` and
+`project_superdex/superdex_physics/assets/`. Each model/prefab/scene file now has a 1,000-step direct-SDK report; the
+controller configuration has a separate 1,040-step controller report.
+
+| Asset group | Files | Target set |
+| --- | ---: | --- |
+| Existing qualified bots and recipes | 21 | FR3/FR3v2, OpenArm arms/grippers, Allegro, ordinary DG5F and Wuji hands, googly eyes and their qualified combinations. |
+| Passive robot | 1 | OpenArm torso; remove the qualification runner's requirement for scalar joints rather than reimplementing its working runtime path. |
+| Closed-loop robots | 2 | 2F85 gripper and the FR3v2–2F85 recipe. |
+| Spherical-joint robots | 4 | Oculus XR hands: left/right, low/high polygon variants. |
+| Rigid-object prefabs | 14 | Sphere, chain, four colored blocks and box assembly, functional-dexterity peg/board, nine-hole pegboard, cup/pyramid, shape box and ground plane. |
+| Articulated prefabs | 4 | Ant, physics FR3, physics Allegro and mixed articulation. |
+| Rigid/articulated scenes | 8 | Cart Pole, Half Cheetah, table, constrained double pendulum, rail pendulum, pose-controller pendulum, skinned pendulum and tendon-comparison articulation. |
+| Built-in controller profile | 1 | FR3 articulated-pose controller configuration. |
+
+Add synthetic fixtures for archives, linear transmissions, spatial tendons,
+multiple articulations and public built-in component combinations missing from
+the asset files. The tendon-comparison scene contains the articulation; the
+example adds tendon models in code, so that scene alone cannot qualify tendon
+support. The rigid chain has no authored constraints. The skinned pendulum uses
+an articulated skeleton and driven skin; the separate soft-skinned pendulum
+requires deformable dynamics and remains deferred.
+
+Keep the FR3 runtime URDF fixture in a separate SDK-limited category: its loader
+can discard primitive collision geometry, so an incomplete import must not be
+reported as faithful support. Custom-component bots, including seed variants
+and the custom 2-DOF example, remain explicitly blocked. Do not strip components
+or infer support from a nearby qualified variant.
+
+Use the SDK source checkout for maintainer discovery only. Qualification must
+use independent local fixtures with recorded dependencies/provenance or small
+synthetic fixtures, without reading the SDK source checkout at runtime or
+modifying asset payloads. External asset roots follow native dependency rules;
+they do not need membership in the historical bundle or its checksum manifest.
+
+**Execution and boundaries:** target one environment in serial mode. Preserve
+existing batch regressions without extending batch support. Defer deformables,
+custom components, new batch execution, image rendering, conversion tooling and
+solver changes. Existing public built-in components stay in scope. Internal-only
+formats and features unavailable in the selected SDK remain SDK/build blockers.
+
+**Done when:** the declared public rigid-body compatibility matrix has no
+unresolved adapter gaps; each promoted capability and representative combination
+has direct-SDK evidence for structure, control, contact, state round trips, reset
+and cleanup; and assets outside the original bundle work through the same
+loading paths. Require at least 1,000 steps for each dynamic qualification
+profile, preserve existing qualified profiles, and record SDK blockers separately.
+Run focused tests, `make check` and `make package`. Keep renderer smoke and manual
+inspection separate, preserve historical reports, and publish exact coverage
+without claiming that a finite fixture set proves every possible asset.
+
+**Completion evidence (2026-09-17):** the new
+[Stage 8 report](../../docs/superdex-rigid-qualification/README.md) records 54 native
+model/prefab/scene passes and 11 synthetic passes, with seven custom-component
+bots and two deformable fixtures deferred. Native state and body-transform
+trajectories match direct SDK execution; contact, state round trips, reset and
+cleanup/recreation are checked separately. The original FR3 controller profile
+and passive OpenArm torso have their own reports. Synthetic tests also verify
+spherical JSC/pose targets, clipping, coupled motion, actor force isolation,
+external roots, archives with cameras, and transformed multiple floating roots.
+
+`make check` passed with 399 tests passed and 21 skipped, with Ruff clean.
+The asset-enabled SuperDex regression suite and `make package` are completion
+gates; their final results are recorded in the Stage 8 report.
+
+`SceneCfg` and factory usage remain intact. Spherical state uses three native
+rotation-vector coordinates; whole-joint queries expand to all three DOFs.
+Each articulation owns its state and force slice, and each scene advances once.
+Native authored constraints, tracking controllers and articulated skin remain
+SDK-owned. New capabilities require `serial` and `num_envs=1`; existing batch
+regressions stay intact. Physics fixtures are copied unchanged to the independent
+local `assets/superdex-physics/` root. Qualification reads only local roots and
+synthetic files, with payload hashes and installed SDK binary hashes recorded.
+
+Run the repeatable qualification and viewer with:
+
+```bash
+uv run --no-sync scripts/superdex_rigid_qualify.py
+uv run --no-sync pytest -q tests/test_superdex_rigid.py
+uv run --no-sync scripts/superdex_rigid_viewer.py \
+  assets/superdex/bots/grippers/2f_85/2f_85.superdex_bot --frames 120
+```
+
+The installed runtime's URDF importer documents that primitive visual/collision
+geometry is silently skipped; URDF is therefore not promoted as faithful native
+loading. Floating OSC remains separately SDK-blocked in the tested build.
+Internal-only formats, deformables, custom components, new batch execution,
+image rendering, conversion tooling and solver changes remain outside Stage 8.
+Historical reports are unchanged. Manual visual inspection remains outstanding.
 
 ## Adapter development process for stages 4–8
 
 For each new capability, follow the same process:
 
-1. Select one representative asset from the inventory and record its required
-   features and current blockers. Inspect direct SDK behavior as the reference.
+1. Select a representative asset or synthetic fixture and record its required
+   features and current blockers. For Stage 8, include the physics asset tree
+   and public SDK features absent from the original inventory. Inspect direct
+   SDK behavior as the reference.
 2. Define how loading, scene ownership, state, controls and reset map to UniSim.
    Keep validation and materialization on cold paths. Extend the public contract
    only if its existing interfaces cannot express the capability.
@@ -407,7 +520,9 @@ For each new capability, follow the same process:
    robot–object contact, actuated motion or complete-scene behavior as applicable.
    Provide numerical readouts for sensor/state details that geometry cannot show.
 5. Run numerical and lifecycle qualification, including headless execution,
-   selective reset and environment isolation. Keep visual results separate.
+   state restoration and reset. Preserve selective-reset and environment-isolation
+   regressions for existing profiles; Stage 8's new qualification target is one
+   serial environment. Keep visual results separate.
 6. Publish the example, regression tests and compatibility status before applying
    the capability to other assets. A visual pass alone does not grant support.
 
@@ -417,14 +532,18 @@ The immediate sequence is **stage 1 complete → stage 2A visualization
 complete → stage 2B FR3 adapter qualification complete → stage 3 compatible
 robots complete → stage 4 native floating roots complete → stage 5 rigid
 prefabs qualified → stage 6 built-in cameras/controllers qualified → stage 7
-complete native scenes qualified**. Manual visual inspection of the stage-5 fixture
-remains a separate follow-up.
+complete native scenes qualified → stage 8 native rigid-body asset compatibility
+qualified**. Manual visual inspections for Stages 5, 7 and 8 remain separate follow-ups.
 
 Stage 4 supplies floating robot state; stage 5 supplies independent rigid
 objects and whole-scene state/reset on the qualified fixed-base route. Stage 6
 reuses these capabilities for component qualification. Stage 7 reuses
 stage 5 state/ownership and qualifies both selected scenes, including native rest springs.
-Stage 8 is scheduled per capability. All extensions reuse the viewer workflow.
+Stage 8 completed the remaining scope, starting with closed-loop mechanisms, then
+spherical joints, then general prefab/scene ownership, followed by rigid
+constraints and coupled actuation, remaining authored scene behavior, and asset
+portability/qualification gaps. Its six work items remain within one stage. All extensions reuse the
+viewer workflow; scene assembly stays in external authoring tools and user scripts.
 
 The first milestone's completed work packages were:
 
@@ -451,7 +570,7 @@ qualify an asset.
 
 | Check | Required evidence |
 | --- | --- |
-| Provenance and dependencies | Source revision and local changes recorded; file hashes match; required references resolve inside `assets/superdex/`. |
+| Provenance and dependencies | Source revision and local changes recorded; fixture hashes match; references resolve within declared local fixture roots using native path rules. The original bundle remains under `assets/superdex/`. |
 | Local asset reproducibility | The configured local asset tree matches recorded file sizes and hashes, and all required dependencies resolve without the source checkout. |
 | Offline boundary | Core/import tests pass with downloads disabled; local fixtures load without network access or the original checkout. |
 | Structure | Authored/compiled body, joint, actor and component inventories agree. |
@@ -460,7 +579,7 @@ qualify an asset.
 | Stability | At least 1,000 steps under a recorded timestep/control profile without invalid state or unexplained divergence. |
 | Geometry and contact | Expected colliders instantiate and a representative contact probe behaves correctly. |
 | Reset | State round trips and whole-scene/selective reset restore the intended state. |
-| Isolation | Stepping or resetting one environment leaves another unchanged. |
+| Isolation | Existing multi-environment profiles retain stepping/reset isolation tests. Stage 8's new capability qualification targets one serial environment. |
 | Lifecycle | Repeated creation, cleanup and recreation succeed. |
 | Visuals | Native UniSim playback shows complete geometry, correct scale and link alignment, bounded movement and visible reset; numerical results are recorded without saving images. |
 
@@ -470,12 +589,17 @@ SDK version, platform, precision,
 timestep, control profile and numerical tolerances with every result. Separate
 checks performed through UniSim from any checks requiring a direct SDK fixture.
 
-Run native viewer checks in serial mode with one environment; validate headless
-batch execution separately. Keep missing-runtime diagnostics and unsupported
+Run native viewer checks in serial mode with one environment. Preserve separate
+headless batch regressions for existing profiles; Stage 8 adds no batch-execution
+requirement for new profiles. Keep missing-runtime diagnostics and unsupported
 feature rejection covered by tests.
 
 For implementation changes, run focused tests and `make check`. Run `make package`
-when packaging changes and `uv lock --check` when dependency metadata changes.
+for Stage 8 scene/runtime changes or packaging changes, and `uv lock --check`
+when dependency metadata changes. For documentation-only revisions, refresh the
+local inventory with `uv run --no-sync scripts/copy_superdex_assets.py --inventory-only`,
+verify document references and run `make check`; retain historical qualification
+reports and their original digests.
 Asset/runtime tests may be optional in the normal suite, but an explicit
 qualification run must fail if its required assets or runtime are missing.
 

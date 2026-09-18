@@ -150,7 +150,9 @@ def compose_rigid_prefabs(p: Any, plan: ModelPlan, scene: SceneCfg) -> ModelPlan
     return plan
 
 
-def append_rigid_metadata(plan: ModelPlan, actors: list[Any]) -> None:
+def append_rigid_metadata(
+    plan: ModelPlan, actors: list[Any], *, disambiguate: bool = False
+) -> None:
     """Append native rigid actors using the shared canonical object state layout."""
     expected = len(actors)
     names = list(plan.body_names)
@@ -160,6 +162,13 @@ def append_rigid_metadata(plan: ModelPlan, actors: list[Any]) -> None:
     rigids = []
     for actor in actors:
         name = actor.get_name()
+        if disambiguate and (not name or name in names):
+            base = name or "rigid"
+            suffix = len(names)
+            name = f"{base}#{suffix}"
+            while name in names:
+                suffix += 1
+                name = f"{base}#{suffix}"
         if name in names:
             raise ValueError(f"superdex duplicate body name {name!r}; name nested instances")
         body = len(names)

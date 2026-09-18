@@ -1,0 +1,9 @@
+{
+  "purpose": "Independent fixture acquisition verification; not read by qualification",
+  "source_repository": "/home/pc829/UniFamily/project_superdex",
+  "source_revision": "6b0541bd41adb39afe4e13fd6c45d9e9288f3021",
+  "source_subtree": "superdex_physics/assets",
+  "local_root": "assets/superdex-physics",
+  "files": 84,
+  "asset_bytes_unchanged": true
+}

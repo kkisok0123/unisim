@@ -1,0 +1,26 @@
+{
+  "status": "passed",
+  "steps": 1000,
+  "sim_dt": 0.002,
+  "articulations": 1,
+  "rigid_actors": 0,
+  "controls": 20,
+  "native_dofs": [
+    26
+  ],
+  "native_state_max_deviation": 0.0,
+  "body_pose_max_deviation": 0.0,
+  "contact_query_pairs": 31,
+  "contact_force_max_deviation": 0.0,
+  "contact_force_peak": 5.962911605834961,
+  "state_round_trip_error": 2.9802322387695312e-08,
+  "reset_error": 1.2101603719116838e-08,
+  "cleanup_recreation": true,
+  "control_routing_matches_sdk": true,
+  "camera_count": 0,
+  "camera_pose_max_deviation": 0.0,
+  "passive": false,
+  "initial_velocity_size": 26,
+  "asset": "bundle/bots/hands/wuji_hand2_beta1/left/wuji_hand2_beta1_left.superdex_bot",
+  "sha256": "bd2fdb8f2d6d7cee923a4283e2a25cb2d64fde43dddba7d99d1d7dcbfbadfd0e"
+}

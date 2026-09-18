@@ -7,11 +7,11 @@
     "source_initial_commit": "1d7150946fa3f3d3fb09c2bff07eaa138cbfdee6",
     "local_derivative_paths": [],
     "historical_upstream_sha": "ed30ce16361329cbbed956173d6a4f5842815d24",
-    "generated_utc": "2026-09-17T06:31:43Z"
+    "generated_utc": "2026-09-17T11:12:20Z"
   },
   "file_count": 888,
-  "total_bytes": 260239613,
-  "tree_digest": "10ba4bffff592c37619492fc19b5dcdb1a0147f903f8465f348e750cf278747b",
+  "total_bytes": 260252712,
+  "tree_digest": "7da60633c8643de11ccfbf9c8a7e5887689a2159ee441fb0a5a4561e40976a2d",
   "root_markers": [
     "bots",
     "prefabs",
@@ -25,24 +25,22 @@
   },
   "disposition_counts": {
     "control-profile": 1,
-    "profile-candidate": 8,
+    "profile-candidate": 38,
     "recipe-candidate": 12,
-    "unsupported-features": 32
+    "unsupported-features": 2
   },
   "entries": [
     {
       "entrypoint": "benchmarks/ant/ant.mochi_prefab",
       "kind": "prefab",
       "name": "ant",
-      "disposition": "unsupported-features",
-      "blockers": [
-        "prefab assembly pending (prefab-articulated-actors)"
-      ],
+      "disposition": "profile-candidate",
+      "blockers": [],
       "required_capabilities": [
         "prefab-articulated-actors"
       ],
       "required_capability_stages": [
-        5
+        8
       ],
       "joint_counts": {
         "Free": 1,
@@ -147,8 +145,8 @@
         "scene-assembly"
       ],
       "required_capability_stages": [
-        5,
-        7
+        7,
+        8
       ],
       "joint_counts": {
         "Prismatic": 1,
@@ -198,8 +196,8 @@
         "scene-controllers"
       ],
       "required_capability_stages": [
-        5,
-        7
+        7,
+        8
       ],
       "joint_counts": {
         "Hard": 1,
@@ -1375,7 +1373,7 @@
       "name": "ExampleBot2dof",
       "disposition": "unsupported-features",
       "blockers": [
-        "actuator/sensor components (actuator-sensor-components)"
+        "custom actuator/sensor components remain deferred"
       ],
       "required_capabilities": [
         "actuator-sensor-components"
@@ -1527,11 +1525,8 @@
       "entrypoint": "bots/grippers/2f_85/2f_85.superdex_bot",
       "kind": "bot",
       "name": "2f_85",
-      "disposition": "unsupported-features",
-      "blockers": [
-        "native floating root (native-floating-root)",
-        "mechanical cycles (mechanical-cycles)"
-      ],
+      "disposition": "profile-candidate",
+      "blockers": [],
       "required_capabilities": [
         "native-floating-root",
         "mechanical-cycles"
@@ -1707,10 +1702,8 @@
       "entrypoint": "bots/grippers/openarm_v20/left/openarm_v20_left_gripper.superdex_bot",
       "kind": "bot",
       "name": "openarm_v20_left_gripper",
-      "disposition": "unsupported-features",
-      "blockers": [
-        "native floating root (native-floating-root)"
-      ],
+      "disposition": "profile-candidate",
+      "blockers": [],
       "required_capabilities": [
         "native-floating-root"
       ],
@@ -1789,10 +1782,8 @@
       "entrypoint": "bots/grippers/openarm_v20/right/openarm_v20_right_gripper.superdex_bot",
       "kind": "bot",
       "name": "openarm_v20_right_gripper",
-      "disposition": "unsupported-features",
-      "blockers": [
-        "native floating root (native-floating-root)"
-      ],
+      "disposition": "profile-candidate",
+      "blockers": [],
       "required_capabilities": [
         "native-floating-root"
       ],
@@ -1871,10 +1862,8 @@
       "entrypoint": "bots/hands/allegro_v5/left/allegro_v5_left.superdex_bot",
       "kind": "bot",
       "name": "allegro_v5_left",
-      "disposition": "unsupported-features",
-      "blockers": [
-        "native floating root (native-floating-root)"
-      ],
+      "disposition": "profile-candidate",
+      "blockers": [],
       "required_capabilities": [
         "native-floating-root"
       ],
@@ -2241,10 +2230,8 @@
       "entrypoint": "bots/hands/allegro_v5/right/allegro_v5_right.superdex_bot",
       "kind": "bot",
       "name": "allegro_v5_right",
-      "disposition": "unsupported-features",
-      "blockers": [
-        "native floating root (native-floating-root)"
-      ],
+      "disposition": "profile-candidate",
+      "blockers": [],
       "required_capabilities": [
         "native-floating-root"
       ],
@@ -2611,10 +2598,8 @@
       "entrypoint": "bots/hands/dg5f_long/left/dg5f_long_left.superdex_bot",
       "kind": "bot",
       "name": "dg5f_long_left",
-      "disposition": "unsupported-features",
-      "blockers": [
-        "native floating root (native-floating-root)"
-      ],
+      "disposition": "profile-candidate",
+      "blockers": [],
       "required_capabilities": [
         "native-floating-root"
       ],
@@ -3093,10 +3078,8 @@
       "entrypoint": "bots/hands/dg5f_long/right/dg5f_long_right.superdex_bot",
       "kind": "bot",
       "name": "dg5f_long_right",
-      "disposition": "unsupported-features",
-      "blockers": [
-        "native floating root (native-floating-root)"
-      ],
+      "disposition": "profile-candidate",
+      "blockers": [],
       "required_capabilities": [
         "native-floating-root"
       ],
@@ -3881,10 +3864,8 @@
       "entrypoint": "bots/hands/dg5f_short/left/dg5f_short_left.superdex_bot",
       "kind": "bot",
       "name": "dg5f_short_left",
-      "disposition": "unsupported-features",
-      "blockers": [
-        "native floating root (native-floating-root)"
-      ],
+      "disposition": "profile-candidate",
+      "blockers": [],
       "required_capabilities": [
         "native-floating-root"
       ],
@@ -4363,10 +4344,8 @@
       "entrypoint": "bots/hands/dg5f_short/right/dg5f_short_right.superdex_bot",
       "kind": "bot",
       "name": "dg5f_short_right",
-      "disposition": "unsupported-features",
-      "blockers": [
-        "native floating root (native-floating-root)"
-      ],
+      "disposition": "profile-candidate",
+      "blockers": [],
       "required_capabilities": [
         "native-floating-root"
       ],
@@ -5151,16 +5130,15 @@
       "entrypoint": "bots/hands/oculus_xr/left/oculus_xr_hand_highpoly_left.superdex_bot",
       "kind": "bot",
       "name": "oculus_xr_hand_highpoly_left",
-      "disposition": "unsupported-features",
-      "blockers": [
-        "native floating root (native-floating-root)",
-        "unsupported joint types: Spherical"
-      ],
+      "disposition": "profile-candidate",
+      "blockers": [],
       "required_capabilities": [
-        "native-floating-root"
+        "native-floating-root",
+        "spherical-joints"
       ],
       "required_capability_stages": [
-        4
+        4,
+        8
       ],
       "joint_counts": {
         "Free": 1,
@@ -5490,16 +5468,15 @@
       "entrypoint": "bots/hands/oculus_xr/left/oculus_xr_hand_lowpoly_left.superdex_bot",
       "kind": "bot",
       "name": "oculus_xr_hand_lowpoly_left",
-      "disposition": "unsupported-features",
-      "blockers": [
-        "native floating root (native-floating-root)",
-        "unsupported joint types: Spherical"
-      ],
+      "disposition": "profile-candidate",
+      "blockers": [],
       "required_capabilities": [
-        "native-floating-root"
+        "native-floating-root",
+        "spherical-joints"
       ],
       "required_capability_stages": [
-        4
+        4,
+        8
       ],
       "joint_counts": {
         "Free": 1,
@@ -5829,16 +5806,15 @@
       "entrypoint": "bots/hands/oculus_xr/right/oculus_xr_hand_highpoly_right.superdex_bot",
       "kind": "bot",
       "name": "oculus_xr_hand_highpoly_right",
-      "disposition": "unsupported-features",
-      "blockers": [
-        "native floating root (native-floating-root)",
-        "unsupported joint types: Spherical"
-      ],
+      "disposition": "profile-candidate",
+      "blockers": [],
       "required_capabilities": [
-        "native-floating-root"
+        "native-floating-root",
+        "spherical-joints"
       ],
       "required_capability_stages": [
-        4
+        4,
+        8
       ],
       "joint_counts": {
         "Free": 1,
@@ -6168,16 +6144,15 @@
       "entrypoint": "bots/hands/oculus_xr/right/oculus_xr_hand_lowpoly_right.superdex_bot",
       "kind": "bot",
       "name": "oculus_xr_hand_lowpoly_right",
-      "disposition": "unsupported-features",
-      "blockers": [
-        "native floating root (native-floating-root)",
-        "unsupported joint types: Spherical"
-      ],
+      "disposition": "profile-candidate",
+      "blockers": [],
       "required_capabilities": [
-        "native-floating-root"
+        "native-floating-root",
+        "spherical-joints"
       ],
       "required_capability_stages": [
-        4
+        4,
+        8
       ],
       "joint_counts": {
         "Free": 1,
@@ -6507,10 +6482,8 @@
       "entrypoint": "bots/hands/wuji_hand2_beta1/left/wuji_hand2_beta1_left.superdex_bot",
       "kind": "bot",
       "name": "wuji_hand2_beta1_left",
-      "disposition": "unsupported-features",
-      "blockers": [
-        "native floating root (native-floating-root)"
-      ],
+      "disposition": "profile-candidate",
+      "blockers": [],
       "required_capabilities": [
         "native-floating-root"
       ],
@@ -7037,10 +7010,8 @@
       "entrypoint": "bots/hands/wuji_hand2_beta1/right/wuji_hand2_beta1_right.superdex_bot",
       "kind": "bot",
       "name": "wuji_hand2_beta1_right",
-      "disposition": "unsupported-features",
-      "blockers": [
-        "native floating root (native-floating-root)"
-      ],
+      "disposition": "profile-candidate",
+      "blockers": [],
       "required_capabilities": [
         "native-floating-root"
       ],
@@ -7567,10 +7538,8 @@
       "entrypoint": "bots/sensors/dg5f_seed/dg5f_seed.superdex_bot",
       "kind": "bot",
       "name": "dg5f_seed",
-      "disposition": "unsupported-features",
-      "blockers": [
-        "native floating root (native-floating-root)"
-      ],
+      "disposition": "profile-candidate",
+      "blockers": [],
       "required_capabilities": [
         "native-floating-root"
       ],
@@ -7674,10 +7643,8 @@
       "entrypoint": "prefabs/box_and_blocks/block_blue.mochi_prefab",
       "kind": "prefab",
       "name": "block_blue",
-      "disposition": "unsupported-features",
-      "blockers": [
-        "prefab assembly pending (prefab-rigid-actors)"
-      ],
+      "disposition": "profile-candidate",
+      "blockers": [],
       "required_capabilities": [
         "prefab-rigid-actors"
       ],
@@ -7719,10 +7686,8 @@
       "entrypoint": "prefabs/box_and_blocks/block_green.mochi_prefab",
       "kind": "prefab",
       "name": "block_green",
-      "disposition": "unsupported-features",
-      "blockers": [
-        "prefab assembly pending (prefab-rigid-actors)"
-      ],
+      "disposition": "profile-candidate",
+      "blockers": [],
       "required_capabilities": [
         "prefab-rigid-actors"
       ],
@@ -7764,10 +7729,8 @@
       "entrypoint": "prefabs/box_and_blocks/block_red.mochi_prefab",
       "kind": "prefab",
       "name": "block_red",
-      "disposition": "unsupported-features",
-      "blockers": [
-        "prefab assembly pending (prefab-rigid-actors)"
-      ],
+      "disposition": "profile-candidate",
+      "blockers": [],
       "required_capabilities": [
         "prefab-rigid-actors"
       ],
@@ -7809,10 +7772,8 @@
       "entrypoint": "prefabs/box_and_blocks/block_yellow.mochi_prefab",
       "kind": "prefab",
       "name": "block_yellow",
-      "disposition": "unsupported-features",
-      "blockers": [
-        "prefab assembly pending (prefab-rigid-actors)"
-      ],
+      "disposition": "profile-candidate",
+      "blockers": [],
       "required_capabilities": [
         "prefab-rigid-actors"
       ],
@@ -7854,10 +7815,8 @@
       "entrypoint": "prefabs/box_and_blocks/box_and_blocks.mochi_prefab",
       "kind": "prefab",
       "name": "box_and_blocks",
-      "disposition": "unsupported-features",
-      "blockers": [
-        "prefab assembly pending (prefab-rigid-actors)"
-      ],
+      "disposition": "profile-candidate",
+      "blockers": [],
       "required_capabilities": [
         "prefab-rigid-actors"
       ],
@@ -8155,10 +8114,8 @@
       "entrypoint": "prefabs/chain/chain.mochi_prefab",
       "kind": "prefab",
       "name": "chain",
-      "disposition": "unsupported-features",
-      "blockers": [
-        "prefab assembly pending (prefab-rigid-actors)"
-      ],
+      "disposition": "profile-candidate",
+      "blockers": [],
       "required_capabilities": [
         "prefab-rigid-actors"
       ],
@@ -8346,7 +8303,7 @@
       "name": "duck_lamp_recumbent",
       "disposition": "unsupported-features",
       "blockers": [
-        "prefab assembly pending ()"
+        "non-rigid actors remain deferred"
       ],
       "required_capabilities": [],
       "required_capability_stages": [],
@@ -8377,10 +8334,8 @@
       "entrypoint": "prefabs/functional_dexterity_test/fdt_peg.mochi_prefab",
       "kind": "prefab",
       "name": "fdt_peg",
-      "disposition": "unsupported-features",
-      "blockers": [
-        "prefab assembly pending (prefab-rigid-actors)"
-      ],
+      "disposition": "profile-candidate",
+      "blockers": [],
       "required_capabilities": [
         "prefab-rigid-actors"
       ],
@@ -8422,10 +8377,8 @@
       "entrypoint": "prefabs/functional_dexterity_test/functional_dexterity_test.mochi_prefab",
       "kind": "prefab",
       "name": "functional_dexterity_test",
-      "disposition": "unsupported-features",
-      "blockers": [
-        "prefab assembly pending (prefab-rigid-actors)"
-      ],
+      "disposition": "profile-candidate",
+      "blockers": [],
       "required_capabilities": [
         "prefab-rigid-actors"
       ],
@@ -8595,10 +8548,8 @@
       "entrypoint": "prefabs/nine_hole_peg_test/nine_hole_peg_test.mochi_prefab",
       "kind": "prefab",
       "name": "nine_hole_peg_test",
-      "disposition": "unsupported-features",
-      "blockers": [
-        "prefab assembly pending (prefab-rigid-actors)"
-      ],
+      "disposition": "profile-candidate",
+      "blockers": [],
       "required_capabilities": [
         "prefab-rigid-actors"
       ],
@@ -8784,10 +8735,8 @@
       "entrypoint": "prefabs/paper_cups/paper_cup.mochi_prefab",
       "kind": "prefab",
       "name": "paper_cup",
-      "disposition": "unsupported-features",
-      "blockers": [
-        "prefab assembly pending (prefab-rigid-actors)"
-      ],
+      "disposition": "profile-candidate",
+      "blockers": [],
       "required_capabilities": [
         "prefab-rigid-actors"
       ],
@@ -8829,10 +8778,8 @@
       "entrypoint": "prefabs/paper_cups/paper_cup_pyramid.mochi_prefab",
       "kind": "prefab",
       "name": "paper_cup_pyramid",
-      "disposition": "unsupported-features",
-      "blockers": [
-        "prefab assembly pending (prefab-rigid-actors)"
-      ],
+      "disposition": "profile-candidate",
+      "blockers": [],
       "required_capabilities": [
         "prefab-rigid-actors"
       ],
@@ -9034,10 +8981,8 @@
       "entrypoint": "prefabs/shape_box/shape_box.mochi_prefab",
       "kind": "prefab",
       "name": "shape_box",
-      "disposition": "unsupported-features",
-      "blockers": [
-        "prefab assembly pending (prefab-rigid-actors)"
-      ],
+      "disposition": "profile-candidate",
+      "blockers": [],
       "required_capabilities": [
         "prefab-rigid-actors"
       ],
@@ -9287,10 +9232,8 @@
       "entrypoint": "prefabs/sphere/sphere.mochi_prefab",
       "kind": "prefab",
       "name": "sphere",
-      "disposition": "unsupported-features",
-      "blockers": [
-        "prefab assembly pending (prefab-rigid-actors)"
-      ],
+      "disposition": "profile-candidate",
+      "blockers": [],
       "required_capabilities": [
         "prefab-rigid-actors"
       ],

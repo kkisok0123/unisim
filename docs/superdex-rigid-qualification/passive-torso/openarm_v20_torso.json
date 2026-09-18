@@ -1,0 +1,36 @@
+{
+  "status": "passed",
+  "steps": 1000,
+  "sim_dt": 0.002,
+  "articulations": 1,
+  "rigid_actors": 0,
+  "controls": 0,
+  "native_dofs": [
+    0
+  ],
+  "native_state_max_deviation": 0.0,
+  "body_pose_max_deviation": 0.0,
+  "contact_query_pairs": 0,
+  "contact_force_max_deviation": 0.0,
+  "contact_force_peak": 0.0,
+  "state_round_trip_error": 0.0,
+  "reset_error": 0.0,
+  "cleanup_recreation": true,
+  "finite_control_response": true,
+  "passive": true,
+  "initial_velocity_size": 0,
+  "bot": "bots/torsos/openarm_v20/openarm_v20_torso.superdex_bot",
+  "qualification_profile": "passive_serial",
+  "num_envs": 1,
+  "provenance": {
+    "code_commit": "636cdf4abb423e5a98ba836f51e2d0ba49d1ce17",
+    "working_tree_modified": true,
+    "tree_digest": "c405c46be8906966d291e238e96401b81e277ff41b7ff8a4c8eff37849a7cc9e",
+    "python": "3.12.14",
+    "sdk_version": "1.0.0",
+    "tolerances": {
+      "native_state": 1e-07,
+      "reset": 1e-06
+    }
+  }
+}

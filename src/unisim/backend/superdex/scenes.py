@@ -13,41 +13,104 @@ from unisim.scene import SceneCfg, resolve_scene_fragment_path
 
 from .geometry import rotation_matrix
 from .plans import ModelPlan
-from .prefabs import _reference, _root, append_rigid_metadata, audit_prefab
+from .prefabs import _reference, _root, append_rigid_metadata
 
 _JOINT_FIELDS = {
-    "name", "type", "axis", "friction", "inertia", "limitDamping", "limitStiffness",
-    "minLimit", "maxLimit", "parentLinkFromJoint",
+    "name",
+    "type",
+    "axis",
+    "friction",
+    "inertia",
+    "limitDamping",
+    "limitStiffness",
+    "minLimit",
+    "maxLimit",
+    "parentLinkFromJoint",
 }
 _LINK_FIELDS = {
-    "name", "parentLink", "parentJointFromLink", "shape", "renderModel", "mass", "density",
-    "centerOfMass", "momentOfInertia", "hasGravity", "layer", "colliderType", "contact",
-    "boundaryElementType", "boundarySubsampling", "shapeTranslation", "shapeRotation",
-    "shapeScale", "renderModelTranslation", "renderModelRotation", "renderModelScale",
+    "name",
+    "parentLink",
+    "parentJointFromLink",
+    "shape",
+    "renderModel",
+    "mass",
+    "density",
+    "centerOfMass",
+    "momentOfInertia",
+    "hasGravity",
+    "layer",
+    "colliderType",
+    "contact",
+    "boundaryElementType",
+    "boundarySubsampling",
+    "shapeTranslation",
+    "shapeRotation",
+    "shapeScale",
+    "renderModelTranslation",
+    "renderModelRotation",
+    "renderModelScale",
 }
 _SOLVER_FIELDS = {"integrationMethod", "linearSolver", "nonLinearSolver", "experimentalEval"}
 _CONTACT_FIELDS = {
-    "collidingPenaltyLengthScale", "coulombFrictionCoefficient", "distanceErrorBound",
-    "frictionFalloffVel", "frictionWithColliderNormal", "maxAlignmentNormals",
-    "normalViscousDampingCoefficient", "objScale", "penaltyCoefficient",
-    "penaltySmoothingHalfDistance", "penaltyThresholdDefault", "penaltyThresholdExtraPadding",
+    "collidingPenaltyLengthScale",
+    "coulombFrictionCoefficient",
+    "distanceErrorBound",
+    "frictionFalloffVel",
+    "frictionWithColliderNormal",
+    "maxAlignmentNormals",
+    "normalViscousDampingCoefficient",
+    "objScale",
+    "penaltyCoefficient",
+    "penaltySmoothingHalfDistance",
+    "penaltyThresholdDefault",
+    "penaltyThresholdExtraPadding",
     "viscousFrictionCoefficient",
 }
 _SOLVER_CHILDREN = {
     "linearSolver": {
-        "abortIfNotSpd", "absTol", "maxIter", "normType", "preconditionerType", "relDivTol",
-        "relTol", "restartSize", "solverType", "verbosity",
+        "abortIfNotSpd",
+        "absTol",
+        "maxIter",
+        "normType",
+        "preconditionerType",
+        "relDivTol",
+        "relTol",
+        "restartSize",
+        "solverType",
+        "verbosity",
     },
     "nonLinearSolver": {
-        "absDivTol", "absTol", "convergenceMode", "dResidualAssemblyPeriod", "explosionControl",
-        "gradientDescentFallback", "lineSearchAlpha", "lineSearchMaxIter",
-        "lineSearchMaxRelIncrease", "lineSearchType", "lineSearchWolfe1", "lineSearchWolfe2",
-        "linearToleranceStrategy", "maxElapsedTimeSeconds", "maxIter", "psdProjMode",
-        "relDivTol", "relStepTol", "relTol", "solverType", "stopIfNoImprovement", "verbosity",
+        "absDivTol",
+        "absTol",
+        "convergenceMode",
+        "dResidualAssemblyPeriod",
+        "explosionControl",
+        "gradientDescentFallback",
+        "lineSearchAlpha",
+        "lineSearchMaxIter",
+        "lineSearchMaxRelIncrease",
+        "lineSearchType",
+        "lineSearchWolfe1",
+        "lineSearchWolfe2",
+        "linearToleranceStrategy",
+        "maxElapsedTimeSeconds",
+        "maxIter",
+        "psdProjMode",
+        "relDivTol",
+        "relStepTol",
+        "relTol",
+        "solverType",
+        "stopIfNoImprovement",
+        "verbosity",
     },
     "experimentalEval": {
-        "consistencyResNorm", "consistencyResNormStep", "explicitNormals", "fadeFriction",
-        "fittedSaturationHessian", "frictionModel", "implicitNormalForceForDissipation",
+        "consistencyResNorm",
+        "consistencyResNormStep",
+        "explicitNormals",
+        "fadeFriction",
+        "fittedSaturationHessian",
+        "frictionModel",
+        "implicitNormalForceForDissipation",
     },
 }
 
@@ -88,18 +151,26 @@ def _transform(value: Any) -> None:
             raise ValueError("superdex scene rotation must be a normalized xyzw quaternion")
 
 
-def audit_scene(path: Path, root: Path) -> dict[str, Any]:
-    """Validate the Stage 7 profile without importing or invoking the SDK.
-
-    One articulation must be authored in the root file. Nested files are rigid
-    prefabs, optionally declaring scene settings identical to the root settings.
-    """
+def audit_scene(path: Path, root: Path, *, _stack=(), _settings=None, _documents=None):
+    """Audit public rigid prefab schemas, including recursively authored scenes."""
+    path = path.resolve()
+    if path in _stack:
+        raise ValueError(f"superdex cyclic prefab dependency: {path}")
     data = json.loads(path.read_text())
-    _fields(data, {"comment", "actors", "scene", "prefabs", "contactFilter", "controllers"},
-            str(path))
+    _fields(
+        data,
+        {"comment", "actors", "scene", "prefabs", "contactFilter", "controllers", "constraints"},
+        str(path),
+    )
     _finite(data)
     settings = data.get("scene", {})
     _fields(settings, {"comment", "description", "gravity", "solver"}, "settings")
+    if _settings is not None:
+        for key, value in settings.items():
+            if key not in {"comment", "description"} and _settings.get(key) != value:
+                raise ValueError(f"superdex scene conflicting nested setting {key!r}: {path}")
+    else:
+        _settings = settings
     if "gravity" in settings:
         _vector(settings["gravity"], 3, "gravity")
     if "solver" in settings:
@@ -109,123 +180,203 @@ def audit_scene(path: Path, root: Path) -> dict[str, Any]:
                 _fields(settings["solver"][key], allowed, f"solver.{key}")
         fitted = settings["solver"].get("experimentalEval", {}).get("fittedSaturationHessian")
         if fitted is not None:
-            _fields(fitted, {"constraintSaturation", "contactFriction", "jointFriction"},
-                    "fittedSaturationHessian")
+            _fields(
+                fitted,
+                {"constraintSaturation", "contactFriction", "jointFriction"},
+                "fittedSaturationHessian",
+            )
     actors = data.get("actors", {})
     _fields(actors, {"comment", "articulated", "rigid"}, "actors")
-    if len(actors.get("articulated", [])) != 1:
-        raise NotImplementedError("superdex scene requires exactly one root-file articulation")
-    articulation = actors["articulated"][0]
-    _fields(articulation, {"comment", "name", "joints", "links", "translation", "rotation",
-                           "scale", "jointVelocities"}, "articulation")
-    if not isinstance(articulation.get("name"), str) or not articulation["name"]:
-        raise ValueError("superdex scene articulation requires a name")
-    if articulation.get("scale", 1) != 1:
-        raise NotImplementedError("superdex scene articulation scale must be 1")
-    _transform({k: articulation[k] for k in ("translation", "rotation") if k in articulation})
-    joints, links = articulation.get("joints", []), articulation.get("links", [])
-    if not joints or len(joints) != len(links):
-        raise ValueError("superdex scene requires one joint per link")
-    for index, (joint, link) in enumerate(zip(joints, links, strict=True)):
-        _fields(joint, _JOINT_FIELDS, "joint")
-        _fields(link, _LINK_FIELDS, "link")
-        if joint.get("type") not in {"Hard", "Revolute", "Prismatic"}:
-            raise NotImplementedError("superdex scene supports only fixed/hinge/slide joints")
-        if joint["type"] != "Hard":
-            axis = _vector(joint.get("axis"), 3, "joint axis")
-            if np.linalg.norm(axis) == 0:
-                raise ValueError("superdex scene joint axis must be nonzero")
-        if "friction" in joint:
-            _fields(joint["friction"], {"viscous", "coulomb", "falloffVel", "stictionExtra",
-                                        "stribeckVel"}, "joint friction")
-        if "contact" in link:
-            _fields(link["contact"], _CONTACT_FIELDS, "link contact")
-        for key in ("minLimit", "maxLimit"):
-            if key in joint:
-                _vector(joint[key], 3, key)
-        _transform(joint.get("parentLinkFromJoint", {}))
-        _transform(link.get("parentJointFromLink", {}))
-        parent = link.get("parentLink", -1)
-        if not isinstance(parent, int) or parent < -1 or parent >= index:
-            raise ValueError("superdex scene links must be in parent-before-child order")
-        for key in ("shape", "renderModel"):
-            if link.get(key):
-                _reference(path, link[key], root)
-    for records, label in ((joints, "joint"), (links, "link")):
-        names = [record.get("name") for record in records]
-        if any(not isinstance(n, str) or not n for n in names) or len(set(names)) != len(names):
-            raise ValueError(f"superdex scene {label} names must be nonempty and unique")
-    if "jointVelocities" in articulation:
-        _vector(articulation["jointVelocities"],
-                sum(j["type"] != "Hard" for j in joints), "jointVelocities")
-    controllers = data.get("controllers", [])
-    if len(controllers) > 1:
-        raise NotImplementedError("superdex scene supports one authored pose controller")
-    for controller in controllers:
-        _fields(controller, {"comment", "articulatedActor", "jointTracking"}, "controller")
-        if controller.get("articulatedActor") != articulation["name"]:
-            raise ValueError("superdex scene controller target is not the articulation")
-        tracking = controller.get("jointTracking", [])
-        if len(tracking) != len(joints):
-            raise ValueError("superdex scene jointTracking must have one entry per joint")
-        for item in tracking:
-            _fields(item, {"stiffness", "damping"}, "jointTracking")
-            if any(not isinstance(v, (int, float)) or v < 0 for v in item.values()):
-                raise ValueError("superdex scene controller gains must be nonnegative")
-    contact_filter = data.get("contactFilter", {})
-    _fields(contact_filter, {"layerContactSymmetric"}, "contactFilter")
-    for item in contact_filter.get("layerContactSymmetric", []):
-        _fields(item, {"enable", "layers"}, "contactFilter entry")
-        if (not isinstance(item.get("enable"), bool) or len(item.get("layers", [])) != 2
-                or any(not isinstance(v, str) for v in item["layers"])):
-            raise ValueError("superdex scene contact filter requires two layers and enable bool")
-    _audit_rigids(data, path, root, settings, ())
-    return data
-
-
-def _audit_rigids(data, path, root, settings, stack) -> int:
+    for articulation in actors.get("articulated", []):
+        _fields(
+            articulation,
+            {
+                "comment",
+                "name",
+                "joints",
+                "links",
+                "translation",
+                "rotation",
+                "scale",
+                "jointVelocities",
+                "cycles",
+                "skin",
+            },
+            "articulation",
+        )
+        if articulation.get("scale", 1) <= 0:
+            raise ValueError("superdex scene articulation scale must be positive")
+        _transform({k: articulation[k] for k in ("translation", "rotation") if k in articulation})
+        joints, links = articulation.get("joints", []), articulation.get("links", [])
+        if not joints or len(joints) != len(links):
+            raise ValueError("superdex scene requires one joint per link")
+        sizes = {"Hard": 0, "Revolute": 1, "Prismatic": 1, "Spherical": 3, "Free": 6}
+        for index, (joint, link) in enumerate(zip(joints, links, strict=True)):
+            _fields(joint, _JOINT_FIELDS, "joint")
+            _fields(link, _LINK_FIELDS, "link")
+            if joint.get("type") not in sizes or (joint["type"] == "Free" and index != 0):
+                raise NotImplementedError("superdex scene unsupported tree joint type")
+            if joint["type"] in {"Revolute", "Prismatic"}:
+                axis = _vector(joint.get("axis"), 3, "joint axis")
+                if np.linalg.norm(axis) == 0:
+                    raise ValueError("superdex scene joint axis must be nonzero")
+            if "friction" in joint:
+                _fields(
+                    joint["friction"],
+                    {"viscous", "coulomb", "falloffVel", "stictionExtra", "stribeckVel"},
+                    "joint friction",
+                )
+            if "contact" in link:
+                _fields(link["contact"], _CONTACT_FIELDS, "link contact")
+            for key in ("minLimit", "maxLimit"):
+                if key in joint:
+                    _vector(joint[key], 3, key)
+            _transform(joint.get("parentLinkFromJoint", {}))
+            _transform(link.get("parentJointFromLink", {}))
+            parent = link.get("parentLink", -1)
+            if not isinstance(parent, int) or parent < -1 or parent >= index:
+                raise ValueError("superdex scene links must be in parent-before-child order")
+            for key in ("shape", "renderModel"):
+                if link.get(key):
+                    _reference(path, link[key], root)
+        for records, label in ((joints, "joint"), (links, "link")):
+            names = [record["name"] for record in records if record.get("name")]
+            if len(set(names)) != len(names):
+                raise ValueError(f"superdex scene authored {label} names must be unique")
+        if "jointVelocities" in articulation:
+            _vector(
+                articulation["jointVelocities"],
+                sum(sizes[j["type"]] for j in joints),
+                "jointVelocities",
+            )
+        for cycle in articulation.get("cycles", []):
+            _fields(cycle, {"parentLink", "childLink", "jointFromChildLink", "stiffness"}, "cycle")
+            for key in ("parentLink", "childLink"):
+                if not isinstance(cycle.get(key), int) or not 0 <= cycle[key] < len(links):
+                    raise ValueError("superdex cycle requires in-range link indices")
+            _transform(cycle.get("jointFromChildLink", {}))
+        if articulation.get("skin") is not None:
+            skin = articulation["skin"]
+            _fields(
+                skin,
+                {
+                    "shape",
+                    "renderModel",
+                    "renderModelScale",
+                    "renderModelRotation",
+                    "renderModelTranslation",
+                    "layer",
+                    "contact",
+                    "boundaryElementType",
+                    "boundarySubsampling",
+                },
+                "articulated skin",
+            )
+            if "contact" in skin:
+                _fields(skin["contact"], _CONTACT_FIELDS, "skin contact")
+            for key in ("shape", "renderModel"):
+                if skin.get(key):
+                    _reference(path, skin[key], root)
     from .prefabs import _RIGID_FIELDS
 
-    if path in stack:
-        raise ValueError(f"superdex cyclic prefab dependency: {path}")
-    count = 0
-    for rigid in data.get("actors", {}).get("rigid", []):
+    for rigid in actors.get("rigid", []):
         _fields(rigid, _RIGID_FIELDS, "rigid actor")
         if "contact" in rigid:
             _fields(rigid["contact"], _CONTACT_FIELDS, "rigid contact")
         if not rigid.get("shape"):
             raise ValueError("superdex scene rigid actors require collision shapes")
+        _transform({k: rigid[k] for k in ("translation", "rotation") if k in rigid})
         for key in ("shape", "renderModel"):
             if rigid.get(key):
                 _reference(path, rigid[key], root)
-        count += 1
+    for controller in data.get("controllers", []):
+        _fields(
+            controller,
+            {"comment", "articulatedActor", "jointTracking", "linkPosTracking", "linkRotTracking"},
+            "controller",
+        )
+        if not isinstance(controller.get("articulatedActor"), str):
+            raise ValueError("superdex scene controller requires an articulation name")
+        for key in ("jointTracking", "linkPosTracking", "linkRotTracking"):
+            for item in controller.get(key, []):
+                _fields(item, {"stiffness", "damping", "saturation"}, key)
+                if any(
+                    not isinstance(v, (int, float)) or (v == 0 if k == "saturation" else v < 0)
+                    for k, v in item.items()
+                ):
+                    raise ValueError("superdex scene controller gains must be nonnegative")
+    contact_filter = data.get("contactFilter", {})
+    categories = {
+        f"{kind}Contact{symmetry}": key
+        for kind, key in (("actor", "actors"), ("layer", "layers"))
+        for symmetry in ("Symmetric", "Asymmetric")
+    }
+    _fields(contact_filter, {"comment", "_comment", *categories}, "contactFilter")
+    for category, key in categories.items():
+        for item in contact_filter.get(category, []):
+            _fields(item, {"enable", key}, "contactFilter entry")
+            if (
+                not isinstance(item.get("enable"), bool)
+                or len(item.get(key, [])) != 2
+                or any(not isinstance(v, str) for v in item[key])
+            ):
+                raise ValueError("superdex scene contact filter requires two names and enable bool")
+    _audit_constraints(data.get("constraints", {}))
+    if _documents is not None:
+        _documents.append(data)
     for nested in data.get("prefabs", []):
-        _fields(nested, {"comment", "name", "path", "translation", "rotation", "scale"},
-                "nested prefab")
+        _fields(
+            nested, {"comment", "name", "path", "translation", "rotation", "scale"}, "nested prefab"
+        )
         _transform({k: nested[k] for k in ("translation", "rotation") if k in nested})
         target = _reference(path, nested["path"], root)
-        if target.suffix != ".mochi_prefab":
-            raise NotImplementedError("superdex scene nested files must be rigid .mochi_prefab")
-        child = json.loads(target.read_text())
-        _fields(child, {"comment", "actors", "prefabs", "scene"}, "nested prefab")
-        _finite(child)
-        _fields(child.get("actors", {}), {"comment", "rigid"}, "nested actors")
-        _fields(child.get("scene", {}), {"comment", "description", "gravity", "solver"},
-                "nested settings")
-        for key, value in child.get("scene", {}).items():
-            if key not in {"comment", "description"} and settings.get(key) != value:
-                raise ValueError(f"superdex scene conflicting nested setting {key!r}: {target}")
-        count += _audit_rigids(child, target, root, settings, (*stack, path))
-    return count
+        if target.suffix not in {".mochi_prefab", ".mochi_scene"}:
+            raise NotImplementedError("superdex nested inputs must be rigid prefab/scene files")
+        audit_scene(
+            target, root, _stack=(*_stack, path), _settings=_settings, _documents=_documents
+        )
+    return data
+
+
+def _audit_constraints(constraints):
+    common = {"stiffness", "damping", "saturation"}
+    types = {
+        "rigidPivotPosition": {"actor", "localPosition", "targetPosition"},
+        "rigidPivotRotation": {"actor", "localRotation", "targetRotation"},
+        "rigidPivotToRigidTarget": {"actor", "localPosition", "targetTransform"},
+        "rigidSphericalJoint": {"actorA", "actorB", "localPosA", "localPosB"},
+        "rigidPrismaticJoint": {"actorA", "actorB", "freeAxis", "min", "max"},
+        "jointRotationRange": {
+            "actorA",
+            "actorB",
+            "angleRangeX",
+            "angleRangeY",
+            "angleRangeZ",
+            "refFrameRotVec",
+            "rangeAroundRest",
+        },
+        "jointRotationTracking": {"actorA", "actorB", "refFrameRotVec"},
+        "articulatedSingleDofRange": {"actor", "jointIndex", "dofIndex", "minValue", "maxValue"},
+        "articulatedSingleDofTarget": {"actor", "jointIndex", "dofIndex", "targetValue"},
+        "articulated3dRotationRange": {"actor", "jointIndex", "minValues", "maxValues"},
+        "articulated3dRotationTarget": {"actor", "jointIndex", "target"},
+    }
+    _fields(constraints, {"comment", *types}, "constraints")
+    for kind, allowed in types.items():
+        for item in constraints.get(kind, []):
+            _fields(item, allowed | common, f"constraint {kind}")
 
 
 def controlled_indices(data, controlled_joints, effort_limits) -> tuple[np.ndarray, np.ndarray]:
     """Resolve explicit physical effort inputs, never infer controls from asset names."""
     from .materialization import _effort_ranges
 
-    if (controlled_joints is None or isinstance(controlled_joints, (str, bytes))
-            or not len(controlled_joints)
-            or any(not isinstance(n, str) for n in controlled_joints)):
+    if (
+        controlled_joints is None
+        or isinstance(controlled_joints, (str, bytes))
+        or not len(controlled_joints)
+        or any(not isinstance(n, str) for n in controlled_joints)
+    ):
         raise ValueError("superdex scene requires an ordered nonempty controlled_joints list")
     if len(set(controlled_joints)) != len(controlled_joints):
         raise ValueError("superdex scene controlled_joints must be unique")
@@ -242,13 +393,17 @@ def controlled_indices(data, controlled_joints, effort_limits) -> tuple[np.ndarr
 
 def native_settings(world: Any) -> dict[str, Any]:
     """Detached effective settings suitable for reports and comparisons."""
+
     def value(item):
         if isinstance(item, (str, int, float, bool)) or item is None:
             return item
         if hasattr(item, "name"):
             return item.name
-        return {k: value(getattr(item, k)) for k in dir(item)
-                if not k.startswith("_") and not callable(getattr(item, k))}
+        return {
+            k: value(getattr(item, k))
+            for k in dir(item)
+            if not k.startswith("_") and not callable(getattr(item, k))
+        }
 
     return {"gravity": list(world.get_gravity()), "solver": value(world.get_solver_params())}
 
@@ -269,120 +424,259 @@ def _verify_settings(authored: dict, effective: dict) -> None:
             raise ValueError(f"superdex scene SDK did not retain setting {key!r}")
 
 
-def materialize_native_scene(p, path: Path, scene: SceneCfg, controlled_joints,
-                             effort_limits) -> ModelPlan:
-    root = _root(path)
-    data = audit_scene(path, root)
-    indices, ranges = controlled_indices(data, controlled_joints, effort_limits)
-    authored = data["actors"]["articulated"][0]
-    extra_paths = [resolve_scene_fragment_path(v, path).resolve() for v in scene.fragment_files]
-    extra_count = sum(audit_prefab(v, _root(v)) for v in extra_paths)
-    expected_rigids = _audit_rigids(data, path, root, data.get("scene", {}), ()) + extra_count
-    loaded = []
-    try:
-        loaded.append(p.prefab.load_from_file(str(path), str(root)))
-        loaded.extend(p.prefab.load_from_file(str(v), str(_root(v))) for v in extra_paths)
-    except BaseException:
-        loaded.clear()
-        raise
-    owned: dict[Any, list[Any]] = {}
+def materialize_native_scene(
+    p, path: Path, scene: SceneCfg, controlled_joints, effort_limits
+) -> ModelPlan:
+    """Compile public native assets with cached per-actor ownership and layouts."""
+    from types import SimpleNamespace
+
+    from unisim.utils.rotation import np_quat_apply_batched, np_quat_mul_batched
+
+    from .articulations import ArticulationGroup, ArticulationLayout
+    from .joints import coordinate_groups, joint_coordinates
+    from .root_state import RootReference
+
+    paths = [path, *(resolve_scene_fragment_path(v, path).resolve() for v in scene.fragment_files)]
+    documents = []
+    data = audit_scene(path, _root(path), _documents=documents)
+    for extra in paths[1:]:
+        audit_scene(extra, _root(extra), _settings=data.get("scene", {}), _documents=documents)
+    counts = {
+        kind: sum(len(d.get("actors", {}).get(kind, [])) for d in documents)
+        for kind in ("articulated", "rigid")
+    }
+    constraints = sum(
+        len(items)
+        for d in documents
+        for key, items in d.get("constraints", {}).items()
+        if key != "comment"
+    )
+    loaded = [p.prefab.load_from_file(str(v), str(_root(v))) for v in paths]
+    owned = {}
 
     def instantiate(world):
-        all_actors = []
+        actors, actual_constraints = [], []
         for cfg in loaded:
             result = p.prefab.add_to_scene(cfg, world)
-            if len(result.constraints):
-                raise ValueError("superdex scene created unexpected constraints")
-            all_actors.extend(result.actors)
-        articulations = [a for a in all_actors if a.get_type() == p.ActorType.ARTICULATED]
-        rigids = [a for a in all_actors if a.get_type() == p.ActorType.RIGID]
-        if len(articulations) != 1 or len(rigids) != expected_rigids:
-            raise ValueError("superdex scene compiled actor inventory differs from audit")
-        if len(all_actors) != len(rigids) + 1:
-            raise ValueError("superdex scene created unsupported actors")
-        actor = articulations[0]
-        if actor.get_name() != authored["name"]:
-            raise ValueError("superdex scene articulation name differs from audit")
-        if actor.has_articulated_pose_controller() != bool(data.get("controllers")):
+            actors.extend(result.actors)
+            actual_constraints.extend(result.constraints)
+        articulations = [a for a in actors if a.get_type() == p.ActorType.ARTICULATED]
+        rigids = [a for a in actors if a.get_type() == p.ActorType.RIGID]
+        if (
+            len(articulations) != counts["articulated"]
+            or len(rigids) != counts["rigid"]
+            or len(actors) != len(articulations) + len(rigids)
+            or len(actual_constraints) != constraints
+        ):
+            raise ValueError(
+                "superdex scene compiled actor/constraint inventory differs from audit"
+            )
+        expected_controllers = sum(len(d.get("controllers", [])) for d in documents)
+        if sum(a.has_articulated_pose_controller() for a in articulations) != expected_controllers:
             raise ValueError("superdex scene compiled controller inventory differs from audit")
-        return actor, rigids
+        return articulations, rigids
 
     def spawn(world):
-        actor, rigids = instantiate(world)
+        actors, rigids = instantiate(world)
         owned[world.get_handle()] = rigids
-
-        def close():
-            owned.pop(world.get_handle(), None)
-
-        return actor, close
+        instance = actors[0] if len(actors) == 1 else ArticulationGroup(actors)
+        return instance, lambda: owned.pop(world.get_handle(), None)
 
     temp = p.create_scene("superdex_scene_metadata")
     try:
-        actor, rigids = instantiate(temp)
+        actors, rigids = instantiate(temp)
         _verify_settings(data.get("scene", {}), native_settings(temp))
-        links = [temp.get_actor(h) for h in actor.get_nested_link_actors()]
-        joints = list(loaded[0].actors.articulated[0].joints)
-        active = [i for i, j in enumerate(joints) if j.type != p.ArticulatedJointType.HARD]
-        n = len(active)
-        if actor.get_num_dofs() != n or len(links) != len(joints):
-            raise ValueError("superdex scene compiled joint/link inventory differs from audit")
         dtype = np.float64 if p.uses_double_precision() else np.float32
-        q0, v0 = np.empty(n, dtype=dtype), np.empty(n, dtype=dtype)
-        actor.get_articulated_pose(q0)
-        actor.get_articulated_joint_velocities(v0)
-        names = tuple(joints[i].name for i in active)
-        limits = []
-        for i in active:
-            joint = joints[i]
-            axis = np.asarray(joint.axis, dtype=float)
-            axis /= np.linalg.norm(axis)
-            limits.append([-np.inf if joint.min_limit is None else np.dot(joint.min_limit, axis),
-                           np.inf if joint.max_limit is None else np.dot(joint.max_limit, axis)])
-        masses, coms = [0.0], [np.zeros(3)]
-        for link in links:
-            masses.append(0.0 if link.is_static() else link.get_mass())
-            pose = link.get_root_transform()
-            offset = (np.asarray(link.get_center_of_mass_transform().translation)
-                      - np.asarray(pose.translation))
-            coms.append(rotation_matrix(np.asarray(pose.rotation)[[3, 0, 1, 2]]).T @ offset)
-        plan = ModelPlan(
-            source_file=str(path), nq=n, nv=n, root_body_id=1, floating=False,
-            body_names=("world", *(a.get_name() for a in links)),
-            body_parent_ids=np.asarray([0, *(a.get("parentLink", -1) + 1
-                                            for a in authored["links"])]),
-            body_link_indices=np.asarray([-1, *range(len(links))]),
-            body_mass=np.asarray(masses), body_ipos=np.asarray(coms), joint_names=names,
-            joint_qpos_indices=np.arange(n), joint_qvel_indices=np.arange(n),
-            joint_ranges=np.asarray(limits).reshape(n, 2),
-            actuator_names=tuple(controlled_joints), actuator_joint_names=tuple(controlled_joints),
-            actuator_qpos_indices=indices, actuator_qvel_indices=indices.copy(),
-            actuator_ctrl_ranges=ranges, actuator_force_ranges=ranges.copy(),
-            actuator_gear=np.ones(len(indices)), actuator_kp=np.zeros(len(indices)),
-            actuator_kd=np.zeros(len(indices)), default_qpos=q0, default_qvel=v0,
-            keyframes={}, gravity=np.asarray(temp.get_gravity()), sensors=(),
-            spawn_actor=spawn, cleanup=loaded.clear,
-            dof_armature=np.asarray([float(joints[i].inertia or 0) for i in active]),
-            effective_scene_settings=native_settings(temp),
+        names, parents, link_indices, masses, coms = ["world"], [0], [-1], [0.0], [np.zeros(3)]
+        joint_names, joint_q, joint_v, limits, armature = [], [], [], [], []
+        q0, v0, layouts, controller_states = [], [], [], []
+        link_start = 0
+        groups = {}
+        actor_names = [a.get_name() or f"articulation_{i}" for i, a in enumerate(actors)]
+        for ai, actor in enumerate(actors):
+            info = actor.get_articulated_shape_info()
+            links = [temp.get_actor(h) for h in actor.get_nested_link_actors()]
+            joints = [
+                SimpleNamespace(
+                    name=str(name) or f"joint_{i}",
+                    type=info.joint_types[i],
+                    axis=info.joint_axes[i],
+                    min_limit=info.joint_min_limits[i],
+                    max_limit=info.joint_max_limits[i],
+                )
+                for i, name in enumerate(list(info.joint_names)[: len(links)])
+            ]
+            coord_names, owners, ranges, indices = joint_coordinates(p, joints, actor)
+            actor_name = actor_names[ai]
+            if actor_names.count(actor_name) > 1:
+                actor_name = f"{actor_name}#{ai}"
+            prefix = f"{actor_name}/" if len(actors) > 1 else ""
+            root_reference = None
+            if joints[0].type == p.ArticulatedJointType.FREE:
+                a, b = info.parent_link_from_joint[0], info.joint_from_child_link[0]
+                frame = actor.get_root_transform()
+                frame_q = np.asarray(frame.rotation)[[3, 0, 1, 2]]
+                root_reference = RootReference(
+                    np.asarray(frame.translation)
+                    + np_quat_apply_batched(frame_q, np.asarray(a.translation)),
+                    np_quat_mul_batched(frame_q, np.asarray(a.rotation)[[3, 0, 1, 2]]),
+                    np.asarray(b.translation).copy(),
+                    np.asarray(b.rotation)[[3, 0, 1, 2]],
+                )
+            layout = ArticulationLayout(
+                actor_name,
+                len(q0),
+                len(v0),
+                actor.get_num_dofs(),
+                link_start,
+                len(links),
+                len(names),
+                root_reference,
+            )
+            layouts.append(layout)
+            native_q, native_v = (
+                np.empty(layout.native_size, dtype),
+                np.empty(layout.native_size, dtype),
+            )
+            actor.get_articulated_pose(native_q)
+            actor.get_articulated_joint_velocities(native_v)
+            q, v = layout.decode(p, native_q, native_v)
+            for name, columns in coordinate_groups(coord_names, owners, joints).items():
+                groups[prefix + name] = tuple(len(joint_names) + i for i in columns)
+            joint_names.extend(prefix + name for name in coord_names)
+            joint_q.extend(indices + len(q0) + int(layout.floating))
+            joint_v.extend(indices + len(v0))
+            limits.extend(ranges)
+            q0.extend(q)
+            v0.extend(v)
+            inertia = list(actor.get_articulated_joint_inertia_params())
+            for ji in range(len(links)):
+                armature.extend([inertia[ji]] * info.dof_info[ji].get_size())
+            for li, link in enumerate(links):
+                name = (
+                    f"{actor_name}/{info.link_names[li] or f'link_{li}'}"
+                    if len(actors) > 1
+                    else link.get_name() or f"{actor_name}/link_{li}"
+                )
+                if name in names:
+                    name = f"{name}#{len(names)}"
+                names.append(name)
+                parent = int(info.parents[li])
+                parents.append(0 if parent < 0 else layout.root_body_id + parent)
+                link_indices.append(link_start + li)
+                masses.append(0.0 if link.is_static() else link.get_mass())
+                pose = link.get_root_transform()
+                offset = np.asarray(link.get_center_of_mass_transform().translation) - np.asarray(
+                    pose.translation
+                )
+                coms.append(rotation_matrix(np.asarray(pose.rotation)[[3, 0, 1, 2]]).T @ offset)
+            link_start += len(links)
+            controller_states.append(
+                _capture_controller(p, actor, len(joints), len(links), native_q, native_v)
+            )
+        if controlled_joints is None:
+            if joint_names:
+                raise ValueError(
+                    "superdex scene requires explicit controlled_joints; use [] for passive"
+                )
+            controlled_joints = []
+        if isinstance(controlled_joints, (str, bytes)):
+            raise ValueError("superdex controlled_joints must be an ordered list")
+        selected = []
+        for name in controlled_joints:
+            if name not in groups:
+                raise ValueError(f"superdex unknown controlled joint/coordinate {name!r}")
+            selected.extend(groups[name])
+        if len(set(selected)) != len(selected):
+            raise ValueError("superdex controlled_joints must not overlap")
+        from .materialization import _effort_ranges
+
+        if effort_limits is None and selected:
+            raise ValueError("superdex scene requires explicit finite effort_limits")
+        ranges = _effort_ranges([] if effort_limits is None else effort_limits, len(selected))
+        selected = np.asarray(selected, dtype=int)
+        jq, jv = np.asarray(joint_q, dtype=int), np.asarray(joint_v, dtype=int)
+        actuator_names = tuple(joint_names[i] for i in selected)
+        # Keep the existing one-articulation hinge/slide scene batch profile.
+        advanced = (
+            path.suffix == ".mochi_prefab"
+            or len(actors) != 1
+            or constraints > 0
+            or not any(a.native_size for a in layouts)
+            or not data.get("actors", {}).get("articulated")
+            or any(
+                a.get("skin") or a.get("cycles")
+                for d in documents
+                for a in d.get("actors", {}).get("articulated", [])
+            )
+            or any(
+                c.get("linkPosTracking") or c.get("linkRotTracking")
+                for d in documents
+                for c in d.get("controllers", [])
+            )
+            or any(a.floating for a in layouts)
+            or any(
+                j.get("type") == "Spherical"
+                for d in documents
+                for a in d.get("actors", {}).get("articulated", [])
+                for j in a["joints"]
+            )
         )
-        if actor.has_articulated_pose_controller():
-            params = p.PoseControllerParams()
-            params.joint_tracking.resize(len(joints))
-            params.link_pos_tracking.resize(len(links))
-            params.link_rot_tracking.resize(len(links))
-            actor.get_articulated_pose_controller_params(params)
-            target = np.empty_like(q0)
-            actor.get_articulated_target_pose(target)
+        plan = ModelPlan(
+            source_file=str(path),
+            nq=len(q0),
+            nv=len(v0),
+            root_body_id=1 if len(names) > 1 else 0,
+            floating=bool(layouts and layouts[0].floating),
+            body_names=tuple(names),
+            body_parent_ids=np.asarray(parents),
+            body_link_indices=np.asarray(link_indices),
+            body_mass=np.asarray(masses),
+            body_ipos=np.asarray(coms),
+            joint_names=tuple(joint_names),
+            joint_qpos_indices=jq,
+            joint_qvel_indices=jv,
+            joint_ranges=np.asarray(limits).reshape(-1, 2),
+            actuator_names=actuator_names,
+            actuator_joint_names=actuator_names,
+            actuator_qpos_indices=jq[selected],
+            actuator_qvel_indices=jv[selected],
+            actuator_ctrl_ranges=ranges,
+            actuator_force_ranges=ranges.copy(),
+            actuator_gear=np.ones(len(selected)),
+            actuator_kp=np.zeros(len(selected)),
+            actuator_kd=np.zeros(len(selected)),
+            default_qpos=np.asarray(q0),
+            default_qvel=np.asarray(v0),
+            keyframes={},
+            gravity=np.asarray(temp.get_gravity()),
+            sensors=(),
+            spawn_actor=spawn,
+            cleanup=loaded.clear,
+            dof_armature=np.asarray(armature),
+            effective_scene_settings=native_settings(temp),
+            articulations=tuple(layouts),
+            serial_only=bool(advanced),
+            joint_coordinate_groups=groups,
+        )
+        if any(state is not None for state in controller_states):
 
-            def restore_controller(instance):
-                instance.set_articulated_pose_controller_params(params)
-                instance.reset_articulated_target_pose(target)
-                instance.set_articulated_target_velocity(v0)
+            def restore(instance):
+                actual = instance.actors if isinstance(instance, ArticulationGroup) else [instance]
+                for actor, state in zip(actual, controller_states, strict=True):
+                    if state is not None:
+                        params, q, v = state
+                        actor.set_articulated_pose_controller_params(params)
+                        actor.reset_articulated_target_pose(q)
+                        actor.set_articulated_target_velocity(v)
 
-            plan.restore_scene_controller = restore_controller
-        append_rigid_metadata(plan, rigids)
+            plan.restore_scene_controller = restore
+        append_rigid_metadata(plan, rigids, disambiguate=True)
         plan.spawn_rigids = lambda world: owned[world.get_handle()]
+        if plan.root_body_id == 0 and rigids:
+            plan.root_body_id = plan.rigids[0].body_id
         if len(set(plan.body_names)) != len(plan.body_names):
-            raise ValueError("superdex scene body names must be unique")
+            raise ValueError("superdex scene body names must be unique; name nested instances")
         return plan
     except BaseException:
         loaded.clear()
@@ -390,3 +684,16 @@ def materialize_native_scene(p, path: Path, scene: SceneCfg, controlled_joints,
         raise
     finally:
         p.destroy_scene(temp)
+
+
+def _capture_controller(p, actor, nj, nl, q, v):
+    if not actor.has_articulated_pose_controller():
+        return None
+    params = p.PoseControllerParams()
+    params.joint_tracking.resize(nj)
+    params.link_pos_tracking.resize(nl)
+    params.link_rot_tracking.resize(nl)
+    actor.get_articulated_pose_controller_params(params)
+    target = np.empty_like(q)
+    actor.get_articulated_target_pose(target)
+    return params, target, v.copy()

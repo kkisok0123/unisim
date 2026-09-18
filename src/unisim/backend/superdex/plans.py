@@ -89,6 +89,10 @@ class ModelPlan:
     camera_params: dict[str, dict[str, Any]] = field(default_factory=dict)
     effective_scene_settings: dict[str, Any] | None = None
     restore_scene_controller: Callable[[Any], None] | None = None
+    # Native scene articulation slices (one or more, independent of rigid bodies).
+    articulations: tuple[Any, ...] = ()
+    serial_only: bool = False
+    joint_coordinate_groups: dict[str, tuple[int, ...]] = field(default_factory=dict)
 
     @property
     def robot_nq(self) -> int:

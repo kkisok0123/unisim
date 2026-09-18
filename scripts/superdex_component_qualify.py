@@ -256,7 +256,7 @@ class Reference:
 def _resolve_effort_limits(cfg, fallback):
     names, _, authored, _ = authored_joint_metadata(cfg)
     if not names:
-        raise NotImplementedError("qualification requires scalar joints")
+        return np.empty(0, dtype=float)
     limits = np.asarray(authored)
     if np.any(limits <= 0) or not np.isfinite(limits).all():
         if fallback is None:
@@ -525,6 +525,13 @@ def qualify_bot(
     audit(cfg)
     names, ranges, _, armature = authored_joint_metadata(cfg)
     limits = _resolve_effort_limits(cfg, effort_fallback)
+    if not names and not fragments and controller_config is None:
+        from superdex_rigid_qualify import qualify
+
+        result = qualify(path, root)
+        result.update(bot=relpath, qualification_profile="passive_serial", num_envs=1)
+        write_report(out, relpath, result, tree_digest)
+        return int(result["status"] != "passed")
     fragment_paths = [root / f for f in fragments or []]
     report = {
         "bot": relpath,
@@ -637,7 +644,8 @@ def qualify_bot(
                     if not all(np.isfinite(x).all() for x in (qb, vb, qr, vr)):
                         raise RuntimeError("non-finite state during trajectory qualification")
                     deviation = max(
-                        deviation, float(np.max(np.abs(qb - qr))), float(np.max(np.abs(vb - vr)))
+                        deviation, float(np.max(np.abs(qb - qr), initial=0)),
+                        float(np.max(np.abs(vb - vr), initial=0))
                     )
                     for a, r in zip(b._rigids[0], reference.rigids):
                         if not np.isfinite(_pose(a)).all() or not np.isfinite(_pose(r)).all():
@@ -649,7 +657,8 @@ def qualify_bot(
                     isolation,
                     float(
                         np.max(
-                            np.abs(backend.get_state()["qpos"][0] - serial.get_state()["qpos"][0])
+                            np.abs(backend.get_state()["qpos"][0] - serial.get_state()["qpos"][0]),
+                            initial=0,
                         )
                     ),
                 )
@@ -721,7 +730,8 @@ def qualify_bot(
             qb, vb = _native_state(backend)
             qr, vr = reference.state()
             control_dev = max(
-                control_dev, float(np.max(np.abs(qb - qr))), float(np.max(np.abs(vb - vr)))
+                control_dev, float(np.max(np.abs(qb - qr), initial=0)),
+                float(np.max(np.abs(vb - vr), initial=0))
             )
             responds &= abs(vb[reference.offset + joint]) > 0
         record(
@@ -740,7 +750,8 @@ def qualify_bot(
         qb, vb = _native_state(backend)
         qs, vs = _native_state(serial)
         qr, vr = reference.state()
-        clip_dev = max(float(np.max(np.abs(qb - qr))), float(np.max(np.abs(vb - vr))))
+        clip_dev = max(float(np.max(np.abs(qb - qr), initial=0)),
+                       float(np.max(np.abs(vb - vr), initial=0)))
         record(
             "effort_clipping",
             np.array_equal(qb, qs) and np.array_equal(vb, vs) and clip_dev <= TOL_TRAJECTORY,

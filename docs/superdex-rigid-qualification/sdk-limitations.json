@@ -1,0 +1,21 @@
+{
+  "runtime_urdf": {
+    "asset": "assets/superdex/test/urdf/fr3v2_1_urdf/robots/fr3v2_1_franka_hand.urdf",
+    "sha256": "99c6bdd280b462bc54740d2af4eb4148007617bbeeae9cc4164788ae0bf2b5ff",
+    "status": "SDK-limited; not promoted",
+    "evidence": "load_bot_prefab_from_urdf_file(path: str) -> superdex_robotics.bots.BotPrefab\n\nLoad bot parameters from a URDF file.\n\nParses the URDF and resolves each link's visual and collision mesh references\nrelative to the URDF location (ROS `package://` URIs are supported), storing the\nresolved on-disk paths in the returned prefab. Collision meshes may be any\nformat the shape loader accepts (e.g. .stl, .obj, .ply, .off, .mochi.h5); when a\ncollision mesh carries no baked SDF, one is generated on demand at bot creation.\nA free `world_joint` is injected at index 0.\n\nArgs:\n    path (str): Path to the .urdf file.\n\nReturns:\n    The loaded or built :class:`~superdex.robotics.BotPrefab`.\n\nRaises:\n    :class:`~superdex.physics.Error`: If an error occurs.\n\nNote:\n    Only ``<mesh>`` geometry is imported. Primitive URDF shapes (``<box>``,\n    ``<cylinder>``, ``<sphere>``) in ``<visual>`` / ``<collision>`` elements are\n    not supported and are silently skipped; the importer uses the first\n    mesh-bearing visual/collision on each link.\n",
+    "reason": "The installed public loader explicitly documents silently skipped primitive geometry."
+  },
+  "floating_osc": {
+    "status": "SDK-blocked in tested build",
+    "evidence": "Existing floating OSC regression preserves the explicit bot/actor effort-index diagnostic."
+  },
+  "deferred": [
+    "deformables",
+    "custom components",
+    "new batch execution",
+    "image rendering",
+    "conversion tooling",
+    "solver changes"
+  ]
+}

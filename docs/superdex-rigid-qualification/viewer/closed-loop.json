@@ -1,0 +1,9 @@
+{
+  "asset": "/home/pc829/UniFamily/unisim/assets/superdex/bots/grippers/2f_85/2f_85.superdex_bot",
+  "status": "passed",
+  "frames": 120,
+  "reset_error": 0.0,
+  "evidence": "renderer smoke",
+  "manual_inspection": "not claimed",
+  "saved_images": false
+}

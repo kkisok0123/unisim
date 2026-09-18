@@ -16,6 +16,7 @@ from unisim.backend.superdex.components import (
     verify_cameras,
 )
 from unisim.backend.superdex.geometry import primitive_shape, rotation_matrix
+from unisim.backend.superdex.joints import coordinate_groups, joint_coordinates
 from unisim.backend.superdex.plans import ModelPlan, SensorPlan
 from unisim.backend.superdex.root_state import RootReference
 from unisim.scene import SceneCfg
@@ -51,13 +52,13 @@ def materialize_model(
     path = Path(scene.model_file).expanduser().resolve()
     if not path.is_file():
         raise FileNotFoundError(path)
-    if path.suffix == ".mochi_scene":
+    if path.suffix in {".mochi_scene", ".mochi_prefab"}:
         from .scenes import materialize_native_scene
 
         return materialize_native_scene(physics, path, scene, controlled_joints, effort_limits)
     if controlled_joints is not None:
-        raise ValueError("superdex controlled_joints applies only to .mochi_scene inputs")
-    if path.suffix == ".superdex_bot":
+        raise ValueError("superdex controlled_joints applies only to native scene/prefab inputs")
+    if path.suffix in {".superdex_bot", ".superdex_bot_archive"}:
         plan = _native_plan(physics, robotics, path, effort_limits)
         if scene.fragment_files:
             from .prefabs import compose_rigid_prefabs
@@ -66,7 +67,8 @@ def materialize_model(
         return plan
     if path.suffix != ".xml":
         raise NotImplementedError(
-            "superdex model must be .superdex_bot, .mochi_scene or audited .xml MJCF"
+            "superdex model must be .superdex_bot, .superdex_bot_archive, "
+            ".mochi_scene, .mochi_prefab or audited .xml MJCF"
         )
     return _mjcf_plan(physics, path, scene, effort_limits, allow_contact_approximation)
 
@@ -75,10 +77,6 @@ def _native_plan(p: Any, r: Any, path: Path, efforts: Sequence[float] | None) ->
     cfg = r.load_bot_prefab_from_file(str(path))
     joints = list(cfg.joints)
     links = list(cfg.links)
-    if len(cfg.cycles) or len(cfg.linear_transmissions) or len(cfg.spatial_tendons):
-        raise NotImplementedError(
-            "superdex native bot transmissions/cycles require a separate audit"
-        )
     if not joints or len(joints) != len(links):
         raise ValueError("superdex native bot requires one joint per link")
     floating = joints[0].type == p.ArticulatedJointType.FREE
@@ -109,14 +107,12 @@ def _native_plan(p: Any, r: Any, path: Path, efforts: Sequence[float] | None) ->
             p.ArticulatedJointType.HARD,
             p.ArticulatedJointType.REVOLUTE,
             p.ArticulatedJointType.PRISMATIC,
+            p.ArticulatedJointType.SPHERICAL,
         )
         for j in joints[1:]
     ):
-        raise NotImplementedError("superdex native bot supports only fixed/hinge/slide joints")
-    active = [
-        i for i, joint in enumerate(joints)
-        if joint.type in (p.ArticulatedJointType.REVOLUTE, p.ArticulatedJointType.PRISMATIC)
-    ]
+        raise NotImplementedError("superdex native bot supports fixed/hinge/slide/spherical joints")
+    names, active, ranges, native_indices = joint_coordinates(p, joints)
     cameras = audit_components(links)
     camera_params = {item.name: expected_parameters(r, item, path) for item in cameras}
     qoffset, voffset = (7, 6) if floating else (0, 0)
@@ -126,17 +122,6 @@ def _native_plan(p: Any, r: Any, path: Path, efforts: Sequence[float] | None) ->
         if any(v <= 0 or not np.isfinite(v) for v in efforts):
             raise ValueError("superdex native bot requires explicit finite effort_limits")
     ctrl_ranges = _effort_ranges(efforts, n)
-    ranges = []
-    for i in active:
-        joint = joints[i]
-        axis = np.asarray(joint.axis, dtype=float)
-        axis /= np.linalg.norm(axis)
-        ranges.append(
-            [
-                -np.inf if joint.min_limit is None else np.dot(joint.min_limit, axis),
-                np.inf if joint.max_limit is None else np.dot(joint.max_limit, axis),
-            ]
-        )
     # A temporary cold scene resolves authored/density-derived mass properties.
     temp = p.create_scene("superdex_metadata")
     context = r.create_context()
@@ -145,6 +130,7 @@ def _native_plan(p: Any, r: Any, path: Path, efforts: Sequence[float] | None) ->
         bot = r.create_bot(temp, cfg, context)
         verify_cameras(bot, cameras, camera_params)
         actor = bot.get_articulated_actor()
+        joint_coordinates(p, joints, actor)
         native_links = [temp.get_actor(h) for h in actor.get_nested_link_actors()]
         masses = [0.0]
         coms = [np.zeros(3)]
@@ -205,7 +191,6 @@ def _native_plan(p: Any, r: Any, path: Path, efforts: Sequence[float] | None) ->
 
         return instance.get_articulated_actor(), close
 
-    names = tuple(str(joints[i].name) for i in active)
     return ModelPlan(
         source_file=str(path),
         nq=n + qoffset,
@@ -218,13 +203,13 @@ def _native_plan(p: Any, r: Any, path: Path, efforts: Sequence[float] | None) ->
         body_mass=np.asarray(masses),
         body_ipos=np.asarray(coms),
         joint_names=names,
-        joint_qpos_indices=np.arange(n) + qoffset,
-        joint_qvel_indices=np.arange(n) + voffset,
+        joint_qpos_indices=native_indices + (1 if floating else 0),
+        joint_qvel_indices=native_indices,
         joint_ranges=np.asarray(ranges).reshape(n, 2),
         actuator_names=names,
         actuator_joint_names=names,
-        actuator_qpos_indices=np.arange(n) + qoffset,
-        actuator_qvel_indices=np.arange(n) + voffset,
+        actuator_qpos_indices=native_indices + (1 if floating else 0),
+        actuator_qvel_indices=native_indices.copy(),
         actuator_ctrl_ranges=ctrl_ranges,
         actuator_gear=np.ones(n),
         actuator_kp=np.zeros(n),
@@ -239,7 +224,12 @@ def _native_plan(p: Any, r: Any, path: Path, efforts: Sequence[float] | None) ->
         native_bots=native_bots,
         camera_params=camera_params,
         dof_armature=np.array([0.0] * voffset + [float(joints[i].inertia or 0) for i in active]),
+        joint_coordinate_groups=coordinate_groups(names, active, joints),
         root_reference=root_reference,
+        serial_only=bool(not n or len(cfg.cycles) or len(cfg.linear_transmissions)
+                         or len(cfg.spatial_tendons)
+                         or any(j.type == p.ArticulatedJointType.SPHERICAL for j in joints)
+                         or path.suffix == ".superdex_bot_archive"),
     )
 
 

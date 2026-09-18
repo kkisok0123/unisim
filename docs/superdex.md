@@ -85,9 +85,9 @@ eval injects both settings (`serial` + `training.play_env_num=1`).
 Preprocessed SuperDex assets stay outside the code repositories. The FR3 example
 uses the upstream `assets/bots/arms/fr3_v2` directory including its HDF5 collision
 and GLB render files. Preserve its LICENSE/NOTICE. The native bot must have a
-HARD or FREE root and fixed/hinge/slide child joints;
-components, cycles, tendons and
-transmissions outside this profile fail closed.
+HARD or FREE root. Stage 8 also supports spherical child joints, closed loops,
+linear transmissions and spatial tendons in one serial environment. Custom
+components remain deferred; see the complete native rigid profile below.
 
 The local asset copy lives at `assets/superdex` (ignored by git; cloning UniSim
 does not provide it). Before an SDK load, `verify_asset_bundle()` from
@@ -384,8 +384,8 @@ or prismatic joints. Root position is world xyz; orientation is a wxyz
 quaternion. Root velocity stores world linear velocity and body-frame angular
 velocity. Scalar joint positions start at index 7, velocities at index 6;
 controls exclude the six unactuated root degrees of freedom. Additional free
-joints, spherical joints, components and
-cycles still fail explicitly.
+joints remain unsupported. Stage 8 extends this profile with spherical joints
+and cycles in one serial environment; Stage 6 covers the built-in components.
 
 Run the local, manifest-verified qualification (SDK required):
 
@@ -557,9 +557,9 @@ torque stepping and removes any solver-side pose controller.
 
 | Type | SDK target and coordinate convention |
 | --- | --- |
-| `BASIC_JSC_PD` | `ControllerBasicJscPdTarget.target_pose`: native actor DOF order; radians for hinges, metres for slides. A free root contributes translation XYZ and rotation-vector XYZ before scalar joints. Gains, saturation and deadband arrays cover all native DOFs; use zero root gains for an unactuated base. |
+| `BASIC_JSC_PD` | `ControllerBasicJscPdTarget.target_pose`: native actor DOF order; radians for hinges, metres for slides. A free root contributes translation XYZ and rotation-vector XYZ before joint coordinates (three per spherical joint). Gains, saturation and deadband arrays cover all native DOFs; use zero root gains for an unactuated base. |
 | `BASIC_OSC_PD` | `ControllerBasicOscPdTarget.root_from_target_ee`: end-effector pose relative to the root frame reported by SDK observations. `init_args` uses unprefixed `baseLinkName` and `eeLinkName`. |
-| `MOCHI_ARTICULATED_POSE` | `ControllerMochiArticulatedPoseTarget.world_from_root` plus exactly one of `pose_dofs` (non-root scalar joints) or `local_to_parent_transforms` (one per robot link). |
+| `MOCHI_ARTICULATED_POSE` | `ControllerMochiArticulatedPoseTarget.world_from_root` plus exactly one of `pose_dofs` (all non-root native joint DOFs) or `local_to_parent_transforms` (one per robot link). |
 
 SDK `TransformRT` quaternions use **xyzw**, unlike UniSim's camera-pose **wxyz**.
 JSC/OSC read fresh native observations each physics substep and their joint
@@ -676,11 +676,11 @@ full/selective reset and state-roundtrip APIs apply to the complete scene.
 State round trips restore kinematics, not hidden solver history. Each environment
 owns its actors/controllers; failed partial instantiation is cleaned up.
 
-This profile rejects multiple articulations, FREE/spherical scene joints,
+The historical Stage 7 profile excluded multiple articulations, FREE/spherical scene joints,
 mechanical cycles, soft bodies, scene cameras/plugins, arbitrary constraints,
 non-rigid nested prefabs and controllers other than joint-tracking pose springs.
-Scene support does not change the separate native-bot FREE-root support.
-Unsupported fields/components are rejected rather than silently discarded.
+Stage 8 extends those rigid capabilities below. Deformables and custom
+components remain deferred, and unsupported fields fail explicitly.
 
 ```bash
 SUPERDEX_ASSETS_PATH="$PWD/assets/superdex" uv run --no-sync scripts/superdex_scene_qualify.py
@@ -694,3 +694,59 @@ per scene in each execution mode, with two environments, zero measured SDK
 state/body-position deviation and passing reset/isolation/control/lifecycle checks.
 Both 240-frame renderer smokes passed with zero reset error. Manual visual
 inspection remains outstanding; no other scene is qualified by these results.
+
+
+## Complete native rigid-body profile (Stage 8)
+
+Use externally authored assets through `SceneCfg` and `create_backend`; no scene
+builder is introduced. Inputs include native bots, bot archives, standalone
+rigid/articulated prefabs and scenes with zero, one or multiple articulations.
+New profiles require `num_envs=1` and `superdex_execution_mode="serial"`.
+Previously qualified batch profiles retain their regression coverage.
+
+```python
+backend = create_backend(
+    "superdex", SceneCfg("/path/to/authored_scene.mochi_scene"), 1, 0.002,
+    superdex_execution_mode="serial",
+    superdex_controlled_joints=["arm/shoulder", "hand/ball"],
+    superdex_effort_limits=[10, 1, 1, 1],  # hinge plus three spherical DOFs
+)
+```
+
+Spherical qpos uses native joint-frame rotation-vector XYZ, with three native
+velocity and effort coordinates. The bare joint name expands to its three DOFs;
+explicit `/x`, `/y`, `/z` names select individual coordinates. Metadata records
+actual joint ownership, rather than guessing from these suffixes. Closed-loop
+constraints and transmissions do not add action coordinates. Limits stay in the
+native solver and effort limits apply per selected control coordinate.
+
+`backend.model.articulations` records each articulation's qpos/qvel and link
+slices. Each free root adds seven qpos and six qvel values; roots retain the
+world-position/wxyz and world-origin-linear/body-angular convention, including
+nested rotated/translated reference frames. Dynamic rigid objects follow all
+articulations. `get_root_state_layout()` exposes each root. Multiple articulations
+use actor-qualified names, and ambiguous repeated actor names gain stable
+`#index` metadata suffixes without renaming native actors. Whole-joint index
+queries expand to all coordinates. `model.joint_coordinate_groups` exposes the
+mapping. Body forces use the owning articulation's Jacobian and every scene
+advances exactly once per substep.
+
+For articulated scenes/prefabs, explicitly select controls or provide `[]` for
+passive operation. Object-only scenes have zero actions. Authored constraints,
+tracking controllers (joint, link position and link rotation), contact filters,
+articulated skin, settings and initial velocities remain SDK-owned. State round
+trips restore kinematics; reset restores authored controller targets and scene
+state. No ground plane, coordinate conversion or scene assembly is implicit.
+
+Bot archives and tagged external bot dependencies use the SDK resolver. For
+physics prefabs/scenes, use the nearest `.superdex_root`, or set
+`SUPERDEX_ASSETS_PATH` for root-relative dependencies; `./` paths resolve beside
+the containing file. External roots do not need the historical bundle layout or
+checksum. Qualification fixtures remain local and independent of the SDK checkout.
+
+See the [Stage 8 report](superdex-rigid-qualification/README.md) for all 55 native
+target files, 11 synthetic fixtures, SDK/build fingerprints and exact evidence.
+The passive torso runner uses one serial environment. Runtime URDF's documented
+primitive-geometry loss and the tested floating OSC limitation are SDK blockers,
+not adapter support claims. Deformables, custom components, new batch execution,
+image rendering, conversion and solver work remain deferred.

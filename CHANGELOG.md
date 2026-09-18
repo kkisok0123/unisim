@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Complete Stage 8 native rigid-body adaptation: closed loops, spherical DOF
+  metadata, bot archives, external roots, standalone/nested prefabs, object-only
+  scenes and multiple articulations. Preserve rigid constraints, transmissions,
+  tendons, tracking controllers and articulated skin. Add per-actor state/force
+  ownership, passive torso qualification, direct-SDK reports and native viewer
+  smoke. New profiles target one serial environment; preserve existing batch
+  regressions and document deferred features and SDK blockers.
+
 - Add Stage 7 native `.mochi_scene` dispatch for one fixed/hinge/slide articulation
   plus rigid objects and nested prefabs. Preserve authored scene settings,
   contact filters and joint-tracking rest springs; keep the timestep caller-owned.

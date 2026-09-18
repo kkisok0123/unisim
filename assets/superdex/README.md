@@ -1,6 +1,9 @@
 # SuperDex assets
 
-Stages 1–6 are implemented for the recorded profiles in this local bundle.
+Stages 1–8 are implemented for their recorded profiles. Stage 8 qualifies all
+55 native target files (54 model/prefab/scene files and one controller profile),
+plus 11 synthetic fixtures, in the scope described below. The earlier evidence
+remains intact: Stages 1–6 cover these historical profiles in the local bundle.
 **10 floating models and 11 fixed-base models qualify**, and FR3 with a sphere
 and nine-hole peg board passes rigid-prefab qualification. Stage 6 adds
 built-in camera metadata/poses, explicit controllers and universal
@@ -15,9 +18,10 @@ and reports live under `scripts/`, `tests/`, and `docs/` in the repository.
 Run the commands below from the repository root.
 
 UniSim does not require SuperDex assets to live in this directory. Set
-`SUPERDEX_ASSETS_PATH` to the root of your own SuperDex asset bundle. The root
-must contain the `bots`, `prefabs`, or `test` directories and their
-`.superdex_root` markers. For the FR3 qualification test, this file must exist:
+`SUPERDEX_ASSETS_PATH` to the root of your own SuperDex asset bundle. The historical bundle-verification tools expect `bots`, `prefabs`, or `test`
+and their `.superdex_root` markers. The adapter also loads independent assets
+and arbitrary external roots; they need not match the historical inventory.
+For the FR3 qualification test, this file must exist:
 
 ```text
 $SUPERDEX_ASSETS_PATH/bots/arms/fr3_v2/fr3_v2.superdex_bot
@@ -398,3 +402,56 @@ See the [scene API guide](../../docs/superdex.md#native-scenes-stage-7),
 [Stage 7 report](../../docs/superdex-scene-qualification/README.md) and
 [integration plan](superdex-assets-integration-plan.md). Inventory candidates
 still require individual qualification; these results do not promote other assets.
+
+
+## Complete native rigid-body compatibility (Stage 8)
+
+The adapter loads `.superdex_bot`, `.superdex_bot_archive`, `.mochi_prefab` and
+`.mochi_scene` inputs through the existing `SceneCfg.model_file` and factory.
+Users author scenes outside the adapter. New Stage 8 profiles use
+`superdex_execution_mode="serial"` and `num_envs=1`.
+
+- Closed loops: 2F85 and FR3–2F85 retain their closure constraints and existing DOFs.
+- Spherical joints: all four Oculus variants, mixed articulation and rail pendulum
+  use native three-component rotation vectors, joint-frame velocities and efforts.
+- Native ownership: standalone objects, passive scenes, fixed/floating/nested and
+  multiple articulations share complete state, body-force, reset and cleanup APIs.
+- Authored behavior: rigid constraints, linear transmissions, spatial tendons,
+  joint/link-position/link-rotation tracking and articulated skin stay active.
+- Portability: bot archives (including camera dependencies) and external roots work;
+  passive OpenArm torso now qualifies without requiring scalar actions or batch mode.
+
+For scenes/prefabs, supply ordered `superdex_controlled_joints` and one finite
+positive effort limit per selected DOF. Use `[]` for passive articulations;
+object-only scenes need no actions. A spherical joint can be selected by its
+whole name or by `joint/x`, `joint/y`, `joint/z`. Multiple articulations use
+`actor/joint` names; inspect `backend.model.joint_coordinate_groups` for the exact
+mapping. Repeated actor names receive stable `#index` metadata suffixes. Native
+actor names and payload bytes are preserved. Root state remains xyz/wxyz with
+world-origin linear velocity and body-frame angular velocity.
+
+```bash
+# Independently copied physics fixtures live at assets/superdex-physics.
+uv run --no-sync scripts/superdex_rigid_qualify.py \
+  --root assets/superdex --physics-root assets/superdex-physics
+uv run --no-sync pytest -q tests/test_superdex_rigid.py
+uv run --no-sync scripts/superdex_rigid_viewer.py \
+  assets/superdex/bots/grippers/2f_85/2f_85.superdex_bot --frames 120
+```
+
+All 54 native model/prefab/scene files and 11 synthetic fixtures pass 1,000 steps
+against direct SDK scenes. The original FR3 controller profile passes its
+separate 1,040-step qualification. This retains all 21 previous robot regressions;
+28 bots now qualify in serial mode, with seven custom-component bots deferred.
+Two deformable fixtures remain deferred. Full details, hashes and individual
+results are in the [Stage 8 report](../../docs/superdex-rigid-qualification/README.md).
+
+Validation: `make check` reports 399 passed and 21 skipped, with Ruff clean.
+The asset-enabled SuperDex regression suite and `make package` are also required
+completion gates; their final results are recorded in the Stage 8 report.
+
+Runtime URDF remains outside faithful loading because the SDK drops primitive
+collision/visual geometry. Floating OSC retains its recorded SDK limitation.
+Deformables, custom components, new batch execution, image rendering, conversion
+and solver changes remain deferred. Renderer smoke does not replace manual
+inspection, which remains outstanding for Stages 5, 7 and 8.

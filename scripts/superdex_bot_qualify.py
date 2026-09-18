@@ -154,7 +154,8 @@ def authored_joint_metadata(cfg) -> tuple[tuple[str, ...], np.ndarray, np.ndarra
             ranges.append([-math.inf, math.inf])
         efforts.append(float(joint.effort_limit))
         armature.append(float(joint.inertia or 0))
-    return tuple(names), np.asarray(ranges), np.asarray(efforts), np.asarray(armature)
+    return (tuple(names), np.asarray(ranges).reshape(-1, 2),
+            np.asarray(efforts), np.asarray(armature))
 
 
 def _recipe_references(bot_path: Path) -> list[tuple[str, str]]:

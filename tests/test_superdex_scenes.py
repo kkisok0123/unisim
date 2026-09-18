@@ -50,7 +50,8 @@ def test_scene_controls_require_explicit_active_joint_mapping(tmp_path):
 @pytest.mark.parametrize("patch", [
     {"scene": {"timestep": 0.01}}, {"scene": {"solver": {"typo": 3}}},
     {"scene": {"solver": {"linearSolver": {"typo": 3}}}},
-    {"constraints": {}}, {"cameras": []}, {"controllers": [{"type": "custom"}]},
+    {"constraints": {"unknownConstraint": []}}, {"cameras": []},
+    {"controllers": [{"type": "custom"}]},
     {"actors": {"soft": [], "articulated": []}},
 ])
 def test_unsupported_scene_fields_fail_before_sdk(tmp_path, patch):
@@ -60,7 +61,7 @@ def test_unsupported_scene_fields_fail_before_sdk(tmp_path, patch):
         audit_scene(write(tmp_path / "test.mochi_scene", source), tmp_path)
 
 
-@pytest.mark.parametrize("change", ["multiple", "free", "components", "cycle", "bad_parent"])
+@pytest.mark.parametrize("change", ["components", "cycle", "bad_parent"])
 def test_unsupported_articulation_content(tmp_path, change):
     source = data()
     actor = source["actors"]["articulated"][0]

@@ -11,22 +11,22 @@ SDK-free inventory of the repository-local asset copy under
 - Working tree clean under `assets/`: True
 - Local derivative files (changed after initial commit `1d7150946fa3): 0
 - Historical upstream pin (reference only): `ed30ce16361329cbbed956173d6a4f5842815d24`
-- Generated: 2026-09-17T06:31:43Z
+- Generated: 2026-09-17T11:12:20Z
 
 ## Bundle summary
 
 - Files: 888
 - Total size: 248.2 MiB
-- Tree digest (SHA-256 over path+file hashes): `10ba4bffff592c37619492fc19b5dcdb1a0147f903f8465f348e750cf278747b`
+- Tree digest (SHA-256 over path+file hashes): `7da60633c8643de11ccfbf9c8a7e5887689a2159ee441fb0a5a4561e40976a2d`
 - Root markers: bots, prefabs, test
 - Entries by kind: {'bot': 35, 'controller': 1, 'prefab': 15, 'scene': 2}
-- Dispositions: {'control-profile': 1, 'profile-candidate': 8, 'recipe-candidate': 12, 'unsupported-features': 32}
+- Dispositions: {'control-profile': 1, 'profile-candidate': 38, 'recipe-candidate': 12, 'unsupported-features': 2}
 
 ## Compatibility table
 
 | Entrypoint | Kind | Disposition | Blockers / required capabilities |
 | --- | --- | --- | --- |
-| `benchmarks/ant/ant.mochi_prefab` | prefab | unsupported-features | prefab assembly pending (prefab-articulated-actors) |
+| `benchmarks/ant/ant.mochi_prefab` | prefab | profile-candidate | prefab-articulated-actors |
 | `benchmarks/cart_pole/cart_pole.mochi_scene` | scene | profile-candidate | prefab-articulated-actors, scene-assembly |
 | `benchmarks/half_cheetah/half_cheetah.mochi_scene` | scene | profile-candidate | prefab-articulated-actors, scene-assembly, scene-controllers |
 | `bots/arm_hand_combos/fr3_dg5f_short/left/fr3_dg5f_short_left.superdex_bot` | bot | recipe-candidate | recipe-composition |
@@ -42,43 +42,43 @@ SDK-free inventory of the repository-local asset copy under
 | `bots/arms/openarm_v20/left/openarm_v20_left_arm.superdex_bot` | bot | profile-candidate |  |
 | `bots/arms/openarm_v20/right/openarm_v20_right_arm.superdex_bot` | bot | profile-candidate |  |
 | `bots/fun/arm_eyes_combos/fr3_v2_with_eyes.superdex_bot` | bot | recipe-candidate | recipe-composition |
-| `bots/fun/example_bot_2dof/example_bot_2dof.superdex_bot` | bot | unsupported-features | actuator/sensor components (actuator-sensor-components) |
+| `bots/fun/example_bot_2dof/example_bot_2dof.superdex_bot` | bot | unsupported-features | custom actuator/sensor components remain deferred |
 | `bots/fun/googly_eyes/googly_eyes.superdex_bot` | bot | profile-candidate |  |
-| `bots/grippers/2f_85/2f_85.superdex_bot` | bot | unsupported-features | native floating root (native-floating-root); mechanical cycles (mechanical-cycles) |
-| `bots/grippers/openarm_v20/left/openarm_v20_left_gripper.superdex_bot` | bot | unsupported-features | native floating root (native-floating-root) |
-| `bots/grippers/openarm_v20/right/openarm_v20_right_gripper.superdex_bot` | bot | unsupported-features | native floating root (native-floating-root) |
-| `bots/hands/allegro_v5/left/allegro_v5_left.superdex_bot` | bot | unsupported-features | native floating root (native-floating-root) |
-| `bots/hands/allegro_v5/right/allegro_v5_right.superdex_bot` | bot | unsupported-features | native floating root (native-floating-root) |
-| `bots/hands/dg5f_long/left/dg5f_long_left.superdex_bot` | bot | unsupported-features | native floating root (native-floating-root) |
-| `bots/hands/dg5f_long/right/dg5f_long_right.superdex_bot` | bot | unsupported-features | native floating root (native-floating-root) |
+| `bots/grippers/2f_85/2f_85.superdex_bot` | bot | profile-candidate | native-floating-root, mechanical-cycles |
+| `bots/grippers/openarm_v20/left/openarm_v20_left_gripper.superdex_bot` | bot | profile-candidate | native-floating-root |
+| `bots/grippers/openarm_v20/right/openarm_v20_right_gripper.superdex_bot` | bot | profile-candidate | native-floating-root |
+| `bots/hands/allegro_v5/left/allegro_v5_left.superdex_bot` | bot | profile-candidate | native-floating-root |
+| `bots/hands/allegro_v5/right/allegro_v5_right.superdex_bot` | bot | profile-candidate | native-floating-root |
+| `bots/hands/dg5f_long/left/dg5f_long_left.superdex_bot` | bot | profile-candidate | native-floating-root |
+| `bots/hands/dg5f_long/right/dg5f_long_right.superdex_bot` | bot | profile-candidate | native-floating-root |
 | `bots/hands/dg5f_long_seed/left/dg5f_long_seed_left.superdex_bot` | bot | recipe-candidate | recipe-composition |
 | `bots/hands/dg5f_long_seed/right/dg5f_long_seed_right.superdex_bot` | bot | recipe-candidate | recipe-composition |
-| `bots/hands/dg5f_short/left/dg5f_short_left.superdex_bot` | bot | unsupported-features | native floating root (native-floating-root) |
-| `bots/hands/dg5f_short/right/dg5f_short_right.superdex_bot` | bot | unsupported-features | native floating root (native-floating-root) |
+| `bots/hands/dg5f_short/left/dg5f_short_left.superdex_bot` | bot | profile-candidate | native-floating-root |
+| `bots/hands/dg5f_short/right/dg5f_short_right.superdex_bot` | bot | profile-candidate | native-floating-root |
 | `bots/hands/dg5f_short_seed/left/dg5f_short_seed_left.superdex_bot` | bot | recipe-candidate | recipe-composition |
 | `bots/hands/dg5f_short_seed/right/dg5f_short_seed_right.superdex_bot` | bot | recipe-candidate | recipe-composition |
-| `bots/hands/oculus_xr/left/oculus_xr_hand_highpoly_left.superdex_bot` | bot | unsupported-features | native floating root (native-floating-root); unsupported joint types: Spherical |
-| `bots/hands/oculus_xr/left/oculus_xr_hand_lowpoly_left.superdex_bot` | bot | unsupported-features | native floating root (native-floating-root); unsupported joint types: Spherical |
-| `bots/hands/oculus_xr/right/oculus_xr_hand_highpoly_right.superdex_bot` | bot | unsupported-features | native floating root (native-floating-root); unsupported joint types: Spherical |
-| `bots/hands/oculus_xr/right/oculus_xr_hand_lowpoly_right.superdex_bot` | bot | unsupported-features | native floating root (native-floating-root); unsupported joint types: Spherical |
-| `bots/hands/wuji_hand2_beta1/left/wuji_hand2_beta1_left.superdex_bot` | bot | unsupported-features | native floating root (native-floating-root) |
-| `bots/hands/wuji_hand2_beta1/right/wuji_hand2_beta1_right.superdex_bot` | bot | unsupported-features | native floating root (native-floating-root) |
-| `bots/sensors/dg5f_seed/dg5f_seed.superdex_bot` | bot | unsupported-features | native floating root (native-floating-root) |
+| `bots/hands/oculus_xr/left/oculus_xr_hand_highpoly_left.superdex_bot` | bot | profile-candidate | native-floating-root, spherical-joints |
+| `bots/hands/oculus_xr/left/oculus_xr_hand_lowpoly_left.superdex_bot` | bot | profile-candidate | native-floating-root, spherical-joints |
+| `bots/hands/oculus_xr/right/oculus_xr_hand_highpoly_right.superdex_bot` | bot | profile-candidate | native-floating-root, spherical-joints |
+| `bots/hands/oculus_xr/right/oculus_xr_hand_lowpoly_right.superdex_bot` | bot | profile-candidate | native-floating-root, spherical-joints |
+| `bots/hands/wuji_hand2_beta1/left/wuji_hand2_beta1_left.superdex_bot` | bot | profile-candidate | native-floating-root |
+| `bots/hands/wuji_hand2_beta1/right/wuji_hand2_beta1_right.superdex_bot` | bot | profile-candidate | native-floating-root |
+| `bots/sensors/dg5f_seed/dg5f_seed.superdex_bot` | bot | profile-candidate | native-floating-root |
 | `bots/torsos/openarm_v20/openarm_v20_torso.superdex_bot` | bot | profile-candidate |  |
-| `prefabs/box_and_blocks/block_blue.mochi_prefab` | prefab | unsupported-features | prefab assembly pending (prefab-rigid-actors) |
-| `prefabs/box_and_blocks/block_green.mochi_prefab` | prefab | unsupported-features | prefab assembly pending (prefab-rigid-actors) |
-| `prefabs/box_and_blocks/block_red.mochi_prefab` | prefab | unsupported-features | prefab assembly pending (prefab-rigid-actors) |
-| `prefabs/box_and_blocks/block_yellow.mochi_prefab` | prefab | unsupported-features | prefab assembly pending (prefab-rigid-actors) |
-| `prefabs/box_and_blocks/box_and_blocks.mochi_prefab` | prefab | unsupported-features | prefab assembly pending (prefab-rigid-actors) |
-| `prefabs/chain/chain.mochi_prefab` | prefab | unsupported-features | prefab assembly pending (prefab-rigid-actors) |
-| `prefabs/duck_lamp/duck_lamp_recumbent.mochi_prefab` | prefab | unsupported-features | prefab assembly pending () |
-| `prefabs/functional_dexterity_test/fdt_peg.mochi_prefab` | prefab | unsupported-features | prefab assembly pending (prefab-rigid-actors) |
-| `prefabs/functional_dexterity_test/functional_dexterity_test.mochi_prefab` | prefab | unsupported-features | prefab assembly pending (prefab-rigid-actors) |
-| `prefabs/nine_hole_peg_test/nine_hole_peg_test.mochi_prefab` | prefab | unsupported-features | prefab assembly pending (prefab-rigid-actors) |
-| `prefabs/paper_cups/paper_cup.mochi_prefab` | prefab | unsupported-features | prefab assembly pending (prefab-rigid-actors) |
-| `prefabs/paper_cups/paper_cup_pyramid.mochi_prefab` | prefab | unsupported-features | prefab assembly pending (prefab-rigid-actors) |
-| `prefabs/shape_box/shape_box.mochi_prefab` | prefab | unsupported-features | prefab assembly pending (prefab-rigid-actors) |
-| `prefabs/sphere/sphere.mochi_prefab` | prefab | unsupported-features | prefab assembly pending (prefab-rigid-actors) |
+| `prefabs/box_and_blocks/block_blue.mochi_prefab` | prefab | profile-candidate | prefab-rigid-actors |
+| `prefabs/box_and_blocks/block_green.mochi_prefab` | prefab | profile-candidate | prefab-rigid-actors |
+| `prefabs/box_and_blocks/block_red.mochi_prefab` | prefab | profile-candidate | prefab-rigid-actors |
+| `prefabs/box_and_blocks/block_yellow.mochi_prefab` | prefab | profile-candidate | prefab-rigid-actors |
+| `prefabs/box_and_blocks/box_and_blocks.mochi_prefab` | prefab | profile-candidate | prefab-rigid-actors |
+| `prefabs/chain/chain.mochi_prefab` | prefab | profile-candidate | prefab-rigid-actors |
+| `prefabs/duck_lamp/duck_lamp_recumbent.mochi_prefab` | prefab | unsupported-features | non-rigid actors remain deferred |
+| `prefabs/functional_dexterity_test/fdt_peg.mochi_prefab` | prefab | profile-candidate | prefab-rigid-actors |
+| `prefabs/functional_dexterity_test/functional_dexterity_test.mochi_prefab` | prefab | profile-candidate | prefab-rigid-actors |
+| `prefabs/nine_hole_peg_test/nine_hole_peg_test.mochi_prefab` | prefab | profile-candidate | prefab-rigid-actors |
+| `prefabs/paper_cups/paper_cup.mochi_prefab` | prefab | profile-candidate | prefab-rigid-actors |
+| `prefabs/paper_cups/paper_cup_pyramid.mochi_prefab` | prefab | profile-candidate | prefab-rigid-actors |
+| `prefabs/shape_box/shape_box.mochi_prefab` | prefab | profile-candidate | prefab-rigid-actors |
+| `prefabs/sphere/sphere.mochi_prefab` | prefab | profile-candidate | prefab-rigid-actors |
 
 ## Verification
 

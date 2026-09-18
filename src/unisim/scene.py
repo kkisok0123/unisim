@@ -42,9 +42,9 @@ class SceneCfg:
     """Scene source and optional cold-path composition configuration."""
 
     model_file: str
-    """Engine input; SuperDex accepts native bots/scenes or audited MJCF XML."""
+    """Engine input; SuperDex accepts native bots/archives/scenes/prefabs or audited MJCF XML."""
     fragment_files: list[str] = field(default_factory=list)
-    """MJCF fragments, or rigid .mochi_prefab files for native SuperDex bots/scenes."""
+    """MJCF fragments; SuperDex bots take rigid prefabs, scenes also take articulations."""
     terrain: TerrainSceneCfg | None = None
     entities: dict[str, object] = field(default_factory=dict)
     """Logical entity partitions materialized by the base-owned manager facade."""

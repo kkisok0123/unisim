@@ -29,9 +29,9 @@ SCENE_SUFFIX = ".mochi_scene"
 CONTROLLER_SUFFIX = ".superdex_controller"
 ENTRYPOINT_SUFFIXES = (BOT_SUFFIX, PREFAB_SUFFIX, SCENE_SUFFIX, CONTROLLER_SUFFIX)
 
-# The native loader accepts a fixed (Hard) root plus these joint types.
+# Structural candidates still require runtime qualification for their exact profile.
 PROFILE_JOINT_TYPES = frozenset({"Hard", "Revolute", "Prismatic"})
-SUPPORTED_JOINT_TYPES = PROFILE_JOINT_TYPES | {"Free"}
+SUPPORTED_JOINT_TYPES = PROFILE_JOINT_TYPES | {"Free", "Spherical"}
 
 # Reference-bearing JSON fields and the dependency role each one carries.
 _ROLE_BY_FIELD = {
@@ -65,7 +65,9 @@ _STAGE_BY_CAPABILITY = {
     CAPABILITY_ACTUATOR_SENSOR_COMPONENTS: 6,
     CAPABILITY_MECHANICAL_CYCLES: 8,
     CAPABILITY_PREFAB_RIGID_ACTORS: 5,
-    CAPABILITY_PREFAB_ARTICULATED_ACTORS: 5,
+    CAPABILITY_PREFAB_ARTICULATED_ACTORS: 8,
+    "spherical-joints": 8,
+    "coupled-actuation": 8,
     CAPABILITY_SCENE_ASSEMBLY: 7,
     CAPABILITY_SCENE_CONTROLLERS: 7,
     CAPABILITY_POSE_CONTROLLER_PROFILE: 6,
@@ -442,15 +444,16 @@ def _bot_capabilities(
     blockers: list[str] = []
     if root_joint == "Free":
         capabilities.append(CAPABILITY_NATIVE_FLOATING_ROOT)
-        blockers.append(f"native floating root ({CAPABILITY_NATIVE_FLOATING_ROOT})")
     if component_types:
         capabilities.append(CAPABILITY_ACTUATOR_SENSOR_COMPONENTS)
-        blockers.append(
-            f"actuator/sensor components ({CAPABILITY_ACTUATOR_SENSOR_COMPONENTS})"
-        )
+        if any(t != "sensor:SENSOR_CAMERA" for t in component_types):
+            blockers.append("custom actuator/sensor components remain deferred")
     if data.get("cycles"):
         capabilities.append(CAPABILITY_MECHANICAL_CYCLES)
-        blockers.append(f"mechanical cycles ({CAPABILITY_MECHANICAL_CYCLES})")
+    if any(j.get("type") == "Spherical" for j in _joints_of(data)):
+        capabilities.append("spherical-joints")
+    if data.get("linearTransmissions") or data.get("spatialTendons"):
+        capabilities.append("coupled-actuation")
     if unsupported_joint_types:
         blockers.append(f"unsupported joint types: {', '.join(unsupported_joint_types)}")
     return tuple(capabilities), tuple(blockers)
@@ -526,8 +529,9 @@ def _classify_prefab(
     if any(not edge.resolved for edge in dependencies):
         disposition = DISPOSITION_UNRESOLVED_DEPENDENCY
     else:
-        disposition = DISPOSITION_UNSUPPORTED_FEATURES
-    blockers = [f"prefab assembly pending ({', '.join(capabilities)})"]
+        disposition = (DISPOSITION_UNSUPPORTED_FEATURES if _rigid_asset_blockers(data)
+                       else DISPOSITION_PROFILE_CANDIDATE)
+    blockers = _rigid_asset_blockers(data)
     joints = _joints_of(data)
     return AssetEntry(
         entrypoint=entrypoint.relative_to(bundle_root).as_posix(),
@@ -545,6 +549,23 @@ def _classify_prefab(
     )
 
 
+def _rigid_asset_blockers(data: dict[str, Any]) -> list[str]:
+    blockers = []
+    if set(data) - {"comment", "actors", "scene", "prefabs", "contactFilter", "controllers",
+                    "constraints"}:
+        blockers.append("fields outside the native rigid scene schema")
+    if set(data.get("actors", {})) - {"comment", "rigid", "articulated"}:
+        blockers.append("non-rigid actors remain deferred")
+    if any(j.get("type") not in SUPPORTED_JOINT_TYPES for j in _joints_of(data)):
+        blockers.append("unsupported native tree joint type")
+    if any(link.get("sensors") or link.get("actuators") for link in _links_of(data)):
+        blockers.append("physics prefab link components require a robotics bot")
+    if any(set(c) - {"comment", "articulatedActor", "jointTracking", "linkPosTracking",
+                     "linkRotTracking"} for c in data.get("controllers", [])):
+        blockers.append("unsupported scene controller schema")
+    return blockers
+
+
 def _classify_scene(
     entrypoint: Path,
     data: dict[str, Any],
@@ -560,23 +581,8 @@ def _classify_scene(
         capabilities.append(CAPABILITY_PREFAB_ARTICULATED_ACTORS)
     if data.get("controllers"):
         capabilities.append(CAPABILITY_SCENE_CONTROLLERS)
-    # Inventory candidates are structural hints, not numerical qualification.
-    # The cold-path scene audit supplies detailed field/dependency diagnostics.
-    blockers = []
-    if set(data) - {"comment", "actors", "scene", "prefabs", "contactFilter", "controllers"}:
-        blockers.append("scene fields outside the stage-7 profile")
-    actors = data.get("actors", {})
-    if len(actors.get("articulated", [])) != 1 or set(actors) - {"comment", "rigid", "articulated"}:
-        blockers.append("stage 7 requires one articulation and optional rigid actors")
-    if any(j.get("type") not in PROFILE_JOINT_TYPES for j in _joints_of(data)):
-        blockers.append("scene joints outside the fixed/hinge/slide profile")
-    if any(a.get("cycles") or a.get("skin") for a in actors.get("articulated", [])):
-        blockers.append("scene mechanisms/skin require a separate capability audit")
-    if any(link.get("sensors") or link.get("actuators") for link in _links_of(data)):
-        blockers.append("scene link components require a separate capability audit")
-    if any(set(c) - {"comment", "articulatedActor", "jointTracking"}
-           for c in data.get("controllers", [])):
-        blockers.append("scene controller outside the joint-tracking profile")
+    # Structural candidates are not numerical qualification.
+    blockers = _rigid_asset_blockers(data)
     if any(not edge.resolved for edge in dependencies):
         disposition = DISPOSITION_UNRESOLVED_DEPENDENCY
     elif not blockers:

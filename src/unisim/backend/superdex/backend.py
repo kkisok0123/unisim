@@ -122,8 +122,16 @@ class SuperDexBackend(BuiltinAPI, SimBackend):
                 controlled_joints=controlled_joints,
                 allow_contact_approximation=allow_contact_approximation,
             )
+            if self._plan.serial_only and (execution_mode != "serial" or num_envs != 1):
+                raise NotImplementedError(
+                    "superdex advanced native assets require execution_mode='serial', num_envs=1"
+                )
             self._body_lookup = {name: i for i, name in enumerate(self._plan.body_names)}
-            self._joint_lookup = {name: i for i, name in enumerate(self._plan.joint_names)}
+            from .joints import coordinate_groups
+
+            self._joint_lookup = (
+                self._plan.joint_coordinate_groups or coordinate_groups(self._plan.joint_names)
+            )
             self._base_id = (
                 self._body_lookup[base_name] if base_name is not None else self._plan.root_body_id
             )
@@ -238,7 +246,9 @@ class SuperDexBackend(BuiltinAPI, SimBackend):
         self._native_actuator_qpos_indices = np.asarray(
             m.actuator_qpos_indices, dtype=np.int32
         ).copy()
-        if m.floating:
+        if m.articulations:
+            self._native_actuator_qpos_indices = np.asarray(m.actuator_qvel_indices, dtype=np.int32)
+        elif m.floating:
             self._native_actuator_qpos_indices -= 1
         self._native_actuator_qvel_indices = np.asarray(
             m.actuator_qvel_indices, dtype=np.int32
@@ -373,6 +383,12 @@ class SuperDexBackend(BuiltinAPI, SimBackend):
             raise ValueError("set_state requires finite qpos/qvel")
         if randomization is not None and randomization.requested_terms():
             raise NotImplementedError("superdex does not support reset model randomization")
+        for layout in self.model.articulations:
+            qi = layout.qpos_start
+            if layout.floating and not np.allclose(
+                np.linalg.norm(q[:, qi + 3:qi + 7], axis=1), 1, atol=1e-5
+            ):
+                raise ValueError("free-root quaternion must be normalized wxyz")
         if self.model.floating and not np.allclose(np.linalg.norm(q[:, 3:7], axis=1), 1, atol=1e-5):
             raise ValueError("free-root quaternion must be normalized wxyz")
         for item in self.model.rigids:
@@ -385,7 +401,14 @@ class SuperDexBackend(BuiltinAPI, SimBackend):
             self._suspend_controller(i)
             world.restore_state(self._snapshots[i], release_immediately=False)
             native_q, native_v = self._native_q[i], self._native_v[i]
-            if self.model.floating:
+            if self.model.articulations:
+                for layout in self.model.articulations:
+                    qi, vi, size = layout.qpos_start, layout.qvel_start, layout.native_size
+                    nq, nv = layout.encode(
+                        self._p, q[row, qi:qi + size + int(layout.floating)], v[row, vi:vi + size]
+                    )
+                    native_q[vi:vi + size], native_v[vi:vi + size] = nq, nv
+            elif self.model.floating:
                 root_q, root_v = q[row, :7], v[row, :6]
                 if self.model.root_reference is not None:
                     root_q, root_v = self.model.root_reference.from_world(root_q, root_v)
@@ -592,10 +615,15 @@ class SuperDexBackend(BuiltinAPI, SimBackend):
                     if m.body_link_indices[body] < 0:
                         continue
                     link = self._links[i][m.body_link_indices[body]]
-                    jacobian = np.asarray(link.get_articulated_jacobian()).reshape(
-                        6, m.robot_nv
-                    )
-                    generalized += jacobian.T @ self._pending_wrench[i, body]
+                    start, size = 0, m.robot_nv
+                    for layout in m.articulations:
+                        if layout.link_start <= m.body_link_indices[body] < (
+                            layout.link_start + layout.link_count
+                        ):
+                            start, size = layout.qvel_start, layout.native_size
+                            break
+                    jacobian = np.asarray(link.get_articulated_jacobian()).reshape(6, size)
+                    generalized[start:start + size] += jacobian.T @ self._pending_wrench[i, body]
                 np.add.at(generalized, m.actuator_qvel_indices, force[i])
                 actor.set_external_forces_on_dofs(self._all_dofs, generalized)
                 world.step(self._dt)
@@ -648,7 +676,14 @@ class SuperDexBackend(BuiltinAPI, SimBackend):
                 actor = self._actors[i]
                 actor.get_articulated_pose(self._native_q[i])
                 actor.get_articulated_joint_velocities(self._native_v[i])
-                if m.floating:
+                if m.articulations:
+                    for layout in m.articulations:
+                        qi, vi, size = layout.qpos_start, layout.qvel_start, layout.native_size
+                        q, v = layout.decode(self._p, self._native_q[i, vi:vi + size],
+                                             self._native_v[i, vi:vi + size])
+                        self._qpos[i, qi:qi + len(q)] = q
+                        self._qvel[i, vi:vi + size] = v
+                elif m.floating:
                     self._qpos[i, :3] = self._native_q[i, :3]
                     quat = self._p.Quaternion.from_rotation_vector(self._native_q[i, 3:6])
                     self._qpos[i, 3:7] = np.asarray(quat)[[3, 0, 1, 2]]
@@ -669,7 +704,7 @@ class SuperDexBackend(BuiltinAPI, SimBackend):
                             link.get_center_of_mass_transform().translation
                         )
                         self._lin[i, body_id] = np.asarray(link.get_linear_velocity())
-        if m.floating:
+        if m.floating and not m.articulations:
             if m.root_reference is None:
                 self._qvel[ids, 3:6] = unrotate(self._qpos[ids, 3:7], self._native_v[ids, 3:6])
             else:
@@ -829,7 +864,7 @@ class SuperDexBackend(BuiltinAPI, SimBackend):
         return np.array(sorted(found), dtype=np.int32)
 
     def get_joint_dof_pos_indices(self, names: Sequence[str]) -> np.ndarray:
-        return np.array([self._joint_lookup[name] for name in names], dtype=np.int32)
+        return np.array([i for name in names for i in self._joint_lookup[name]], dtype=np.int32)
 
     def get_joint_dof_vel_indices(self, names: Sequence[str]) -> np.ndarray:
         return self.get_joint_dof_pos_indices(names)
@@ -850,6 +885,12 @@ class SuperDexBackend(BuiltinAPI, SimBackend):
                 return BackendRootStateLayout(
                     qpos_indices=tuple(range(item.qpos_index, item.qpos_index + 7)),
                     qvel_indices=tuple(range(item.qvel_index, item.qvel_index + 6)),
+                )
+        for layout in self.model.articulations:
+            if body == layout.root_body_id and layout.floating:
+                return BackendRootStateLayout(
+                    qpos_indices=tuple(range(layout.qpos_start, layout.qpos_start + 7)),
+                    qvel_indices=tuple(range(layout.qvel_start, layout.qvel_start + 6)),
                 )
         if not self.model.floating or body != self.model.root_body_id:
             raise NotImplementedError(
