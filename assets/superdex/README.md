@@ -455,3 +455,28 @@ collision/visual geometry. Floating OSC retains its recorded SDK limitation.
 Deformables, custom components, new batch execution, image rendering, conversion
 and solver changes remain deferred. Renderer smoke does not replace manual
 inspection, which remains outstanding for Stages 5, 7 and 8.
+
+
+## Shared public interface
+
+SuperDex application code now uses operations declared in `SimBackend`.
+`get_model_info()` exposes detached body/articulation ownership and joint-coordinate
+metadata; scalar `superdex_effort_limits` expand internally. `set_gravity([0, 0, 0])`
+disables gravity for the session and persists across resets. Existing authored
+settings remain unchanged unless explicitly overridden.
+
+Controllers accept UniSim `JointTarget`, `CartesianTarget` and
+`ArticulationPoseTarget` values. Native targets remain compatible with deprecation
+warnings. Camera metadata/poses, controller descriptions and `close()` are part of
+the shared interface; unsupported adapters use explicit defaults. No native SDK
+objects are required by the application-facing viewers.
+
+```bash
+uv run --no-sync scripts/superdex_rigid_viewer.py \
+  assets/superdex/bots/grippers/2f_85/2f_85.superdex_bot --no-gravity
+```
+
+The [interface report](../../docs/superdex-interface-qualification/README.md)
+records fresh validation without replacing the historical Stage 1–8 evidence.
+Native image rendering, new batch profiles and deferred dynamics remain outside
+this change; manual visual inspections remain outstanding.

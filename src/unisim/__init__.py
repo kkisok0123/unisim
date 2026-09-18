@@ -5,6 +5,15 @@ The distribution is named ``unisim-core`` while the public Python namespace is
 """
 
 from .adapters import ADAPTER_SPECS, AdapterSpec, adapter_spec
+from .backend.api_types import (
+    ArticulationPoseTarget,
+    BackendArticulationInfo,
+    BackendControllerInfo,
+    BackendModelInfo,
+    CartesianTarget,
+    ControllerTarget,
+    JointTarget,
+)
 from .benchmark import BenchmarkCase, BenchmarkResult
 from .conformance import assert_backend_conformance
 from .contract import (
@@ -22,6 +31,13 @@ from .fake import FakeBackend
 from .optional import OptionalDependencyError
 
 __all__ = [
+    "ArticulationPoseTarget",
+    "BackendArticulationInfo",
+    "BackendControllerInfo",
+    "BackendModelInfo",
+    "CartesianTarget",
+    "ControllerTarget",
+    "JointTarget",
     "BackendCapability",
     "BackendError",
     "BenchmarkCase",

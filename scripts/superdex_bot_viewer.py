@@ -94,40 +94,6 @@ def resolve_assets_root(cli_value: str | None) -> Path:
     return root
 
 
-def _authored_joint_metadata(bot_path: Path):
-    """(names, ranges, efforts, armature) of a prefab's active joints.
-
-    Prefab parsing needs no process runtime; the SDK's verbose joint dumps on
-    recipe compilation are silenced.
-    """
-    import contextlib
-    import io
-
-    import numpy as np
-    import superdex.physics as physics
-    import superdex.robotics as robotics
-
-    with contextlib.redirect_stdout(io.StringIO()):
-        cfg = robotics.load_bot_prefab_from_file(str(bot_path))
-    jt = physics.ArticulatedJointType
-    names, ranges, efforts, armature = [], [], [], []
-    for joint in cfg.joints:
-        if joint.type in (jt.HARD, jt.FREE):
-            continue
-        names.append(str(joint.name))
-        if joint.type == jt.REVOLUTE and joint.min_limit is not None:
-            axis = np.asarray(joint.axis, dtype=float)
-            axis = axis / np.linalg.norm(axis)
-            ranges.append(
-                [float(np.dot(joint.min_limit, axis)), float(np.dot(joint.max_limit, axis))]
-            )
-        else:
-            ranges.append([-math.inf, math.inf])
-        efforts.append(float(joint.effort_limit))
-        armature.append(float(joint.inertia or 0))
-    return tuple(names), ranges, efforts, armature
-
-
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
@@ -191,15 +157,6 @@ def main(argv: list[str] | None = None) -> int:
 
     import numpy as np
 
-    # Resolve the control profile from the authored prefab before any backend
-    # exists (prefab parsing needs no process runtime): explicit effort limits
-    # and critically damped kd from the authored armature.
-    names, _, efforts, armature = _authored_joint_metadata(bot_path)
-    try:
-        resolved = resolve_gains(profile, names, armature, efforts)
-    except ValueError as exc:
-        raise SystemExit(f"error: {exc}") from exc
-
     backend = create_backend(
         "superdex",
         SceneCfg(str(bot_path)),
@@ -207,13 +164,22 @@ def main(argv: list[str] | None = None) -> int:
         SIM_DT,
         superdex_execution_mode="serial",
         superdex_num_workers=0,
-        superdex_effort_limits=list(resolved.effort_limits),
+        superdex_effort_limits=profile.effort_limits,
     )
 
+    info = backend.get_model_info()
+    names = info.coordinate_names
+    efforts = backend.get_actuator_ctrl_range()[:, 1]
+    armature = backend.get_dof_armature()[list(info.coordinate_qvel_indices)]
+    try:
+        resolved = resolve_gains(profile, names, armature, efforts)
+    except ValueError:
+        backend.close()
+        raise
     default_state = backend.get_default_qpos()
     q0 = backend.get_dof_pos()[0].copy()
-    floating = backend.model.floating
-    body_ids = np.arange(1, len(backend.model.body_names))
+    floating = any(a.floating for a in info.articulations)
+    body_ids = np.arange(1, len(info.body_names))
     # Apply gravity compensation at each link's COM through the public API.
     # This viewer profile keeps a free hand in frame; qualification uses gravity.
     support = -backend.get_body_mass()[body_ids, None] * backend.get_gravity()[None, :]
@@ -270,16 +236,6 @@ def main(argv: list[str] | None = None) -> int:
         if phase_time > 0.0:
             return False
         if name == "initial-pose":
-            if profile.camera_direction is not None:
-                from superdex.physics.viewer.backend import polyscope as ps
-
-                boxes = [link.get_aabb_world() for link in backend._links[0]]
-                lo = np.min([box.min for box in boxes], axis=0)
-                hi = np.max([box.max for box in boxes], axis=0)
-                center = (lo + hi) / 2
-                direction = np.asarray(profile.camera_direction)
-                eye = center + direction / np.linalg.norm(direction) * np.linalg.norm(hi - lo) * 2
-                ps.look_at(eye, center)
             print(f"[{name}] holding authored default pose (inspect geometry)")
         elif name == "bounded-movement":
             if floating:
@@ -337,6 +293,20 @@ def main(argv: list[str] | None = None) -> int:
         phase_time += CTRL_DT
         return obs
 
+    camera = None
+    if profile.camera_direction is not None:
+        from unisim import CameraCfg
+
+        direction = np.asarray(profile.camera_direction, dtype=float)
+        direction /= np.linalg.norm(direction)
+        positions = backend.get_body_pos_w(body_ids)[0]
+        lo, hi = positions.min(axis=0), positions.max(axis=0)
+        camera = CameraCfg(
+            cam_lookat=tuple((lo + hi) / 2),
+            cam_distance=max(0.25, float(np.linalg.norm(hi - lo)) * 2),
+            cam_azimuth=float(np.rad2deg(np.arctan2(direction[1], direction[0]))),
+            cam_elevation=-float(np.rad2deg(np.arcsin(direction[2]))),
+        )
     frames = args.frames
     started = time.perf_counter()
     interrupted = False
@@ -348,6 +318,7 @@ def main(argv: list[str] | None = None) -> int:
             num_steps=frames,
             headless=frames is not None,
             record_video=False,
+            camera_kwargs=camera,
         )
     except KeyboardInterrupt:
         # Ctrl-C must still release the viewer and backend via the finally

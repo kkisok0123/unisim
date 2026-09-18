@@ -31,24 +31,22 @@ def main():
     args = parser.parse_args()
     if args.frames is not None and args.frames < 3:
         parser.error("--frames must be at least 3")
-    from superdex import physics as p
-    from superdex import robotics as r
-
+    path = args.model.resolve()
+    if path.name.endswith(".mochi.h5"):
+        parser.error(
+            ".mochi.h5 is a shape asset, not a standalone scene or robot. "
+            "Load an authored .mochi_prefab, .mochi_scene or .superdex_bot that "
+            "references the shape. Deformable rod simulation is outside this rigid viewer's scope."
+        )
     from unisim import create_backend
-    from unisim.backend.superdex.joints import joint_coordinates
     from unisim.scene import SceneCfg
 
-    path = args.model.resolve()
-    options = {}
-    if path.suffix in {".superdex_bot", ".superdex_bot_archive"}:
-        cfg = r.load_bot_prefab_from_file(str(path))
-        names, _, _, _ = joint_coordinates(p, list(cfg.joints))
-        options["superdex_effort_limits"] = [args.effort_limit] * len(names)
-    else:
+    options = {"superdex_effort_limits": args.effort_limit}
+    if path.suffix in {".mochi_scene", ".mochi_prefab"}:
         selected = args.controlled_joints.split(",") if args.controlled_joints else []
         options["superdex_controlled_joints"] = selected
-        # Explicit component names make the number of effort limits unambiguous.
-        options["superdex_effort_limits"] = [args.effort_limit] * len(selected)
+    elif args.controlled_joints:
+        parser.error("--controlled-joints applies only to .mochi_scene and .mochi_prefab inputs")
     backend = create_backend("superdex", SceneCfg(str(path)), 1, .002,
                              superdex_execution_mode="serial", **options)
     frame, error = 0, 0.0
@@ -70,9 +68,7 @@ def main():
 
     try:
         if args.no_gravity:
-            backend.model.gravity[:] = 0
-            for world in backend._worlds:
-                world.set_gravity(backend.model.gravity)
+            backend.set_gravity([0, 0, 0])
         backend.run_playback(
             env=SimpleNamespace(cfg=SimpleNamespace(ctrl_dt=.002)), initialize=lambda: None,
             step=advance, num_steps=frames, headless=frames is not None, record_video=False,

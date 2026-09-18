@@ -502,6 +502,31 @@ Internal-only formats, deformables, custom components, new batch execution,
 image rendering, conversion tooling and solver changes remain outside Stage 8.
 Historical reports are unchanged. Manual visual inspection remains outstanding.
 
+## Shared-interface alignment — implementation complete; validation recorded separately
+
+This single follow-on milestone preserves the completed Stages 1–8 above.
+Applications use operations declared by `SimBackend`; the SuperDex adapter owns
+native loading, coordinate conversion, controls, state, playback and cleanup.
+Other backends retain their behavior and inherit unsupported defaults for new
+optional operations.
+
+1. **Shared API/configuration:** declare camera/controller methods, controller
+   descriptions, detached model metadata, gravity override and idempotent close;
+   resolve scalar effort limits internally while preserving explicit scene controls.
+2. **Shared inputs:** accept SDK-independent joint, Cartesian and articulation-pose
+   targets, validate every environment before stepping, and convert frames internally.
+   Preserve authored controller config files and warn on legacy native target objects.
+3. **Callers/evidence:** migrate normal viewers and adapter controller calls to the
+   shared interface; keep native inspection only in explicit qualification audits
+   and independent reference loops. Verify import boundaries, public method coverage,
+   metadata, reset, gravity and direct-SDK behavior before completion.
+
+The [interface report](../../docs/superdex-interface-qualification/README.md) records
+focused tests, full checks, packaging and fresh native qualification. Historical
+reports retain their original hashes. Existing batch regressions remain required;
+new rigid profiles still target one serial environment. Deformables, custom
+components, image capture, new batch support and solver changes stay deferred.
+
 ## Adapter development process for stages 4–8
 
 For each new capability, follow the same process:

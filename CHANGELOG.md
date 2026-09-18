@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Fix rigid-viewer format routing: pass controlled-joint selection only for scenes
+  and prefabs, and explain that `.mochi.h5` shape files are not standalone models.
+
+- Align SuperDex with the shared `SimBackend` interface: optional model/controller
+  metadata, camera/controller methods and gravity override, plus idempotent close.
+  Export SDK-independent controller targets; retain native inputs with deprecation
+  warnings. Resolve scalar effort limits inside the adapter and migrate viewers
+  to public APIs. Include bot-level placement in floating world-state conversion
+  (notably Oculus hands); preserve native physics and existing batch profiles.
+
 - Complete Stage 8 native rigid-body adaptation: closed loops, spherical DOF
   metadata, bot archives, external roots, standalone/nested prefabs, object-only
   scenes and multiple articulations. Preserve rigid constraints, transmissions,

@@ -62,7 +62,7 @@ class SuperDexBackend(BuiltinAPI, SimBackend):
         base_name: str | None = None,
         num_workers: int = 0,
         execution_mode: str = "batch",
-        effort_limits: Sequence[float] | None = None,
+        effort_limits: float | Sequence[float] | None = None,
         controlled_joints: Sequence[str] | None = None,
         allow_contact_approximation: bool = False,
         **unexpected: Any,
@@ -400,6 +400,7 @@ class SuperDexBackend(BuiltinAPI, SimBackend):
             world, actor = self._worlds[i], self._actors[i]
             self._suspend_controller(i)
             world.restore_state(self._snapshots[i], release_immediately=False)
+            world.set_gravity(self.model.gravity)
             native_q, native_v = self._native_q[i], self._native_v[i]
             if self.model.articulations:
                 for layout in self.model.articulations:
@@ -965,6 +966,7 @@ class SuperDexBackend(BuiltinAPI, SimBackend):
                 offscreen=bool(headless),
                 debug_overlay_getter=debug_overlay_getter,
                 on_frame=on_frame,
+                camera_cfg=None if camera_kwargs is None else CameraCfg.from_kwargs(camera_kwargs),
             )
         from unisim.backend.playback_common import run_offline_snapshot_playback
 
@@ -991,7 +993,8 @@ class SuperDexBackend(BuiltinAPI, SimBackend):
         )
 
     def _run_interactive_playback(
-        self, *, env, initialize, step, num_steps, offscreen, debug_overlay_getter, on_frame
+        self, *, env, initialize, step, num_steps, offscreen, debug_overlay_getter, on_frame,
+        camera_cfg=None,
     ):
         """Drive the native Polyscope viewer on the single serial-mode scene."""
         if debug_overlay_getter is not None:
@@ -1028,6 +1031,22 @@ class SuperDexBackend(BuiltinAPI, SimBackend):
             # Frame the scene before the first render; Polyscope's initial
             # camera matrix is otherwise NaN. Initialization must also clean up.
             viewer.frame_scene()
+            if camera_cfg is not None:
+                from superdex.physics.viewer.backend import polyscope as ps
+
+                if camera_cfg.cam_tracking:
+                    raise NotImplementedError("superdex interactive camera tracking is unsupported")
+                center = (
+                    np.asarray(camera_cfg.cam_lookat) if camera_cfg.cam_lookat is not None
+                    else self.get_base_pos()[0]
+                )
+                az, el = np.deg2rad([camera_cfg.cam_azimuth, camera_cfg.cam_elevation])
+                direction = np.array([np.cos(el) * np.cos(az),
+                                      np.cos(el) * np.sin(az), -np.sin(el)])
+                ps.look_at(center + camera_cfg.cam_distance * direction, center)
+                if camera_cfg.cam_fov is not None:
+                    ps.set_view_projection_mode("perspective")
+                    ps.set_vertical_fov_degrees(camera_cfg.cam_fov)
             ctrl_dt = float(env_cfg_value(env, "ctrl_dt", 1.0 / 60.0))
             obs = initialize()
             steps = 0
@@ -1062,6 +1081,21 @@ class SuperDexBackend(BuiltinAPI, SimBackend):
 
     def get_scene_visual_model_file(self) -> str | None:
         return self.scene_visual_model_file
+
+    def get_model_info(self):
+        self._check_open()
+        from .metadata import model_info
+
+        return model_info(self.model)
+
+    def set_gravity(self, gravity: Sequence[float]) -> None:
+        self._check_open()
+        value = np.asarray(gravity, dtype=self._dtype)
+        if value.shape != (3,) or not np.isfinite(value).all():
+            raise ValueError("gravity must be a finite world-frame three-vector in m/s²")
+        for world in self._worlds:
+            world.set_gravity(value)
+        self.model.gravity = value.copy()
 
     def get_gravity(self) -> np.ndarray:
         return self.model.gravity.copy()

@@ -1,0 +1,6 @@
+{
+  "status": "deferred",
+  "reason": "authored deformable actors",
+  "asset": "physics/samples/articulations_soft_skinned_double_pendulum.mochi_scene",
+  "sha256": "ca2456331ba664829c5d709921d62999476feb97bb318f3d9afedd738d1f1efd"
+}

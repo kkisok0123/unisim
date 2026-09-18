@@ -100,16 +100,18 @@ def qualify(path: Path, root: Path, steps=1000):
             actors = [a for a in result.actors if a.get_type() == p.ActorType.ARTICULATED]
             rigids = [a for a in result.actors if a.get_type() == p.ActorType.RIGID]
         names, routes = native_controls(p, actors)
-        options = {"superdex_execution_mode": "serial", "superdex_effort_limits": [1] * len(names)}
+        options = {"superdex_execution_mode": "serial", "superdex_effort_limits": 1.0}
         if not is_bot:
             options["superdex_controlled_joints"] = names
         backend = create_backend("superdex", SceneCfg(str(path)), 1, 0.002, **options)
+        # White-box SDK audit: native contact samples and compiled actor inventories
+        # have no shared query equivalent. Application stepping/state stay public.
         actual = (
             list(backend._actors[0].actors)
             if hasattr(backend._actors[0], "actors")
             else [backend._actors[0]]
         )
-        dtype = backend._dtype
+        dtype = backend.get_state()["qpos"].dtype
         assert backend.get_actuator_names() == tuple(names)
         np.testing.assert_allclose(backend.get_gravity(), world.get_gravity(), atol=1e-6)
         assert len(actual) == len(actors) and len(backend._rigids[0]) == len(rigids)
@@ -208,9 +210,9 @@ def qualify(path: Path, root: Path, steps=1000):
         backend.set_state(np.array([0]), **before)
         round_trip = max(maximum(before[k] - backend.get_state()[k]) for k in before)
         assert round_trip < 4e-5, f"state round trip {round_trip}"
-        for layout in backend.model.articulations:
+        for layout in backend.get_model_info().articulations:
             if layout.floating:
-                qi = layout.qpos_start
+                qi = layout.qpos_indices[0]
                 np.testing.assert_allclose(
                     backend.get_state()["qpos"][0, qi : qi + 3],
                     backend.get_body_pos_w([layout.root_body_id])[0, 0],
@@ -345,8 +347,15 @@ def main():
         }
     sources = [
         *sorted((REPOSITORY / "src/unisim/backend/superdex").glob("*.py")),
+        REPOSITORY / "src/unisim/backend/base.py",
+        REPOSITORY / "src/unisim/backend/api_types.py",
+        REPOSITORY / "src/unisim/contract.py",
+        REPOSITORY / "src/unisim/__init__.py",
         Path(__file__).resolve(),
         REPOSITORY / "scripts/superdex_rigid_fixtures.py",
+        REPOSITORY / "scripts/superdex_component_qualify.py",
+        REPOSITORY / "scripts/superdex_rigid_viewer.py",
+        REPOSITORY / "scripts/superdex_bot_viewer.py",
     ]
     source_hashes = {
         str(p.relative_to(REPOSITORY)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sources

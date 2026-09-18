@@ -51,6 +51,7 @@ def fixture_runtime(root="FREE", child="REVOLUTE", offset=False):
     )
     pose = np.array([0.2, -0.3, 0.4, 0, 0, 0, 0.1]) if root == "FREE" else np.array([0.1])
     actor = SimpleNamespace(
+        get_root_transform=lambda: identity,
         get_nested_link_actors=lambda: [0, 1],
         get_articulated_pose=lambda out: np.copyto(out, pose),
         get_num_dofs=lambda: len(pose),

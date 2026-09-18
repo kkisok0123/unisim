@@ -80,3 +80,13 @@ def coordinate_groups(names, owners=(), joints=()):
             raise ValueError("superdex ambiguous joint and coordinate names")
         groups[name] = columns
     return groups
+
+
+def coordinate_kinds(p, joints, owners):
+    """Public coordinate representations from native joint identity, never names."""
+    kinds = {
+        p.ArticulatedJointType.PRISMATIC: "translation",
+        p.ArticulatedJointType.REVOLUTE: "angle",
+        p.ArticulatedJointType.SPHERICAL: "rotation_vector_component",
+    }
+    return tuple(kinds[joints[i].type] for i in owners)

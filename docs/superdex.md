@@ -5,6 +5,12 @@ The `superdex` adapter runs SuperDex Physics/Robotics 1.0.0 directly behind
 tracks this development profile. Changes remain on roadmap branches; the
 version is unchanged and no PyPI release is required for local integration.
 
+Native model entrypoints are `.superdex_bot`, `.superdex_bot_archive`,
+`.mochi_scene` and `.mochi_prefab`. A `.mochi.h5` file supplies shape geometry
+referenced by an authored model; it is not a standalone input to the adapter or
+`scripts/superdex_rigid_viewer.py`. In particular, `rods/helix_with_visual.mochi.h5`
+is used by the SDK's deformable rod example, which is outside rigid-body support.
+
 ## Installation and ownership
 
 Use CPython 3.12 or 3.13, as covered by the superdex-uni wheels. From the UniSim
@@ -502,8 +508,9 @@ board listed in the report. No assets or SDK downloads enter the normal tests.
 
 The native adapter supports link-attached `SENSOR_CAMERA` metadata and world
 poses, plus explicitly configured `BASIC_JSC_PD`, `BASIC_OSC_PD` and
-`MOCHI_ARTICULATED_POSE` controllers. These are SuperDex-specific methods;
-`SimBackend` and the base package's optional-import boundary are unchanged.
+`MOCHI_ARTICULATED_POSE` controllers. These operations are now declared in `SimBackend` and overridden by SuperDex.
+The base package remains independent of engine SDKs. Other adapters inherit
+explicit unsupported defaults for operations they do not implement.
 
 Models including `wuji_hand2_beta1` support ordinary joint-torque control.
 Unsupported actuator/sensor components are rejected before spawning and are
@@ -521,6 +528,8 @@ poses = backend.get_camera_poses(names[0], env_ids) # selected rows
 Settings are detached dictionaries with SDK snake_case fields: `name`,
 `image_width`, `image_height`, `fov_vertical_deg`, `near_clip`, `far_clip`,
 `forward_axis`, `up_axis_local`, `offset_local`, `look_at`, `look_distance`.
+Image dimensions are pixels, vertical FOV is degrees, and clip distances, offsets
+and look distance are metres. Axis fields retain the authored SDK convention.
 The returned pose is the mounted sensor frame, not an optical view matrix;
 renderers must interpret the axis/offset settings separately. Translated and
 rotated mounts are supported. Poses reflect stepping, state assignment and
@@ -532,7 +541,7 @@ Every spawn verifies authored camera inventory, mounts, attachments and settings
 
 ```python
 import json
-import superdex.robotics as robotics
+from unisim import JointTarget
 
 # A fixed-base robot: every array contains one entry per native actor DOF.
 n = backend.num_actuators
@@ -541,8 +550,7 @@ backend.configure_controller(
     param_args=json.dumps({"Kp": [10.] * n, "Kd": [1.] * n,
                            "saturation": [2.] * n, "deadband": [0.] * n}),
 )
-targets = [robotics.ControllerBasicJscPdTarget(target_pose=q)
-           for q in backend.get_dof_pos()]
+targets = [JointTarget(q) for q in backend.get_dof_pos()]
 backend.step_controller(targets, nsteps=8)
 backend.clear_controller()
 ```
@@ -555,13 +563,19 @@ is configured at a time; clear it before switching. While configured, ordinary
 `step(ctrl)` and user pre-step callbacks are rejected. Clearing restores ordinary
 torque stepping and removes any solver-side pose controller.
 
-| Type | SDK target and coordinate convention |
+| Controller identifier | Shared target and coordinate convention |
 | --- | --- |
-| `BASIC_JSC_PD` | `ControllerBasicJscPdTarget.target_pose`: native actor DOF order; radians for hinges, metres for slides. A free root contributes translation XYZ and rotation-vector XYZ before joint coordinates (three per spherical joint). Gains, saturation and deadband arrays cover all native DOFs; use zero root gains for an unactuated base. |
-| `BASIC_OSC_PD` | `ControllerBasicOscPdTarget.root_from_target_ee`: end-effector pose relative to the root frame reported by SDK observations. `init_args` uses unprefixed `baseLinkName` and `eeLinkName`. |
-| `MOCHI_ARTICULATED_POSE` | `ControllerMochiArticulatedPoseTarget.world_from_root` plus exactly one of `pose_dofs` (all non-root native joint DOFs) or `local_to_parent_transforms` (one per robot link). |
+| `BASIC_JSC_PD` | `JointTarget(positions)`: `get_dof_pos()` order, excluding floating roots. Radians for hinges/spherical rotation vectors, metres for slides. Authored gains/saturation/deadband still cover native DOFs; use zero root gains for an unactuated base. |
+| `BASIC_OSC_PD` | `CartesianTarget(pose)`: xyz + wxyz relative to the configured root link. `init_args` retains authored `baseLinkName` and `eeLinkName`. |
+| `MOCHI_ARTICULATED_POSE` | `ArticulationPoseTarget(root_pose, joint_positions=...)` or `link_poses=...`: world xyz + wxyz root pose; joint positions in public order or parent-relative xyz + wxyz poses for every link, including the root. |
 
-SDK `TransformRT` quaternions use **xyzw**, unlike UniSim's camera-pose **wxyz**.
+`get_controller_descriptions()` gives identifiers, availability reasons, target
+kinds, coordinate names and link ordering for the loaded profile. A descriptor
+is not permission to replace an authored scene controller. All target arrays are
+validated for the complete environment batch before stepping. SDK objects are
+created internally. Existing native target objects remain accepted with
+`DeprecationWarning`; new callers should use the shared types exported by `unisim`.
+
 JSC/OSC read fresh native observations each physics substep and their joint
 outputs are clipped to the adapter's effort limits. Nonzero free-root effort
 is rejected. The pose controller uses the native implicit solver: its
@@ -750,3 +764,61 @@ The passive torso runner uses one serial environment. Runtime URDF's documented
 primitive-geometry loss and the tested floating OSC limitation are SDK blockers,
 not adapter support claims. Deformables, custom components, new batch execution,
 image rendering, conversion and solver work remain deferred.
+
+
+## Shared-interface alignment
+
+Application code can use the qualified SuperDex rigid profiles entirely through
+`SimBackend`. Native SDK handles remain private. The controller identifiers and
+configuration files are runtime-specific authored inputs, not portable controller
+algorithms; the public target values and method signatures are shared.
+
+```python
+from unisim import create_backend
+from unisim.scene import SceneCfg
+import numpy as np
+
+backend = create_backend(
+    "superdex", SceneCfg("assets/superdex/bots/grippers/2f_85/2f_85.superdex_bot"),
+    num_envs=1, sim_dt=0.002, superdex_execution_mode="serial",
+    superdex_effort_limits=1.0,  # expanded after native DOF discovery
+)
+try:
+    info = backend.get_model_info()
+    backend.set_gravity([0, 0, 0])  # world m/s², every environment, persists across reset
+    backend.step(np.zeros((backend.num_envs, backend.num_actuators)))
+    state = backend.get_state()
+    backend.reset()
+finally:
+    backend.close()
+```
+
+`get_model_info()` returns detached state dimensions, body names/parents,
+articulation ownership and state slices, joint-coordinate names/groups, and
+position/velocity indices, representations and units. Coordinate tables use
+`get_dof_pos()`/`get_dof_vel()` order. Spherical positions are rotation vectors;
+spherical velocities are joint-frame angular velocities, not rotation-vector
+derivatives. Floating root layouts remain world xyz/wxyz, world-origin linear
+velocity and body-frame angular velocity. Bot-level `worldFromRoot` placement is
+included, correcting the previous floating-state frame mismatch in Oculus hands. `backend.model` remains available for
+compatibility and diagnostics but is unnecessary for normal application setup.
+
+A positive scalar effort limit expands over selected coordinates; a sequence
+must have exactly that many entries. Omission retains authored bot limits and
+errors if those are missing/invalid. Scenes still require explicit joint selection
+(use `[]` for passive scenes); selecting a spherical joint expands all three
+coordinates before limits are resolved. Invalid values are rejected even for an
+empty control vector. Ordinary native `step()` remains physical effort input.
+
+`get_camera_*`, controller methods, `get_model_info()` and `set_gravity()` are
+optional shared operations: other adapters raise `NotImplementedError` until
+implemented. `close()` has an idempotent artifact-cleanup default; native adapters
+retain their resource owners. Geometry queries, domain randomization, image
+capture and the existing SDK-blocked profiles are not newly enabled.
+
+Both native viewers use public metadata and methods. The rigid viewer accepts
+`--no-gravity`; it neither imports the SDK nor accesses private backend handles.
+Qualification tools retain clearly identified white-box native audits for
+compiled structure/contact checks and separate direct-SDK reference loops.
+New evidence is recorded in [the interface qualification report](superdex-interface-qualification/README.md);
+Stage 1–8 numerical reports retain their original results and fingerprints.

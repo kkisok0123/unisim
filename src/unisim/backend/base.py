@@ -7,6 +7,11 @@ from typing import Any, Literal
 
 import numpy as np
 
+from unisim.backend.api_types import (
+    BackendControllerInfo,
+    BackendModelInfo,
+    ControllerTarget,
+)
 from unisim.dr.types import (
     DomainRandomizationCapabilities,
     InitRandomizationPlan,
@@ -655,10 +660,12 @@ class SimBackend(abc.ABC):
         raise NotImplementedError(f"{self.__class__.__name__} does not expose actuator names")
 
     def get_actuator_joint_names(self) -> tuple[str, ...]:
-        """Return each actuator's target single-DoF joint in control-vector order.
+        """Return each actuator's target coordinate name in control-vector order.
 
         Backends must fail closed when an actuator does not target exactly one
-        hinge/slide joint.  Manager action terms use this cold-path metadata to
+        coordinate. Scalar joints use their joint name; multi-DOF joints use
+        explicit coordinate names from get_model_info(). Manager action terms use
+        this cold-path metadata to
         map community joint selectors onto the backend control vector without
         inspecting backend-private model objects.
         """
@@ -820,6 +827,59 @@ class SimBackend(abc.ABC):
     def get_geom_friction(self) -> np.ndarray:
         """Return the backend geom-friction table."""
         raise NotImplementedError(f"{self.__class__.__name__} does not expose geom friction")
+
+    def set_gravity(self, gravity: Sequence[float]) -> None:
+        """Set world gravity (m/s²), one finite three-vector for every environment.
+
+        An explicit override persists across resets. Unsupported adapters reject
+        it rather than silently ignoring the requested simulation setting.
+        """
+        raise NotImplementedError(f"{self.__class__.__name__} cannot override gravity")
+
+    def get_model_info(self) -> BackendModelInfo:
+        """Return detached, SDK-independent ownership and coordinate metadata."""
+        raise NotImplementedError(f"{self.__class__.__name__} does not expose model info")
+
+    def get_controller_descriptions(self) -> tuple[BackendControllerInfo, ...]:
+        """Describe controller identities, target layouts and profile limitations."""
+        raise NotImplementedError(f"{self.__class__.__name__} does not expose controllers")
+
+    def configure_controller(self, type_name: str, *, param_args="", init_args="") -> None:
+        """Configure a described controller using authored runtime JSON/file inputs.
+
+        Identifiers and configuration schemas are runtime-specific. Public target
+        objects are SDK-independent; configuring does not change step() semantics.
+        """
+        raise NotImplementedError(f"{self.__class__.__name__} does not expose controllers")
+
+    def step_controller(self, targets: Sequence[ControllerTarget], nsteps: int = 1) -> None:
+        """Hold one target per environment, recomputing control each physics substep.
+
+        Validate the complete batch before advancing any environment. All public
+        pose targets use metres and normalized wxyz; joint targets use the
+        representations and ordering reported by get_model_info().
+        """
+        raise NotImplementedError(f"{self.__class__.__name__} does not expose controllers")
+
+    def clear_controller(self) -> None:
+        """Release a configured controller and restore ordinary step() usage."""
+        raise NotImplementedError(f"{self.__class__.__name__} does not expose controllers")
+
+    def get_camera_names(self) -> tuple[str, ...]:
+        """Return camera identifiers. Metadata support does not imply image capture."""
+        raise NotImplementedError(f"{self.__class__.__name__} does not expose cameras")
+
+    def get_camera_parameters(self, name: str) -> dict[str, Any]:
+        """Return detached camera settings with adapter-documented units and axes."""
+        raise NotImplementedError(f"{self.__class__.__name__} does not expose cameras")
+
+    def get_camera_poses(self, name: str, env_ids=None) -> np.ndarray:
+        """Return world xyz (metres) + wxyz camera mount poses, shape (N, 7)."""
+        raise NotImplementedError(f"{self.__class__.__name__} does not expose cameras")
+
+    def close(self) -> None:
+        """Idempotently release resources; native owners override this default."""
+        self.cleanup_scene_assets()
 
     def get_gravity(self) -> np.ndarray:
         """Return the backend gravity vector."""
@@ -1396,22 +1456,24 @@ class SimBackend(abc.ABC):
             names: Joint names.
 
         Returns:
-            ``int32`` index array with shape ``(len(names),)`` relative to
-            the qvel start.
+            ``int32`` index array relative to the qvel start. Multi-DOF
+            joint names expand to their ordered coordinates; scalar joint
+            names contribute one entry.
         """
         raise NotImplementedError(f"{type(self).__name__} does not implement get_joint_dof_indices")
 
     def get_joint_dof_pos_indices(self, names: Sequence[str]) -> np.ndarray:
         """Resolve joint names to DoF indices in position space (qpos).
 
-        Only single-DoF joints are supported; free joints are excluded.
+        Floating roots are excluded. Adapters supporting multi-DOF joints
+        expand their names to ordered coordinates; other adapters reject them.
 
         Args:
             names: Joint names.
 
         Returns:
-            ``int32`` index array with shape ``(len(names),)`` relative to
-            the joint section of qpos.
+            ``int32`` columns in get_dof_pos(), preserving requested name order
+            and expanding supported joint groups. Scalar names yield one entry.
         """
         raise NotImplementedError(
             f"{type(self).__name__} does not implement get_joint_dof_pos_indices"
@@ -1424,15 +1486,15 @@ class SimBackend(abc.ABC):
             names: Joint names.
 
         Returns:
-            ``int32`` index array with shape ``(len(names),)`` relative to
-            the joint section start.
+            ``int32`` columns in get_dof_vel(), preserving requested name order
+            and expanding supported joint groups. Scalar names yield one entry.
         """
         raise NotImplementedError(
             f"{type(self).__name__} does not implement get_joint_dof_vel_indices"
         )
 
     def get_joint_state_qpos_indices(self, names: Sequence[str]) -> np.ndarray:
-        """Resolve single-DoF joints to full ``set_state`` qpos columns.
+        """Resolve joint names/coordinate groups to full ``set_state`` qpos columns.
 
         Unlike :meth:`get_joint_dof_pos_indices`, these indices address the
         complete qpos vector accepted by :meth:`set_state`, including any root
@@ -1443,7 +1505,7 @@ class SimBackend(abc.ABC):
         )
 
     def get_joint_state_qvel_indices(self, names: Sequence[str]) -> np.ndarray:
-        """Resolve single-DoF joints to full ``set_state`` qvel columns."""
+        """Resolve joint names/coordinate groups to full ``set_state`` qvel columns."""
         raise NotImplementedError(
             f"{type(self).__name__} does not implement get_joint_state_qvel_indices"
         )

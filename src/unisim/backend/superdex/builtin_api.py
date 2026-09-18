@@ -1,13 +1,21 @@
-"""Explicit SuperDex-only camera and controller APIs; no eager SDK imports."""
+"""SuperDex overrides of shared camera/controller APIs; no eager SDK imports."""
 
 from __future__ import annotations
 
 import copy
 import json
+import warnings
 from pathlib import Path
 from typing import Any
 
 import numpy as np
+
+from unisim.backend.api_types import (
+    ArticulationPoseTarget,
+    BackendControllerInfo,
+    CartesianTarget,
+    JointTarget,
+)
 
 CONTROLLERS = {
     "BASIC_JSC_PD": "ControllerBasicJscPdTarget",
@@ -31,7 +39,26 @@ def _transform(value: Any) -> None:
 
 
 class BuiltinAPI:
-    """Implemented by SuperDexBackend, separate from the shared SimBackend contract."""
+    """Shared-interface overrides composed into SuperDexBackend."""
+
+    def get_controller_descriptions(self) -> tuple[BackendControllerInfo, ...]:
+        self._check_open()
+        info = self.get_model_info()
+        links = tuple(info.body_names[i] for a in info.articulations for i in a.body_ids)
+        descriptions = []
+        for name, kind in (("BASIC_JSC_PD", "joint"), ("BASIC_OSC_PD", "cartesian"),
+                           (POSE_CONTROLLER, "articulation_pose")):
+            reason = None
+            if self.model.restore_scene_controller is not None:
+                reason = "authored scene controllers cannot be replaced"
+            elif not self.model.native_bots:
+                reason = "requires a native bot or bot archive"
+            elif name == "BASIC_OSC_PD" and self.model.floating:
+                reason = "SDK floating OSC bot-space vs actor-space indexing limitation"
+            descriptions.append(BackendControllerInfo(
+                name, kind, reason is None, reason, info.coordinate_names, links,
+            ))
+        return tuple(descriptions)
 
     def get_camera_names(self) -> tuple[str, ...]:
         self._check_open()
@@ -146,6 +173,61 @@ class BuiltinAPI:
         if self._controllers and self._controller_type == POSE_CONTROLLER:
             self._controllers[i][2].initialize(False)
 
+    def _target_array(self, value, shape, label):
+        array = np.asarray(value, dtype=self._dtype)
+        _finite(array, shape, label)
+        return array.copy()
+
+    def _target_transform(self, value, label):
+        pose = self._target_array(value, (7,), label)
+        if not np.isclose(np.linalg.norm(pose[3:]), 1, atol=1e-5):
+            raise ValueError(f"{label} quaternion must be normalized wxyz")
+        return self._p.TransformRT(translation=pose[:3], rotation=pose[[4, 5, 6, 3]])
+
+    def _native_target(self, target, env):
+        """Convert shared values only; do not mutate any live controller or scene."""
+        kind = self._controller_type
+        if isinstance(target, JointTarget) and kind == "BASIC_JSC_PD":
+            positions = self._target_array(
+                target.positions, (len(self.model.joint_names),), "joint positions"
+            )
+            # Preserve unactuated free-root placeholders in the current native frame.
+            native = self._native_q[env].copy()
+            native[self.model.joint_qvel_indices] = positions
+            return self._r.ControllerBasicJscPdTarget(target_pose=native)
+        if isinstance(target, CartesianTarget) and kind == "BASIC_OSC_PD":
+            return self._r.ControllerBasicOscPdTarget(
+                root_from_target_ee=self._target_transform(target.pose, "Cartesian target")
+            )
+        if isinstance(target, ArticulationPoseTarget) and kind == POSE_CONTROLLER:
+            native = self._r.ControllerMochiArticulatedPoseTarget()
+            native.world_from_root = self._target_transform(target.root_pose, "world root pose")
+            if (target.joint_positions is None) == (target.link_poses is None):
+                raise ValueError("provide exactly one of joint_positions or link_poses")
+            if target.joint_positions is not None:
+                native.pose_dofs = self._target_array(
+                    target.joint_positions, (len(self.model.joint_names),), "joint positions"
+                )
+            else:
+                poses = self._target_array(
+                    target.link_poses, (len(self._links[env]), 7), "parent-relative link poses"
+                )
+                native.local_to_parent_transforms = [
+                    self._target_transform(pose, "parent-relative link pose") for pose in poses
+                ]
+            return native
+        if isinstance(target, (JointTarget, CartesianTarget, ArticulationPoseTarget)):
+            raise TypeError(f"{kind} received a different shared controller target kind")
+        expected = getattr(self._r, CONTROLLERS[kind])
+        if isinstance(target, expected):
+            warnings.warn(
+                "Native SuperDex controller targets are deprecated; use UniSim JointTarget, "
+                "CartesianTarget or ArticulationPoseTarget instead.",
+                DeprecationWarning, stacklevel=4,
+            )
+            return target
+        raise TypeError(f"{kind} requires a matching UniSim controller target")
+
     def _validate_targets(self, targets) -> list[Any]:
         if not self._controllers:
             raise RuntimeError("configure_controller() before step_controller()")
@@ -154,6 +236,7 @@ class BuiltinAPI:
             raise ValueError("provide exactly one controller target per environment")
         kind = self._controller_type
         expected = getattr(self._r, CONTROLLERS[kind])
+        targets = [self._native_target(target, i) for i, target in enumerate(targets)]
         for target in targets:
             if not isinstance(target, expected):
                 raise TypeError(f"{kind} requires {expected.__name__} targets")

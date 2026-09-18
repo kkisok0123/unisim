@@ -7,11 +7,11 @@
     "source_initial_commit": "1d7150946fa3f3d3fb09c2bff07eaa138cbfdee6",
     "local_derivative_paths": [],
     "historical_upstream_sha": "ed30ce16361329cbbed956173d6a4f5842815d24",
-    "generated_utc": "2026-09-17T11:12:20Z"
+    "generated_utc": "2026-09-18T02:44:47Z"
   },
   "file_count": 888,
-  "total_bytes": 260252712,
-  "tree_digest": "7da60633c8643de11ccfbf9c8a7e5887689a2159ee441fb0a5a4561e40976a2d",
+  "total_bytes": 260255576,
+  "tree_digest": "3f896fd4a0c30516f4538dfcafdb1bcdd4a35eea18e7ddd9ab9504bfe619b6cf",
   "root_markers": [
     "bots",
     "prefabs",

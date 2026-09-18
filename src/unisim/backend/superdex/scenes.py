@@ -433,7 +433,7 @@ def materialize_native_scene(
     from unisim.utils.rotation import np_quat_apply_batched, np_quat_mul_batched
 
     from .articulations import ArticulationGroup, ArticulationLayout
-    from .joints import coordinate_groups, joint_coordinates
+    from .joints import coordinate_groups, coordinate_kinds, joint_coordinates
     from .root_state import RootReference
 
     paths = [path, *(resolve_scene_fragment_path(v, path).resolve() for v in scene.fragment_files)]
@@ -489,6 +489,7 @@ def materialize_native_scene(
         dtype = np.float64 if p.uses_double_precision() else np.float32
         names, parents, link_indices, masses, coms = ["world"], [0], [-1], [0.0], [np.zeros(3)]
         joint_names, joint_q, joint_v, limits, armature = [], [], [], [], []
+        kinds = []
         q0, v0, layouts, controller_states = [], [], [], []
         link_start = 0
         groups = {}
@@ -507,6 +508,7 @@ def materialize_native_scene(
                 for i, name in enumerate(list(info.joint_names)[: len(links)])
             ]
             coord_names, owners, ranges, indices = joint_coordinates(p, joints, actor)
+            kinds.extend(coordinate_kinds(p, joints, owners))
             actor_name = actor_names[ai]
             if actor_names.count(actor_name) > 1:
                 actor_name = f"{actor_name}#{ai}"
@@ -634,6 +636,7 @@ def materialize_native_scene(
             body_mass=np.asarray(masses),
             body_ipos=np.asarray(coms),
             joint_names=tuple(joint_names),
+            coordinate_kinds=tuple(kinds),
             joint_qpos_indices=jq,
             joint_qvel_indices=jv,
             joint_ranges=np.asarray(limits).reshape(-1, 2),

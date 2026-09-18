@@ -1,0 +1,26 @@
+{
+  "status": "passed",
+  "steps": 1000,
+  "sim_dt": 0.002,
+  "articulations": 1,
+  "rigid_actors": 0,
+  "controls": 27,
+  "native_dofs": [
+    33
+  ],
+  "native_state_max_deviation": 0.0,
+  "body_pose_max_deviation": 0.0,
+  "contact_query_pairs": 19,
+  "contact_force_max_deviation": 0.0,
+  "contact_force_peak": 1383.00341796875,
+  "state_round_trip_error": 1.4901161193847656e-07,
+  "reset_error": 1.7700707011236716e-08,
+  "cleanup_recreation": true,
+  "control_routing_matches_sdk": true,
+  "camera_count": 0,
+  "camera_pose_max_deviation": 0.0,
+  "passive": false,
+  "initial_velocity_size": 33,
+  "asset": "bundle/bots/hands/oculus_xr/left/oculus_xr_hand_lowpoly_left.superdex_bot",
+  "sha256": "f32df042d595e023df30d4114f6d3625e6e8bd78a1deaf9f28499df2306df56b"
+}

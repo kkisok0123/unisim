@@ -16,10 +16,11 @@ from unisim.backend.superdex.components import (
     verify_cameras,
 )
 from unisim.backend.superdex.geometry import primitive_shape, rotation_matrix
-from unisim.backend.superdex.joints import coordinate_groups, joint_coordinates
+from unisim.backend.superdex.joints import coordinate_groups, coordinate_kinds, joint_coordinates
 from unisim.backend.superdex.plans import ModelPlan, SensorPlan
 from unisim.backend.superdex.root_state import RootReference
 from unisim.scene import SceneCfg
+from unisim.utils.rotation import np_quat_apply_batched, np_quat_mul_batched
 
 
 def _noop() -> None:
@@ -30,8 +31,12 @@ def _transform(p: Any, pos: Any, quat: Any = (1, 0, 0, 0)) -> Any:
     return p.TransformRT(translation=pos, rotation=np.asarray(quat)[[1, 2, 3, 0]])
 
 
-def _effort_ranges(values: Sequence[float], count: int) -> np.ndarray:
+def _effort_ranges(values: float | Sequence[float], count: int) -> np.ndarray:
     limits = np.asarray(values, dtype=float)
+    if limits.ndim == 0:
+        if isinstance(values, (bool, np.bool_)) or not np.isfinite(limits) or limits <= 0:
+            raise ValueError("superdex effort_limits scalar must be finite and positive")
+        limits = np.full(count, float(limits))
     if limits.shape != (count,) or not np.isfinite(limits).all() or np.any(limits <= 0):
         raise ValueError(f"superdex effort_limits must contain {count} finite positive values")
     return np.column_stack((-limits, limits))
@@ -42,7 +47,7 @@ def materialize_model(
     robotics: Any,
     scene: SceneCfg,
     *,
-    effort_limits: Sequence[float] | None = None,
+    effort_limits: float | Sequence[float] | None = None,
     controlled_joints: Sequence[str] | None = None,
     allow_contact_approximation: bool = False,
 ) -> ModelPlan:
@@ -73,7 +78,7 @@ def materialize_model(
     return _mjcf_plan(physics, path, scene, effort_limits, allow_contact_approximation)
 
 
-def _native_plan(p: Any, r: Any, path: Path, efforts: Sequence[float] | None) -> ModelPlan:
+def _native_plan(p: Any, r: Any, path: Path, efforts: float | Sequence[float] | None) -> ModelPlan:
     cfg = r.load_bot_prefab_from_file(str(path))
     joints = list(cfg.joints)
     links = list(cfg.links)
@@ -131,6 +136,28 @@ def _native_plan(p: Any, r: Any, path: Path, efforts: Sequence[float] | None) ->
         verify_cameras(bot, cameras, camera_params)
         actor = bot.get_articulated_actor()
         joint_coordinates(p, joints, actor)
+        if floating:
+            # Bot-level placement (e.g. Oculus orientation) is outside the
+            # authored free joint. Compose it into the public world reference.
+            frame = actor.get_root_transform()
+            pos = np.asarray(frame.translation, dtype=float)
+            quat = np.asarray(frame.rotation, dtype=float)[[3, 0, 1, 2]]
+            if not np.isfinite(pos).all() or not np.isfinite(quat).all():
+                raise ValueError("superdex native actor frame must be finite")
+            norm = np.linalg.norm(quat)
+            if norm == 0:
+                raise ValueError("superdex native actor quaternion must be nonzero")
+            quat = quat / norm
+            if not np.array_equal(pos, [0, 0, 0]) or not np.array_equal(quat, [1, 0, 0, 0]):
+                reference = root_reference or RootReference(
+                    np.zeros(3), np.array([1., 0, 0, 0]),
+                    np.zeros(3), np.array([1., 0, 0, 0]),
+                )
+                root_reference = RootReference(
+                    pos + np_quat_apply_batched(quat, reference.parent_pos),
+                    np_quat_mul_batched(quat, reference.parent_quat),
+                    reference.link_pos, reference.link_quat,
+                )
         native_links = [temp.get_actor(h) for h in actor.get_nested_link_actors()]
         masses = [0.0]
         coms = [np.zeros(3)]
@@ -225,6 +252,7 @@ def _native_plan(p: Any, r: Any, path: Path, efforts: Sequence[float] | None) ->
         camera_params=camera_params,
         dof_armature=np.array([0.0] * voffset + [float(joints[i].inertia or 0) for i in active]),
         joint_coordinate_groups=coordinate_groups(names, active, joints),
+        coordinate_kinds=coordinate_kinds(p, joints, active),
         root_reference=root_reference,
         serial_only=bool(not n or len(cfg.cycles) or len(cfg.linear_transmissions)
                          or len(cfg.spatial_tendons)
@@ -292,7 +320,7 @@ def _mjcf_plan(
     p: Any,
     path: Path,
     scene: SceneCfg,
-    efforts: Sequence[float] | None,
+    efforts: float | Sequence[float] | None,
     allow_contact_approximation: bool,
 ) -> ModelPlan:
     mj, m = _load_mjcf(path, scene)
@@ -354,6 +382,10 @@ def _mjcf_plan(
         body_mass=np.array(m.body_mass),
         body_ipos=np.array(m.body_ipos),
         joint_names=tuple(joint_names[i] for i in active),
+        coordinate_kinds=tuple(
+            "translation" if m.jnt_type[i] == int(mj.mjtJoint.mjJNT_SLIDE) else "angle"
+            for i in active
+        ),
         joint_qpos_indices=np.array(m.jnt_qposadr[active]),
         joint_qvel_indices=np.array(m.jnt_dofadr[active]),
         joint_ranges=joint_ranges,
@@ -590,7 +622,7 @@ def _friction_factors(m: Any, geoms: list[int]) -> dict[int, float]:
 
 
 def _actuators(
-    mj: Any, m: Any, joint_names: tuple[str, ...], efforts: Sequence[float] | None
+    mj: Any, m: Any, joint_names: tuple[str, ...], efforts: float | Sequence[float] | None
 ) -> dict[str, Any]:
     targets, kp, kd, gears = [], [], [], []
     for a in range(m.nu):

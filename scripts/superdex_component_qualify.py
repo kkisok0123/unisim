@@ -75,6 +75,7 @@ def audit(cfg) -> None:
 
 
 def _native_state(backend, env=0):
+    """White-box numerical audit only; application paths use the public state API."""
     actor = backend._actors[env]
     q = np.empty(backend.model.robot_nv, dtype=backend._dtype)
     v = np.empty_like(q)
@@ -138,6 +139,60 @@ def absolute_target(reference, spec):
         )
         return target
     raise NotImplementedError(f"unsupported absolute target controller {kind!r}")
+
+
+def shared_absolute_target(kind, spec, info):
+    """Convert the existing CLI JSON format into shared values, without SDK imports."""
+    from unisim import ArticulationPoseTarget, CartesianTarget, JointTarget
+
+    if not isinstance(spec, dict) or spec.get("type_name") != kind:
+        raise ValueError("absolute target type_name must match the configured controller")
+
+    def pose(value):
+        if not isinstance(value, dict) or set(value) != {"translation", "rotation_xyzw"}:
+            raise ValueError("pose requires translation and rotation_xyzw")
+        xyz = _finite_vector(value["translation"], 3, "translation")
+        xyzw = _finite_vector(value["rotation_xyzw"], 4, "rotation")
+        if not np.isclose(np.linalg.norm(xyzw), 1, atol=1e-5):
+            raise ValueError("rotation must be normalized")
+        return np.r_[xyz, xyzw[[3, 0, 1, 2]]]
+
+    if kind == "BASIC_JSC_PD":
+        if set(spec) != {"type_name", "target_pose"}:
+            raise ValueError("JSC absolute target requires only target_pose")
+        size = len(info.articulations[0].qvel_indices)
+        values = _finite_vector(spec["target_pose"], size, "target_pose")
+        return JointTarget(values[list(info.coordinate_qvel_indices)])
+    if kind == "BASIC_OSC_PD":
+        if set(spec) != {"type_name", "root_from_target_ee"}:
+            raise ValueError("OSC absolute target requires only root_from_target_ee")
+        return CartesianTarget(pose(spec["root_from_target_ee"]))
+    if kind == "MOCHI_ARTICULATED_POSE":
+        if set(spec) != {"type_name", "world_from_root", "pose_dofs"}:
+            raise ValueError("pose target requires world_from_root and pose_dofs")
+        return ArticulationPoseTarget(
+            pose(spec["world_from_root"]),
+            joint_positions=_finite_vector(
+                spec["pose_dofs"], len(info.coordinate_names), "pose_dofs"
+            ),
+        )
+    raise NotImplementedError(f"unsupported controller {kind!r}")
+
+
+def _shared_reference_target(reference, target):
+    """Copy independent reference commands into shared inputs for the adapter side."""
+    from unisim import ArticulationPoseTarget, CartesianTarget, JointTarget
+
+    def pose(t):
+        return np.r_[t.translation, np.asarray(t.rotation)[[3, 0, 1, 2]]]
+
+    if reference.kind == "BASIC_JSC_PD":
+        return JointTarget(np.asarray(target.target_pose)[reference.offset :].copy())
+    if reference.kind == "BASIC_OSC_PD":
+        return CartesianTarget(pose(target.root_from_target_ee))
+    return ArticulationPoseTarget(
+        pose(target.world_from_root), joint_positions=np.asarray(target.pose_dofs).copy()
+    )
 
 
 def _open_viewer(scene, title):
@@ -294,7 +349,7 @@ def _run_adapter_viewer(
 
     role = "UniSim adapter"
     signal.signal(signal.SIGINT, signal.SIG_IGN)
-    backend = viewer = None
+    backend = None
     try:
         backend = create_backend(
             "superdex",
@@ -307,34 +362,33 @@ def _run_adapter_viewer(
         )
         backend.configure_controller(**config)
         backend.reset()
-        target = absolute_target(
-            SimpleNamespace(
-                kind=config["type_name"],
-                r=backend._r,
-                p=backend._p,
-                nv=backend.model.robot_nv,
-                n=backend.num_actuators,
-                dtype=backend._dtype,
-            ),
-            target_spec,
-        )
-        viewer = _open_viewer(backend._worlds[0], role)
-        ready_queue.put((role, "ready", ""))
-        start_event.wait()
-        while not stop_event.is_set() and _wait_for_live_frame(frame_barrier, stop_event):
-            started = time.monotonic()
+        target = shared_absolute_target(config["type_name"], target_spec, backend.get_model_info())
+
+        def initialize():
+            ready_queue.put((role, "ready", ""))
+            start_event.wait()
+
+        def advance(_):
+            if stop_event.is_set() or not _wait_for_live_frame(frame_barrier, stop_event):
+                raise StopIteration
             backend.step_controller([target], DECIMATION)
-            viewer.render()
-            if viewer.user_requested_close():
-                break
-            stop_event.wait(max(0.0, SIM_DT * DECIMATION - (time.monotonic() - started)))
+
+        try:
+            backend.run_playback(
+                env=SimpleNamespace(cfg=SimpleNamespace(ctrl_dt=SIM_DT * DECIMATION)),
+                initialize=initialize,
+                step=advance,
+                num_steps=None,
+                headless=False,
+                record_video=False,
+            )
+        except StopIteration:
+            pass
     except BaseException as exc:
         ready_queue.put((role, "error", f"{type(exc).__name__}: {exc}"))
         raise
     finally:
         stop_event.set()
-        if viewer is not None:
-            viewer.close()
         if backend is not None:
             backend.close()
 
@@ -624,8 +678,13 @@ def qualify_bot(
             hold = _target(reference, q0, amplitudes * 0, 0, anchor) if controller_config else None
             for _ in range(DECIMATION):
                 if controller_config:
-                    backend.step_controller([target, hold])
-                    serial.step_controller([target])
+                    backend.step_controller(
+                        [
+                            _shared_reference_target(reference, target),
+                            _shared_reference_target(reference, hold),
+                        ]
+                    )
+                    serial.step_controller([_shared_reference_target(reference, target)])
                     reference.step(target, limits)
                 else:
                     goal = q0[reference.offset :] + amplitudes * np.sin(k * 0.03)
@@ -644,8 +703,9 @@ def qualify_bot(
                     if not all(np.isfinite(x).all() for x in (qb, vb, qr, vr)):
                         raise RuntimeError("non-finite state during trajectory qualification")
                     deviation = max(
-                        deviation, float(np.max(np.abs(qb - qr), initial=0)),
-                        float(np.max(np.abs(vb - vr), initial=0))
+                        deviation,
+                        float(np.max(np.abs(qb - qr), initial=0)),
+                        float(np.max(np.abs(vb - vr), initial=0)),
                     )
                     for a, r in zip(b._rigids[0], reference.rigids):
                         if not np.isfinite(_pose(a)).all() or not np.isfinite(_pose(r)).all():
@@ -730,8 +790,9 @@ def qualify_bot(
             qb, vb = _native_state(backend)
             qr, vr = reference.state()
             control_dev = max(
-                control_dev, float(np.max(np.abs(qb - qr), initial=0)),
-                float(np.max(np.abs(vb - vr), initial=0))
+                control_dev,
+                float(np.max(np.abs(qb - qr), initial=0)),
+                float(np.max(np.abs(vb - vr), initial=0)),
             )
             responds &= abs(vb[reference.offset + joint]) > 0
         record(
@@ -750,8 +811,9 @@ def qualify_bot(
         qb, vb = _native_state(backend)
         qs, vs = _native_state(serial)
         qr, vr = reference.state()
-        clip_dev = max(float(np.max(np.abs(qb - qr), initial=0)),
-                       float(np.max(np.abs(vb - vr), initial=0)))
+        clip_dev = max(
+            float(np.max(np.abs(qb - qr), initial=0)), float(np.max(np.abs(vb - vr), initial=0))
+        )
         record(
             "effort_clipping",
             np.array_equal(qb, qs) and np.array_equal(vb, vs) and clip_dev <= TOL_TRAJECTORY,
@@ -761,7 +823,13 @@ def qualify_bot(
             cycle = make(1)
             try:
                 if controller_config:
-                    cycle.step_controller([_target(reference, q0, amplitudes, 0, anchor)])
+                    cycle.step_controller(
+                        [
+                            _shared_reference_target(
+                                reference, _target(reference, q0, amplitudes, 0, anchor)
+                            )
+                        ]
+                    )
                 else:
                     cycle.step(np.zeros((1, len(names))))
                 cycle.reset()

@@ -92,6 +92,7 @@ class ModelPlan:
     # Native scene articulation slices (one or more, independent of rigid bodies).
     articulations: tuple[Any, ...] = ()
     serial_only: bool = False
+    coordinate_kinds: tuple[str, ...] = ()
     joint_coordinate_groups: dict[str, tuple[int, ...]] = field(default_factory=dict)
 
     @property

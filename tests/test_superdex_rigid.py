@@ -151,7 +151,7 @@ def test_spherical_controller_targets_match_sdk(fixtures, kind):
     from superdex import physics as p
     from superdex import robotics as r
 
-    from unisim import create_backend
+    from unisim import ArticulationPoseTarget, JointTarget, create_backend
 
     path = fixtures["ball_bot"]
     b = create_backend("superdex", SceneCfg(str(path)), 1, 0.002, superdex_execution_mode="serial")
@@ -178,13 +178,16 @@ def test_spherical_controller_targets_match_sdk(fixtures, kind):
             target = r.ControllerMochiArticulatedPoseTarget()
             target.world_from_root = p.TransformRT()
             target.pose_dofs = [0.1, 0.02, -0.03, 0.04]
+        shared = (JointTarget([0.1, 0.02, -0.03, 0.04]) if kind == "BASIC_JSC_PD"
+                  else ArticulationPoseTarget([0, 0, 0, 1, 0, 0, 0],
+                                               [0.1, 0.02, -0.03, 0.04]))
         args = json.dumps(params)
         b.configure_controller(kind, param_args=args, init_args="{}")
         controller = bot.create_controller(kind)
         controller.configure_from_scene_entry(args, "{}")
         world.step(0)
         for _ in range(1000):
-            b.step_controller([target])
+            b.step_controller([shared])
             if kind == "BASIC_JSC_PD":
                 obsv = controller.get_current_observations_from_mochi()
                 obsv.dt = 0.002
@@ -199,7 +202,7 @@ def test_spherical_controller_targets_match_sdk(fixtures, kind):
         np.testing.assert_allclose(b.get_state()["qpos"][0], expected, atol=1e-6)
         assert np.linalg.norm(expected[:3]) > 0.01
         b.reset()
-        b.step_controller([target], 3)
+        b.step_controller([shared], 3)
         assert np.isfinite(b.get_state()["qpos"]).all()
     finally:
         if bot is not None:

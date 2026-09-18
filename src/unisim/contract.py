@@ -5,6 +5,15 @@ the original public import path while benchmark metadata keeps its coarse
 capability labels.
 """
 
+from .backend.api_types import (
+    ArticulationPoseTarget,
+    BackendArticulationInfo,
+    BackendControllerInfo,
+    BackendModelInfo,
+    CartesianTarget,
+    ControllerTarget,
+    JointTarget,
+)
 from .backend.base import (
     CameraCfg,
     DebugOverlayGetter,
@@ -15,6 +24,13 @@ from .backend.base import (
 from .errors import BackendCapability, BackendError, UnsupportedCapabilityError
 
 __all__ = [
+    "ArticulationPoseTarget",
+    "BackendArticulationInfo",
+    "BackendControllerInfo",
+    "BackendModelInfo",
+    "CartesianTarget",
+    "ControllerTarget",
+    "JointTarget",
     "BackendCapability",
     "BackendError",
     "CameraCfg",
