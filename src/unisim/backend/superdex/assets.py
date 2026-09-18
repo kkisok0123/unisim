@@ -15,19 +15,22 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass, field
+import tempfile
+import zipfile
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 ROOT_MARKER_NAME = ".superdex_root"
 ROOTED_REFERENCE_PREFIX = "//"
 LFS_POINTER_PREFIX = b"version https://git-lfs.github.com/spec/v1"
 BOT_SUFFIX = ".superdex_bot"
+ARCHIVE_SUFFIX = ".superdex_bot_archive"
 PREFAB_SUFFIX = ".mochi_prefab"
 SCENE_SUFFIX = ".mochi_scene"
 CONTROLLER_SUFFIX = ".superdex_controller"
-ENTRYPOINT_SUFFIXES = (BOT_SUFFIX, PREFAB_SUFFIX, SCENE_SUFFIX, CONTROLLER_SUFFIX)
+ENTRYPOINT_SUFFIXES = (BOT_SUFFIX, ARCHIVE_SUFFIX, PREFAB_SUFFIX, SCENE_SUFFIX, CONTROLLER_SUFFIX)
 
 # Structural candidates still require runtime qualification for their exact profile.
 PROFILE_JOINT_TYPES = frozenset({"Hard", "Revolute", "Prismatic"})
@@ -206,9 +209,7 @@ class Inventory:
         disposition_counts: dict[str, int] = {}
         for entry in self.entries:
             kind_counts[entry.kind] = kind_counts.get(entry.kind, 0) + 1
-            disposition_counts[entry.disposition] = (
-                disposition_counts.get(entry.disposition, 0) + 1
-            )
+            disposition_counts[entry.disposition] = disposition_counts.get(entry.disposition, 0) + 1
         return {
             "provenance": self.provenance.to_json(),
             "file_count": self.file_count,
@@ -294,9 +295,7 @@ def _find_root_marker(start: Path, bundle_root: Path) -> Path | None:
     return None
 
 
-def resolve_reference(
-    manifest: Path, reference: str, bundle_root: Path
-) -> tuple[Path, str]:
+def resolve_reference(manifest: Path, reference: str, bundle_root: Path) -> tuple[Path, str]:
     """Resolve one manifest reference to a path inside the bundle.
 
     Returns ``(resolved_path, resolution_rule)``.  Rooted ``//`` references
@@ -424,12 +423,17 @@ def _components_of(links: list[dict[str, Any]]) -> tuple[int, int, tuple[str, ..
             continue
         for actuator in link.get("actuators") or []:
             actuator_count += 1
-            if isinstance(actuator, dict) and "type" in actuator:
-                types.add(f"actuator:{actuator['type']}")
+            if isinstance(actuator, dict):
+                # SDK schemas use both "type" and "typeName" spellings.
+                kind = actuator.get("type") or actuator.get("typeName")
+                if kind:
+                    types.add(f"actuator:{kind}")
         for sensor in link.get("sensors") or []:
             sensor_count += 1
-            if isinstance(sensor, dict) and "type" in sensor:
-                types.add(f"sensor:{sensor['type']}")
+            if isinstance(sensor, dict):
+                kind = sensor.get("type") or sensor.get("typeName")
+                if kind:
+                    types.add(f"sensor:{kind}")
     return actuator_count, sensor_count, tuple(sorted(types))
 
 
@@ -459,6 +463,48 @@ def _bot_capabilities(
     return tuple(capabilities), tuple(blockers)
 
 
+def _recipe_dependency_blockers(
+    manifest: Path, data: dict[str, Any], bundle_root: Path
+) -> list[str]:
+    """Fold custom-component blockers from a recipe's resolved bot closure.
+
+    Recipe manifests stay clean while their ``AttachBot``/base dependencies
+    carry the offending components (e.g. seed sensors); the entrypoint must
+    still be recorded as blocked so runners never treat it as qualified.
+    """
+    blockers: list[str] = []
+    seen: set[Path] = {manifest.resolve()}
+    queue: list[tuple[Path, dict[str, Any]]] = [(manifest, data)]
+    while queue:
+        current, document = queue.pop()
+        for _field_path, reference in _reference_fields(document):
+            try:
+                target, _rule = resolve_reference(current, reference, bundle_root)
+            except SuperdexAssetError:
+                continue
+            resolved = target.resolve()
+            if resolved in seen or target.suffix != BOT_SUFFIX:
+                continue
+            seen.add(resolved)
+            try:
+                child = json.loads(target.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            child_links = _links_of(child)
+            _actuators, _sensors, child_types = _components_of(child_links)
+            if any(t != "sensor:SENSOR_CAMERA" for t in child_types):
+                blockers.append(
+                    f"custom actuator/sensor components via {target.name}: "
+                    + ", ".join(
+                        sorted(
+                            t.split(":", 1)[1] for t in child_types if t != "sensor:SENSOR_CAMERA"
+                        )
+                    )
+                )
+            queue.append((target, child))
+    return blockers
+
+
 def _classify_bot(
     entrypoint: Path,
     data: dict[str, Any],
@@ -478,12 +524,19 @@ def _classify_bot(
         component_types,
         sorted(set(joint_counts) - SUPPORTED_JOINT_TYPES),
     )
+    if is_recipe:
+        feature_blockers = list(feature_blockers) + _recipe_dependency_blockers(
+            entrypoint, data, bundle_root
+        )
     if any(not edge.resolved for edge in dependencies):
         disposition = DISPOSITION_UNRESOLVED_DEPENDENCY
+    elif feature_blockers:
+        # A recipe carrying custom components or unsupported joints is not a
+        # runnable candidate; record the blocker (and the recipe capability
+        # below) instead of advertising it as qualified.
+        disposition = DISPOSITION_UNSUPPORTED_FEATURES
     elif is_recipe:
         disposition = DISPOSITION_RECIPE_CANDIDATE
-    elif feature_blockers:
-        disposition = DISPOSITION_UNSUPPORTED_FEATURES
     else:
         disposition = DISPOSITION_PROFILE_CANDIDATE
     required = list(capabilities)
@@ -529,8 +582,11 @@ def _classify_prefab(
     if any(not edge.resolved for edge in dependencies):
         disposition = DISPOSITION_UNRESOLVED_DEPENDENCY
     else:
-        disposition = (DISPOSITION_UNSUPPORTED_FEATURES if _rigid_asset_blockers(data)
-                       else DISPOSITION_PROFILE_CANDIDATE)
+        disposition = (
+            DISPOSITION_UNSUPPORTED_FEATURES
+            if _rigid_asset_blockers(data)
+            else DISPOSITION_PROFILE_CANDIDATE
+        )
     blockers = _rigid_asset_blockers(data)
     joints = _joints_of(data)
     return AssetEntry(
@@ -551,8 +607,15 @@ def _classify_prefab(
 
 def _rigid_asset_blockers(data: dict[str, Any]) -> list[str]:
     blockers = []
-    if set(data) - {"comment", "actors", "scene", "prefabs", "contactFilter", "controllers",
-                    "constraints"}:
+    if set(data) - {
+        "comment",
+        "actors",
+        "scene",
+        "prefabs",
+        "contactFilter",
+        "controllers",
+        "constraints",
+    }:
         blockers.append("fields outside the native rigid scene schema")
     if set(data.get("actors", {})) - {"comment", "rigid", "articulated"}:
         blockers.append("non-rigid actors remain deferred")
@@ -560,8 +623,11 @@ def _rigid_asset_blockers(data: dict[str, Any]) -> list[str]:
         blockers.append("unsupported native tree joint type")
     if any(link.get("sensors") or link.get("actuators") for link in _links_of(data)):
         blockers.append("physics prefab link components require a robotics bot")
-    if any(set(c) - {"comment", "articulatedActor", "jointTracking", "linkPosTracking",
-                     "linkRotTracking"} for c in data.get("controllers", [])):
+    if any(
+        set(c)
+        - {"comment", "articulatedActor", "jointTracking", "linkPosTracking", "linkRotTracking"}
+        for c in data.get("controllers", [])
+    ):
         blockers.append("unsupported scene controller schema")
     return blockers
 
@@ -684,9 +750,7 @@ def _dependencies_of(
 
 def _detect_recipe_cycles(parsed: dict[Path, dict[str, Any]], bundle_root: Path) -> None:
     """Raise ``recipe_cycle`` if the base/attachment graph contains a cycle."""
-    bot_manifests = {
-        path: data for path, data in parsed.items() if path.suffix == BOT_SUFFIX
-    }
+    bot_manifests = {path: data for path, data in parsed.items() if path.suffix == BOT_SUFFIX}
     visited: set[Path] = set()
 
     def recipe_references(data: dict[str, Any]) -> list[str]:
@@ -704,9 +768,7 @@ def _detect_recipe_cycles(parsed: dict[Path, dict[str, Any]], bundle_root: Path)
 
     def visit(manifest: Path, chain: tuple[Path, ...]) -> None:
         if manifest in chain:
-            cycle = " -> ".join(
-                str(p.relative_to(bundle_root)) for p in (*chain, manifest)
-            )
+            cycle = " -> ".join(str(p.relative_to(bundle_root)) for p in (*chain, manifest))
             raise SuperdexAssetError("recipe_cycle", cycle)
         if manifest in visited:
             return
@@ -725,6 +787,56 @@ def _detect_recipe_cycles(parsed: dict[Path, dict[str, Any]], bundle_root: Path)
 
     for manifest in sorted(bot_manifests):
         visit(manifest, ())
+
+
+def _archive_entry(manifest, bundle_root, provenance, local_derivative):
+    """Audit a self-contained archive, including its target and packed dependencies."""
+    relative = manifest.relative_to(bundle_root).as_posix()
+    try:
+        with zipfile.ZipFile(manifest) as archive, tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for member in archive.infolist():
+                name = PurePosixPath(member.filename)
+                if name.is_absolute() or ".." in name.parts or "\\" in member.filename:
+                    raise ValueError(f"invalid archive member {member.filename!r}")
+                if name.suffix == ARCHIVE_SUFFIX:
+                    raise ValueError("nested bot archives are not inventory entrypoints")
+                destination = root.joinpath(*name.parts)
+                if member.is_dir():
+                    destination.mkdir(parents=True, exist_ok=True)
+                else:
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    destination.write_bytes(archive.read(member))
+            metadata = json.loads((root / ".mochi_bot_archive_metadata").read_text())
+            target = PurePosixPath(metadata["target"])
+            if target.is_absolute() or ".." in target.parts:
+                raise ValueError("archive target must stay inside the archive")
+            inventory = build_inventory(root, provenance)
+            entry = next((e for e in inventory.entries if e.entrypoint == target.as_posix()), None)
+            if entry is None or entry.kind != "bot":
+                raise ValueError("archive metadata target must name a packed bot")
+            dependencies = tuple(
+                replace(
+                    edge,
+                    source=relative + "!/" + edge.source,
+                    target=relative if edge.resolved else relative + "!/" + edge.target,
+                    note="packed dependency: " + edge.target if edge.resolved else edge.note,
+                )
+                for item in inventory.entries
+                for edge in item.dependencies
+            )
+            unresolved = any(not edge.resolved for edge in dependencies)
+            return replace(
+                entry,
+                entrypoint=relative,
+                kind="archive",
+                local_derivative=local_derivative,
+                dependencies=dependencies,
+                licenses=_collect_licenses(manifest, bundle_root) or entry.licenses,
+                disposition=DISPOSITION_UNRESOLVED_DEPENDENCY if unresolved else entry.disposition,
+            )
+    except (OSError, ValueError, KeyError, zipfile.BadZipFile) as exc:
+        raise SuperdexAssetError("schema_unexpected", f"{relative}: {exc}") from exc
 
 
 def build_inventory(
@@ -748,7 +860,10 @@ def build_inventory(
         if path.is_file() and path.suffix in ENTRYPOINT_SUFFIXES
     )
     parsed: dict[Path, dict[str, Any]] = {}
+    archives = [p for p in manifests if p.suffix == ARCHIVE_SUFFIX]
     for manifest in manifests:
+        if manifest.suffix == ARCHIVE_SUFFIX:
+            continue
         try:
             parsed[manifest] = json.loads(manifest.read_text(encoding="utf-8"))
         except (OSError, ValueError) as exc:
@@ -759,7 +874,15 @@ def build_inventory(
 
     _detect_recipe_cycles(parsed, bundle_root)
 
-    entries: list[AssetEntry] = []
+    entries: list[AssetEntry] = [
+        _archive_entry(
+            p,
+            bundle_root,
+            provenance,
+            p.relative_to(bundle_root).as_posix() in local_derivative_paths,
+        )
+        for p in archives
+    ]
     for manifest, data in parsed.items():
         relative = manifest.relative_to(bundle_root).as_posix()
         dependencies = _dependencies_of(manifest, data, bundle_root)
@@ -796,9 +919,7 @@ def load_recorded_inventory(report: Path) -> dict[str, Any]:
     try:
         data = json.loads(Path(report).read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
-        raise SuperdexAssetError(
-            "schema_unexpected", f"{report}: {exc}"
-        ) from exc
+        raise SuperdexAssetError("schema_unexpected", f"{report}: {exc}") from exc
     if not isinstance(data, dict) or not isinstance(data.get("provenance"), dict):
         raise SuperdexAssetError(
             "schema_unexpected", f"{report}: not a recorded asset inventory report"
@@ -826,9 +947,7 @@ def verify_asset_bundle(bundle_root: Path, report: Path) -> dict[str, Any]:
     recorded = load_recorded_inventory(report)
     for key in ("tree_digest", "file_count", "total_bytes"):
         if not isinstance(recorded.get(key), (int, str)):
-            raise SuperdexAssetError(
-                "schema_unexpected", f"{report}: recorded {key} is missing"
-            )
+            raise SuperdexAssetError("schema_unexpected", f"{report}: recorded {key} is missing")
     digest, file_count, total_bytes = hash_tree(bundle_root)
     if (digest, file_count, total_bytes) != (
         recorded["tree_digest"],
@@ -883,15 +1002,9 @@ def verify_bundle(inventory: Inventory, bundle_root: Path) -> tuple[list[str], l
                 if not target.is_file():
                     errors.append(f"{entry.entrypoint}: {edge.field} -> {edge.target}: missing")
                 elif _is_lfs_pointer(target):
-                    errors.append(
-                        f"{entry.entrypoint}: {edge.field} -> {edge.target}: lfs_pointer"
-                    )
+                    errors.append(f"{entry.entrypoint}: {edge.field} -> {edge.target}: lfs_pointer")
             else:
-                errors.append(
-                    f"{entry.entrypoint}: {edge.field} -> {edge.target}: {edge.note}"
-                )
+                errors.append(f"{entry.entrypoint}: {edge.field} -> {edge.target}: {edge.note}")
         if not entry.licenses:
-            warnings.append(
-                f"{entry.entrypoint}: no LICENSE/NOTICE found in directory chain"
-            )
+            warnings.append(f"{entry.entrypoint}: no LICENSE/NOTICE found in directory chain")
     return errors, warnings

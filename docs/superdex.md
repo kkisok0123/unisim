@@ -1,824 +1,713 @@
-# SuperDex CPU development profile
+# SuperDex adapter guide
 
-The `superdex` adapter runs SuperDex Physics/Robotics 1.0.0 directly behind
-`SimBackend`. UniLab roadmap [#1533](https://github.com/Motphys/UniLab/issues/1533)
-tracks this development profile. Changes remain on roadmap branches; the
-version is unchanged and no PyPI release is required for local integration.
+[中文版](superdex_zh.md)
 
-Native model entrypoints are `.superdex_bot`, `.superdex_bot_archive`,
-`.mochi_scene` and `.mochi_prefab`. A `.mochi.h5` file supplies shape geometry
-referenced by an authored model; it is not a standalone input to the adapter or
-`scripts/superdex_rigid_viewer.py`. In particular, `rods/helix_with_visual.mochi.h5`
-is used by the SDK's deformable rod example, which is outside rigid-body support.
+Use this guide to load local models, run SuperDex through UniSim, inspect a model,
+and check adapter-versus-SDK agreement. **SuperDex computes the physics; UniSim
+provides the shared interface and translates model, control and state data.**
+UniLab remains responsible for tasks, action normalization, rewards, observations,
+training and policy rollouts.
 
-## Installation and ownership
+The English guide and its Chinese translation describe the same implementation.
+Keep their examples, support boundaries and limitation reports synchronized.
 
-Use CPython 3.12 or 3.13, as covered by the superdex-uni wheels. From the UniSim
-checkout:
+## Contents
 
-```sh
+1. [Install and run a first model](#quick-start)
+2. [Choose an input and execution mode](#inputs-and-modes)
+3. [Use the Python API](#python-api)
+4. [Understand state and control values](#state-and-control)
+5. [Use cameras and controllers](#cameras-and-controllers)
+6. [View and compare models](#tools)
+7. [Resolve and verify assets](#assets)
+8. [Understand the code and public interface](#architecture)
+9. [Check current limitations and unsupported assets](#limitations)
+10. [Troubleshoot common failures](#troubleshooting)
+11. [Validate changes and track remaining work](#validation)
+
+<a id="quick-start"></a>
+## 1. Install and run a first model
+
+Run commands from the UniSim repository root. The examples require the local asset
+bundle; cloning the repository does not download its ignored asset payloads.
+
+```bash
 uv sync --python 3.12 --extra superdex --extra mujoco
+export SUPERDEX_ASSETS_PATH="$PWD/assets/superdex"
+
+uv run --no-sync scripts/superdex_viewer.py \
+    benchmarks/cart_pole/cart_pole.mochi_scene \
+    --controlled-joints Cart --effort-limit 3.0
 ```
 
-`superdex-physics-uni==1.0.0` and `superdex-robotics-uni==1.0.0` are optional.
-They are a temporary unilabsim build of the upstream SuperDex 1.0.0 facades
-carrying the native batch executor, published from
-[unilabsim/superdex-uni](https://github.com/unilabsim/superdex-uni) until the
-upstream project_superdex PR merges; they install into the same `superdex/`
-namespace as the upstream packages and must not be co-installed with them. The
-extra also supplies MuJoCo 3.11 as a **cold MJCF parser**; SuperDex executes every
-physics step. Native `.superdex_bot` and `.mochi_scene` loading do not use that parser.
-Importing `unisim` or its `SuperDexBackend` class does not load either engine.
-SuperDex Lab, Gymnasium and a learner are not adapter dependencies.
+This opens one native viewer through the UniSim adapter. `Cart` selects the cart's
+prismatic joint; `3.0` is its force limit in newtons, **not a constant applied force**.
+The viewer supplies a small demonstration effort. Close the window or press Ctrl+C
+to release the viewer and backend.
 
-For a sibling UniLab checkout, keep both versions unchanged and install local
-editable projects together, for example `uv pip install -e './[superdex,mujoco]'
--e ../UniLab`. Use `uv run --no-sync` (or `UV_NO_SYNC=1 make check`) while
-testing editable overrides so normal project synchronization does not replace
-them with index distributions. UniLab's local provenance test profile uses
-`UNILAB_LOCAL_UNISIM` pointing at the exact UniSim checkout. The UniLab backend
-guide describes its task and registered asset setup.
+For a bounded renderer check without an interactive window:
 
-The verified platform is Linux x86_64, CPU FP32. Upstream also provides
-Windows x86_64 and macOS ARM wheels, but this integration has not established
-those platforms. The default x86 build requires AVX2 and related instructions.
-The upstream source exposes optional CUDA linear solvers, but the tested wheel
-rejects them as not built with CUDA. This adapter does not enable GPU solvers.
-FP64 upstream packages require a process-wide precision choice before import;
-the integration's numerical validation currently targets FP32.
-
-Each environment owns an independent native scene. The adapter reference
-counts the process-global engine: closing one instance leaves other instances
-alive. The source-built SuperDex `SceneBatchExecutor` batches force writes,
-stepping, articulated state, link state, contact sensors and solver status in
-persistent C++ workers. `superdex_num_workers=0` uses the physical cores visible
-to the process (Linux topology or macOS `sysctl`);
-SDK-internal workers are disabled. Runtime initialization must belong to UniSim,
-and live backends cannot be transferred between processes. Call the public
-`cleanup_scene_assets()` hook or `close()` before interpreter shutdown. UniLab's
-`env.close()` calls that public hook.
-
-## Native debugger and serial execution
-
-A SuperDex scene's `DebugDraw` object is thread-affine. When the native SuperDex
-debugger is connected, its sync callbacks gather debug-draw data from the
-scene's step thread, so stepping scenes on `SceneBatchExecutor` workers with an
-attached debugger violates that affinity and traps natively. The default
-`batch` execution mode therefore fails closed: constructing or stepping the
-backend while a debugger client is connected raises an actionable `RuntimeError`.
-
-Attach the debugger only with the serial execution mode, which never constructs
-the executor and steps every scene on the environment thread:
-
-```sh
-create_backend("superdex", scene, num_envs, sim_dt, superdex_execution_mode="serial")
+```bash
+uv run --no-sync scripts/superdex_viewer.py \
+    benchmarks/cart_pole/cart_pole.mochi_scene \
+    --controlled-joints Cart --effort-limit 3.0 --frames 9
 ```
 
-In UniLab pass `env.superdex_execution_mode=serial` on the Hydra command line.
-`superdex_num_workers` has no effect in serial mode. The mode is a debugging
-profile, not a performance configuration: prefer `batch` for training.
+No images, videos or JSON reports are saved by default. The viewer can find the
+repository's default bundle without an environment-variable export; the Python
+examples and asset qualification commands below explicitly set it for clarity.
 
-Serial mode also unlocks the native Polyscope viewer
-(`superdex.physics.viewer`) for `run_playback` in `interactive` render mode:
-the viewer shares the scene's thread with stepping, so interactive playback
-requires serial mode and exactly one environment, and fails closed with an
-actionable error otherwise. `record`/`auto` playback still uses the shared
-MuJoCo offline renderer and works in both modes. UniLab's interactive superdex
-eval injects both settings (`serial` + `training.play_env_num=1`).
+### Runtime requirements
 
-## Native robots
+| Item | Current integration boundary |
+| --- | --- |
+| Python | CPython 3.12 or 3.13 for the SuperDex wheels |
+| SDK packages | `superdex-physics-uni==1.0.0`, `superdex-robotics-uni==1.0.0` |
+| Verified configuration | Linux x86_64, CPU, FP32 |
+| Other platforms / FP64 | Not qualified by this integration |
+| GPU physics | Not enabled; the tested wheel does not provide CUDA solvers |
+| Base UniSim import | Remains usable without importing an engine SDK |
 
-Preprocessed SuperDex assets stay outside the code repositories. The FR3 example
-uses the upstream `assets/bots/arms/fr3_v2` directory including its HDF5 collision
-and GLB render files. Preserve its LICENSE/NOTICE. The native bot must have a
-HARD or FREE root. Stage 8 also supports spherical child joints, closed loops,
-linear transmissions and spatial tendons in one serial environment. Custom
-components remain deferred; see the complete native rigid profile below.
+The `superdex-uni` packages are the integration builds carrying the native batch
+executor. They share the `superdex/` namespace with upstream packages; do not
+co-install the two sets. The x86 build requires AVX2 and related instructions.
+MuJoCo 3.11 is a model-loading parser for audited MJCF inputs and an optional
+playback renderer; **it does not perform the SuperDex simulation steps**.
+Native bot/scene loading does not use the MJCF parser. SuperDex Lab, Gymnasium and
+a learner are not adapter dependencies.
 
-The local asset copy lives at `assets/superdex` (ignored by git; cloning UniSim
-does not provide it). Before an SDK load, `verify_asset_bundle()` from
-`unisim.backend.superdex.assets` re-hashes the tree against the recorded
-inventory (`docs/superdex-assets-inventory.json`) and re-resolves every
-dependency edge, so a qualification run fails on missing or modified assets
-without consulting the original checkout.
+`uv run --no-sync` preserves the installed environment, including editable SDK
+or project overrides. For sibling UniLab development, an editable setup is
+`uv pip install -e './[superdex,mujoco]' -e ../UniLab`; `UNILAB_LOCAL_UNISIM` identifies
+the exact checkout in UniLab's local provenance checks. A PyPI release is not
+required for this local integration. Historical project context is tracked in
+[UniLab roadmap #1533](https://github.com/Motphys/UniLab/issues/1533).
+
+<a id="inputs-and-modes"></a>
+## 2. Choose an input and execution mode
+
+**Support depends on the file's contents and the execution mode, not just its suffix.**
+
+| Input | Role and current support |
+| --- | --- |
+| `.superdex_bot` | Robot with HARD (fixed) or FREE (floating) root; supported joint/component profile only |
+| `.superdex_bot_archive` | Packed bot plus dependencies; serial mode, one environment |
+| `.mochi_scene`, `.mochi_prefab` | Direct scene inputs: rigid actors, articulations, nested prefabs, supported constraints, contact filters and authored pose controllers |
+| MJCF `.xml` | Audited subset described below; not an arbitrary MuJoCo model |
+| `.urdf` | Direct loading is unsupported |
+| `.mochi.h5`, meshes, textures, CAD files | Supporting payloads; not standalone simulation inputs |
+| `.superdex_controller`, sensor configuration files | Configuration used alongside a compatible model; not standalone models |
+
+`rods/helix_with_visual.mochi.h5`, for example, is shape data for a deformable-rod
+example, not a rigid model that the viewer can directly simulate.
+
+### Serial versus batch
+
+| Mode | Behavior | Use |
+| --- | --- | --- |
+| `serial` | Steps scenes on the calling thread | Native viewer/debugger; advanced profiles |
+| `batch` (default) | Uses the native `SceneBatchExecutor` and persistent C++ workers | Supported multi-environment simulation |
+
+Ordinary supported bots can use either mode. Archives, spherical joints, closed
+loops, coupled actuation, multiple articulations, constraints and advanced
+link-tracking controllers require **serial mode and `num_envs=1`** under the
+current audited profiles. Interactive native playback also requires that combination.
+A feature being supported in serial mode does not imply it is supported in batch mode.
+
+The native debugger's `DebugDraw` is thread-affine. Attaching it to a batch backend
+is rejected to prevent native thread-affinity failures. Use
+`superdex_execution_mode="serial"` before attaching. In UniLab the setting is
+`env.superdex_execution_mode=serial`; interactive evaluation also uses one play environment.
+
+In batch mode, `superdex_num_workers=0` selects the physical cores visible to the
+process. SDK-internal workers are disabled to avoid competing thread pools.
+Leave the worker setting at zero in serial mode; a nonzero value is rejected.
+
+### Audited MJCF boundary
+
+Supported: one articulation tree, an optional free root, hinge/slide joints,
+scalar stateless motor or linear position actuators, static planes, named keyframes
+and supported fragments. Mass, inertia/COM, frames/axes, armature, joint friction
+and actuator limits are translated at load time. Dynamic primitive collision
+geometry is triangulated and baked to SDF during loading.
+
+Contact is not numerically equivalent to MuJoCo. Torsional/rolling friction needs
+`superdex_allow_contact_approximation=True`; this experimental option warns that
+only sliding Coulomb friction is retained. The SDK lacks per-pair friction overrides:
+the importer factors sliding-friction pairs into actor coefficients and rejects
+incompatible graphs instead of silently changing them.
+
+<a id="python-api"></a>
+## 3. Use the Python API
+
+Export `SUPERDEX_ASSETS_PATH` as in section 1 before running these examples.
+The Cart Pole, FR3 and controller examples are **independent programs**. Do not
+create a second backend by overwriting an existing variable without closing it.
+
+### Load, step, read state and reset a scene
 
 ```python
+import os
+from pathlib import Path
+
 import numpy as np
+
 from unisim import create_backend
 from unisim.scene import SceneCfg
 
+assets = Path(os.environ["SUPERDEX_ASSETS_PATH"]).expanduser().resolve()
 backend = create_backend(
     "superdex",
-    SceneCfg("/path/to/project_superdex/assets/bots/arms/fr3_v2/fr3_v2.superdex_bot"),
-    num_envs=2,
+    SceneCfg(str(assets / "benchmarks/cart_pole/cart_pole.mochi_scene")),
+    num_envs=1,
     sim_dt=0.002,
-    base_name="fr3_link0",
-    superdex_num_workers=0,
-    superdex_effort_limits=[20, 20, 20, 20, 5, 5, 5],
+    superdex_execution_mode="serial",
+    superdex_controlled_joints=["Cart"],
+    superdex_effort_limits=[3.0],
 )
 try:
-    backend.step(np.zeros((2, 7)), nsteps=5)
+    print(backend.get_actuator_names())  # ("Cart",)
+    print(backend.get_model_info())
+    command = np.array([[1.0]])  # One environment, one actuator; force in N.
+    backend.step(command, nsteps=8)
     state = backend.get_state()
+    print(state["qpos"], state["qvel"])
+    backend.reset()
 finally:
-    backend.cleanup_scene_assets()
+    backend.close()
 ```
 
-The native control vector names and ordering follow the single-DoF joint names.
-Positive finite effort limits must be present in the asset or supplied
-explicitly. The example values define a research control profile, not verified
-FR3 hardware ratings. Fixed-base `get_state()` contains only joint coordinates;
-requesting a floating-root layout for a fixed body is rejected. A named keyframe
-must actually exist in the scene; the adapter does not invent `home` for bots.
+`command` has shape `(num_envs, num_actuators)`. Cart Pole has two generalized
+coordinates but only one selected actuator. With `sim_dt=0.002`, eight physics
+steps advance **0.016 seconds of simulation time**, regardless of wall-clock speed.
+Inputs are clipped to the selected effort limits.
 
-## FR3 viewer demonstration (stage 2A)
+For native scenes/prefabs, supply ordered `superdex_controlled_joints` and finite,
+positive `superdex_effort_limits` for active controls. Use `[]` to make a scene
+passive; its command array then has shape `(num_envs, 0)`.
 
-One documented command visualizes the unchanged FR3 through the adapter's
-native `run_playback` path against the local asset copy. It requires the
-optional runtime (`uv sync --python 3.12 --extra superdex --extra mujoco`),
-Polyscope >= 2.5.0 and a graphical session:
+### Load two independent robot environments
 
-```sh
-export SUPERDEX_ASSETS_PATH="$PWD/assets/superdex"
-uv run scripts/superdex_bot_viewer.py
+```python
+import os
+from pathlib import Path
+
+import numpy as np
+
+from unisim import create_backend
+from unisim.scene import SceneCfg
+
+assets = Path(os.environ["SUPERDEX_ASSETS_PATH"]).expanduser().resolve()
+backend = create_backend(
+    "superdex",
+    SceneCfg(str(assets / "bots/arms/fr3_v2/fr3_v2.superdex_bot")),
+    num_envs=2,
+    sim_dt=0.002,
+    superdex_effort_limits=[87, 87, 87, 87, 12, 12, 12],
+)
+try:
+    backend.step(np.zeros((2, backend.num_actuators)), nsteps=8)
+    state = backend.get_state()
+    backend.set_state(np.array([0]), state["qpos"][[0]], state["qvel"][[0]])
+    backend.reset(np.array([0]))  # Environment 1 is unchanged.
+finally:
+    backend.close()
 ```
 
-The script verifies the asset tree against the recorded inventory (use
-`--skip-verification` to bypass), constructs the backend with
-`superdex_execution_mode="serial"`, `num_envs=1` and no recording, and runs
-three distinct, observable phases in the native Polyscope viewer:
+The effort limits follow actuator order. A zero effort command does not hold a
+robot in place: gravity and passive dynamics still act. This example uses the
+default batch mode. `set_state()` writes the selected rows; `reset([0])` restores
+environment 0 to its authored initial state while leaving environment 1 unchanged.
 
-1. **Initial pose** (2 s): PD position control holds the authored default pose
-   so geometry, scale and link alignment can be inspected.
-2. **Bounded movement** (6 s): a phase-shifted sine sweep per joint, bounded
-   inside the authored joint ranges.
-3. **Reset** (1 s settle): `backend.reset()` visibly restores the default
-   pose; the restored joint state is checked numerically (exact by
-   construction) before the settle phase.
+### Compose a robot with rigid objects
 
-Control profile (recorded in `docs/superdex-fr3-viewer/report.json`): commands
-are joint-position targets in radians following the authored actuator order
-`fr3_joint1..fr3_joint7`; a pre-step PD converter (`kp` 400/400/400/400/20/20/20,
-critically damped `kd`) turns them into motor torques clipped to explicit
-effort limits of 87/87/87/87/12/12/12 N·m (Franka's SRMS rating shape, a
-demonstration profile, not verified hardware ratings); `sim_dt` 0.002 s with
-8 substeps per 60 Hz render. Zero effort does **not** hold the arm: without
-torque the FR3 collapses under gravity within half a second, and the earlier
-`[20,20,20,20,5,5,5]` research profile visibly sags at the elbow.
-
-Closing the window releases the viewer and backend (verified for window close,
-Ctrl-C and error paths); the run report lands in
-`docs/superdex-fr3-viewer/`. Use `--frames N` for an offscreen smoke run on a
-headless host. The viewer does not save images. Physics and lifecycle
-qualification of the unchanged FR3 follows below.
-
-## FR3 adapter qualification (stage 2B)
-
-One command runs the numerical and lifecycle qualification of the unchanged
-FR3 against direct SDK execution; no viewer or graphical session is needed:
-
-```sh
-export SUPERDEX_ASSETS_PATH="$PWD/assets/superdex"
-uv run scripts/superdex_fr3_qualify.py
-```
-
-The script verifies the asset tree against the recorded inventory, then loads
-the FR3 through `create_backend("superdex", ...)` while a direct SuperDex SDK
-scene in the same process is driven with identical inputs, separating adapter
-translation from asset/SDK behavior. Seven checks run, each recorded with
-evidence in `docs/superdex-fr3-qualification/report.json`:
-
-1. **Structure** — body/joint inventories, actuator control order, default
-   pose, dynamic-link masses, world link transforms, world AABBs and authored
-   joint ranges against the direct SDK actor and authored prefab.
-2. **Control** — per-joint ordering by rollout differencing (the torqued joint
-   is the most affected DoF for every joint index) and effort-limit clipping
-   (a saturated command reproduces per-joint capped dynamics exactly).
-3. **Trajectory equivalence** — batch and serial execution modes each match
-   the direct SDK rollout under the recorded PD sweep profile; this is also
-   the 1,000+ step stability check.
-4. **Contact recovery** — starting from a pose beyond joint 2's authored range
-   (`-2.6` rad < `-1.784`), `set_state` stores the pose unclamped and the
-   contact push-out matches the SDK rollout through 14 contact steps.
-5. **Reset** — whole-scene and selective restore are exact, and
-   `set_state`/`get_state` round-trip within float32 noise.
-6. **Isolation** — each environment of a two-environment backend reproduces
-   the matching single-environment backend exactly while the other runs
-   different commands.
-7. **Lifecycle** — repeated create/step/reset/close cycles.
-
-On the qualification host (SuperDex 1.0.0, float32, `sim_dt` 0.002) every
-adapter-vs-SDK deviation measured exactly 0.0 — batch, serial and direct SDK
-integrate identically — and no adapter defect was demonstrated, so stage 2B
-required no adapter fix. Known SDK behavior recorded alongside: authored joint
-limits are soft (an all-limits pose overshoots ~0.11 rad under 87 N·m), and
-`set_state` does not clamp to authored ranges by design. The report records
-code commit, asset tree digest, SDK precision, timestep, control profile and
-tolerances.
-
-The regression subset is `tests/test_superdex_fr3_qualification.py`
-(8 tests, opt-in via `SUPERDEX_ASSETS_PATH`; skips cleanly without the local
-assets or runtime). The pre-existing mass-metadata regression in
-`tests/test_superdex.py` stays a separate test.
-
-## Compatible bots and recipe compositions (stage 3)
-
-One parameterized runner applies the stage-2B check set to every registered
-candidate — native fixed-base bots and Mod Bot recipe compositions — against
-direct SDK execution; the stage-2A viewer demonstration gained `--bot <key>`
-for the same assets:
-
-```sh
-export SUPERDEX_ASSETS_PATH="$PWD/assets/superdex"
-uv run scripts/superdex_bot_qualify.py                  # all candidates + blocked probes
-uv run scripts/superdex_bot_qualify.py --bots openarm_v20_wuji,googly_eyes
-uv run scripts/superdex_bot_viewer.py --bot openarm_v20 # visual check, serial + 1 env
-```
-
-Candidate selection and per-asset control profiles live in
-`scripts/superdex_bot_profiles.py` (explicit effort limits where authored
-limits are unlimited, `kp` with critically damped `kd` from authored armature,
-per-joint sweep amplitudes bounded by the authored ranges). Eleven bots
-qualified with every adapter-vs-SDK deviation exactly 0.0: the fr3 and fr3_v2
-arms, both openarm_v20 arms, googly_eyes, fr3_v2_with_eyes, and the recipe
-compositions `openarm_v20` (18 joints), `openarm_v20_wuji` (54),
-`fr3_dg5f_short` left/right (27) and `fr3_v2_allegro_v5_right` (23). Reports
-and the compatibility table land in `docs/superdex-bots-qualification/`.
-
-Recipe compositions need no adapter extension for this set: the SDK resolves
-`base` plus `AttachBot`/`ReplaceLinkWithBot` references (including `//`-rooted
-paths and prefixes) into one compiled prefab at load time, and the compiled
-results stay inside the native loader's profile (HARD root, fixed/revolute
-joints, no components). The runner adds a recipe-accounting check that every
-base/attachment reference resolves inside the verified bundle, and structure
-checks compare against the *compiled* SDK actor, not a sum of parts
-(`ReplaceLinkWithBot` merges links: openarm_v20's components sum to 28 links,
-the compiled robot has 26).
-
-Two stage-2B check generalizations were required. The FR3 control-ordering
-probe (torqued joint = most affected DoF) does not hold for light distal
-links — openarm's wrist responds more to a proximal torque than to its own —
-so control now verifies the adapter's per-joint velocity *response matrix*
-matches the direct SDK matrix exactly plus a nonzero diagonal (each control
-column reaches its own joint). The FR3 10 rad/s sweep-velocity guard is kept
-only on the pure fr3 arms; near-massless distal joints (googly_eyes,
-hand/finger combos) legitimately oscillate far faster while staying
-adapter-vs-SDK exact. Recorded SDK behaviors, not adapter defects: the debug
-SDK build asserts natively if CONTACT_POINTS queries are registered on a
-scene whose earlier rollout produced deep self-collisions (the runner uses a
-fresh reference scene per contact probe), and the openarm arms' authored
-armature of 0 needs a damping floor (`armature_floor=0.05` in the profile) —
-with the default floor the viewer sweep diverges the solver deterministically
-around frame 141 of the demo.
-
-The historical stage-3 report records the blockers before floating-root support (see
-`docs/superdex-bots-qualification/blocked-probes.json`): floating FREE roots
-(superseded for the qualified hands below), actuator/sensor components (stage 6; the dg5f *seed* variants and
-`fr3_dg5f_short_seed` carry 5 each), mechanical cycles (`fr3_v2_2f_85`
-compiles 2 from its 2f_85 attachment; `2f_85` also has a FREE root),
-SPHERICAL joints (oculus_xr hands), and the 0-DoF `openarm_v20_torso`, which
-loads in serial mode but is rejected by the default batch executor
-(`SceneBatchExecutor requires articulated actors with DoFs`). The pytest
-regression subset is `tests/test_superdex_bot_qualification.py` (6 tests,
-opt-in via `SUPERDEX_ASSETS_PATH`); it also guards that every stage-1
-recipe-candidate is either qualified or precisely blocked, so silent drops
-fail CI.
-
-## Audited MJCF profile
-
-The cold importer accepts one articulation tree, one optional free root,
-hinge/slide joints, scalar stateless motor or linear position actuators and
-authored static planes. Existing scene fragments and named keyframes are
-materialized before stepping. Joint and actuator ordering remain distinct.
-Mass, inertial frame/COM, joint frames/axes, armature, joint friction and
-control/force limits are mapped explicitly.
-
-Dynamic primitive collision geometry is triangulated and baked to SDF once
-during materialization. Separate welded geometry links retain authored
-geom-pair contact sensor identity; their mass/inertia parts sum to the original
-body's inertial properties. Mesh collision, arbitrary multiple joints per body,
-multiple articulations, equality/tendon/flex/mocap/hfield/plugin features and
-unsupported actuator/sensor semantics are rejected. Visual mesh files still
-need to be present for the source MJCF parser even though this adapter is
-headless. No model parsing or SDF baking occurs during reset, step or getters.
-
-SuperDex contact and its implicit integration are not numerically equivalent to
-MuJoCo. Primitive SDFs approximate analytic surfaces, and solver settings have
-different meanings. Torsional/rolling friction requires the explicit
-`superdex_allow_contact_approximation=True` experimental profile, which warns
-that only the sliding Coulomb component is preserved. The default rejects that
-loss of semantics. Go2's task owner opts into this profile; a finite rollout is
-not evidence of locomotion quality or equivalent contacts.
-
-The 1.0.0 wheel lacks the newer source tree's per-pair friction override API.
-The importer therefore factors authored sliding-friction pairs into native
-actor coefficients so their geometric-mean mixing reproduces the selected
-MuJoCo pair coefficient. Incompatible friction graphs are rejected; no private
-engine API or silently changed mixing rule is used.
-
-## State, controls and sensors
-
-Free-root public qpos is world xyz + **wxyz**, followed by single-DoF joints.
-Public reset qvel is world body-origin linear velocity + **body-frame angular
-velocity**, followed by joint velocity. Native SuperDex free qpos stores a
-rotation vector, but its free rotational velocity is **not** the ordinary
-derivative of that vector. With an identity native reference transform, native
-free qvel uses world origin linear velocity and world angular velocity. The
-adapter rotates the angular component at the state barrier and verifies body
-origin/COM velocity against authored MuJoCo kinematics at nontrivial poses.
-Native bots may also author parent-joint and joint-link reference transforms.
-For those roots the adapter composes both transforms, rotates native velocities
-from the parent joint's axes, and accounts for the root-origin velocity induced
-by angular motion around a translated joint. Both translations and rotations
-are covered by independent SDK transform/Jacobian checks.
-
-The pre-step control callback runs once per physics substep. Motor/position
-controls respect authored order, gains, gear and limits. Pending body forces
-are accumulated as generalized forces and submitted together with control;
-one native external-force write cannot erase a separate control contribution.
-
-Named joint position/velocity, frame pose/axis/velocity, gyro and velocimeter
-signals are reconstructed from native state into NumPy caches. Supported
-plane/geom `contact data="found" num="1"` signals use native contact points and
-the actual actor pair, not a nonzero-force proxy. Contacts represent the last
-completed physics solve. A reset clears the solved contact state; `step(0)` does
-not rebuild the contact manifold after teleportation, so the first positive
-physics step supplies fresh contact results. Do not use reset-time contact
-flags as a geometric-overlap test.
-
-Authored accelerometers are recognized but unavailable: requesting/binding one
-raises `NotImplementedError`, because the public runtime does not supply
-instantaneous point acceleration. Unused accelerometers do not prevent loading
-an otherwise supported asset; no zero or finite-difference substitute is
-presented as the authored sensor. Native bot sensor components, cameras,
-arbitrary force/touch sensors and site Jacobians are outside this profile.
-
-Reset restores a private initial dynamic snapshot, writes selected qpos/qvel,
-clears controls/external forces and refreshes kinematic caches. Other rows are
-unchanged. Snapshot bytes are not exposed as portable checkpoints. Model DR,
-rendering/video, ROM/soft/tactile state and GPU batched physics are unsupported
-and must not be advertised by callers. Playback uses the shared offline MuJoCo
-renderer when a visual MJCF model is available.
-
-## Validation
-
-```sh
-uv run --no-sync pytest -q tests/test_superdex_contract.py tests/test_superdex.py \
-  tests/test_superdex_materialization.py tests/test_superdex_fr3_qualification.py
-UV_NO_SYNC=1 make check
-uv lock --check
-make package
-```
-
-Set `SUPERDEX_ASSETS_PATH` to the repository-local asset copy at
-`assets/superdex` to include the native FR3 fixture. The copy is a verified
-byte-for-byte duplicate of the local SuperDex asset checkout; provenance,
-dependency resolution and per-entry capability records live in
-`docs/superdex-assets-inventory.md`, generated by
-`scripts/copy_superdex_assets.py` (use `--report-only` to rebuild the report
-and re-verify without re-copying), and loading it never requires the source
-checkout. Other numerical tests use small authored models
-and require the optional Python 3.12 runtime. Contract/import tests also run
-without it. UniLab owns task rollouts, training checkpoints and sim2sim policy
-I/O validation; those outcomes are tracked in the roadmap's integration child.
-
-
-## Native floating hands (stage 4)
-
-The native loader supports a FREE root with authored `parentLinkFromJoint`
-and `parentJointFromLink` translations and rotations, followed by fixed, revolute
-or prismatic joints. Root position is world xyz; orientation is a wxyz
-quaternion. Root velocity stores world linear velocity and body-frame angular
-velocity. Scalar joint positions start at index 7, velocities at index 6;
-controls exclude the six unactuated root degrees of freedom. Additional free
-joints remain unsupported. Stage 8 extends this profile with spherical joints
-and cycles in one serial environment; Stage 6 covers the built-in components.
-
-Run the local, manifest-verified qualification (SDK required):
-
-```bash
-uv run scripts/superdex_floating_qualify.py --all-floating \
-  --out docs/superdex-floating-qualification/all-models
-SUPERDEX_ASSETS_PATH="$PWD/assets/superdex" uv run pytest -q tests/test_superdex_native_floating.py
-```
-
-Allegro V5 right (16 joints) and DG5F Short left (20 joints) passed 1,040
-steps in each of serial and batch modes against independent SDK scenes,
-including nonidentity root orientation, nonzero root/joint velocities, state
-round trips, full/selective reset, two-environment isolation and recreation.
-The command fails if the runtime, asset tree or any check is missing/failing.
-These checks qualify floating state and lifecycle; they do not qualify
-robot–object contact or sensor/actuator components.
-See [the report and current compatibility limits](superdex-floating-qualification/README.md).
-
-The expanded audit (`--all-floating`) discovers all 22 compiled FREE-root
-models in the local bundle. Ten pass: Allegro V5 left/right, DG5F Short and
-Long left/right, unactuated Wuji left/right, and OpenArm V20 left/right grippers.
-Twelve retain explicit later-stage
-blockers; see the [full table](superdex-floating-qualification/all-models/compatibility-table.md).
-The pytest qualification is parameterized over all ten passing models. Separate
-offscreen viewer smoke checks cover all ten; the standalone runner is
-`uv run scripts/superdex_floating_viewers.py`. SDK-free tests also cover root
-frame math and viewer cleanup on window-close events and initialization errors.
-
-The existing viewer accepts all ten floating profiles, for example:
-
-```bash
-uv run scripts/superdex_bot_viewer.py --bot allegro_v5_right
-uv run scripts/superdex_bot_viewer.py --bot wuji_hand2_beta1_left
-```
-
-Its viewer profile applies per-link gravity compensation through UniSim's
-force API to keep the hand in frame, then starts a slow root translation and
-rotation alongside a bounded finger sweep. Reset restores the full root and
-joint state. The numerical qualification uses ordinary gravity without this
-viewer compensation. The offscreen runner records numerical movement/reset
-reports and logs without saving images.
-
-## Rigid objects and nested prefabs (stage 5)
-
-A native `.superdex_bot` can now own independent rigid objects alongside its
-articulation. Pass `.mochi_prefab` files in `SceneCfg.fragment_files`; their path
-resolution follows the existing scene-fragment rule. The SDK resolves nested
-prefabs, names, transforms, collision shapes and render models on the cold path.
-Use named nested instances to disambiguate repeated actors. Body names must be
-unique across the robot and all prefab instances.
+Using the imports and `assets` variable from the FR3 example, run this as a
+separate block after closing any previous backend:
 
 ```python
 scene = SceneCfg(
     str(assets / "bots/arms/fr3_v2/fr3_v2.superdex_bot"),
     fragment_files=[str(assets / "prefabs/sphere/sphere.mochi_prefab")],
 )
+backend = create_backend(
+    "superdex", scene, num_envs=1, sim_dt=0.002,
+    superdex_execution_mode="serial",
+    superdex_effort_limits=[87, 87, 87, 87, 12, 12, 12],
+)
+try:
+    backend.step(np.zeros((1, backend.num_actuators)))
+finally:
+    backend.close()
 ```
 
-That minimal example preserves the sphere's authored origin. For a placed
-contact fixture, use the runnable example below, which writes temporary nested
-wrappers around the unchanged FR3, sphere and nine-hole peg-board assets.
+Fragments retain their authored transforms. This does not attach the sphere to
+the robot or invent a contact arrangement; use an authored wrapper prefab when
+you need specific placement.
 
-The existing public state interfaces cover the whole scene:
+### Metadata, gravity and cleanup
 
-- Robot coordinates and action indices retain their existing order. Each dynamic
-  rigid body then appends seven `qpos` entries (world xyz and wxyz quaternion)
-  and six `qvel` entries (world body-origin velocity and body-frame angular
-  velocity). Use `get_root_state_layout(body_name)` to obtain the indices.
-- `get_state`, `set_state`, `get_default_qpos`, `get_init_qvel` and
-  `get_physics_state` include all dynamic objects. Authored object velocities
-  are preserved. Body getters include static and dynamic prefab bodies; static
-  objects have no generalized coordinates and report mass/COM offset as zero.
-  Joint/actuator getters continue to describe only the robot.
-- `reset()` restores every actor, including the static fixtures. `reset(env_ids)`
-  and `set_state(env_ids, qpos, qvel)` touch only the selected scenes. A state
-  round trip restores pose and velocity, not the solver's internal history:
-  `set_state` first restores the initial native snapshot, then applies the
-  supplied coordinates and clears controls/pending forces, as for robot-only
-  scenes. Static transforms remain authored and are not independently mutable.
-- `apply_body_force` accepts dynamic rigid objects with world-frame COM forces
-  and torques. Static prefab targets are rejected. Each scene owns its rigid
-  actors, including partially constructed instances on failure; closing destroys
-  the scenes and releases the loaded prefab resources before runtime shutdown.
+On an open backend, use `get_model_info()` to inspect articulations, coordinate
+names/units/representations, coordinate groups and body ownership. Use
+`get_actuator_names()` and `get_joint_state_qpos_indices()` /
+`get_joint_state_qvel_indices()` instead of guessing action/state order.
 
-Both serial and batch execution are supported. Object readback happens after the
-native worker barrier; each environment has independent actor handles. Native
-interactive playback renders the complete scene in serial mode with one
-environment. MuJoCo offline video requires a separately authored visual twin
-whose generalized coordinates match this expanded state layout.
+`get_gravity()` reads gravity; `set_gravity([0, 0, -3])` changes it and the override
+persists across resets. Native scenes preserve authored gravity and solver settings;
+missing values use SDK defaults. No ground plane or coordinate rotation is inserted.
+Nested explicit settings must agree with the root. `sim_dt` is caller-owned;
+scene timestep fields are rejected rather than silently ignored.
 
-Run the numerical qualification and the viewer with the verified local bundle:
+| Qualified scene | Ordered controlled joints | Effort limits | Dimensions |
+| --- | --- | --- | --- |
+| Cart Pole | `Cart` | 3 | `nq=nv=2` |
+| Half Cheetah | `BackThigh`, `BackShin`, `BackFoot`, `FrontThigh`, `FrontShin`, `FrontFoot` | 120, 90, 60, 120, 60, 30 | `nq=nv=9` |
 
-```bash
-SUPERDEX_ASSETS_PATH="$PWD/assets/superdex" uv run scripts/superdex_prefab_qualify.py
-SUPERDEX_ASSETS_PATH="$PWD/assets/superdex" uv run scripts/superdex_prefab_qualify.py --viewer
-SUPERDEX_ASSETS_PATH="$PWD/assets/superdex" uv run pytest -q tests/test_superdex_prefabs.py
-```
+Both benchmark scenes author gravity `[0, -9.8, 0]`; bot loading uses negative Z.
 
-The viewer holds the initial state for two seconds, simulates contact for four
-seconds, and restores the whole scene for inspection. Closing before reset is
-reported as an incomplete demonstration. `--viewer --frames 420` runs the same
-phases offscreen and records a renderer smoke report without saving images.
-Reports and exact qualification limits are in
-[`superdex-prefab-qualification/README.md`](superdex-prefab-qualification/README.md).
+Each environment owns a native scene. UniSim reference-counts the shared
+process-wide SDK runtime; closing one backend leaves other live backends usable.
+Let UniSim own initialization, do not transfer live backends between processes,
+and always call `close()` (or the public `cleanup_scene_assets()` lifecycle hook).
+UniLab's `env.close()` calls that hook.
 
-This profile accepts only rigid actors and nested prefab references. Scene
-settings, authored contact-filter overrides, constraints, controllers, sensors,
-actuators, extra articulations and soft bodies are rejected instead of dropped.
-Full `.mochi_scene` dispatch is covered separately by Stage 7 below. SDK support
-for another prefab does not qualify it automatically; the stage-5 evidence covers the sphere and peg
-board listed in the report. No assets or SDK downloads enter the normal tests.
+<a id="state-and-control"></a>
+## 4. Understand state and control values
 
-## Built-in cameras, controllers and universal qualification (stage 6)
+### State layout and coordinate frames
 
-The native adapter supports link-attached `SENSOR_CAMERA` metadata and world
-poses, plus explicitly configured `BASIC_JSC_PD`, `BASIC_OSC_PD` and
-`MOCHI_ARTICULATED_POSE` controllers. These operations are now declared in `SimBackend` and overridden by SuperDex.
-The base package remains independent of engine SDKs. Other adapters inherit
-explicit unsupported defaults for operations they do not implement.
+`get_state()` returns detached NumPy arrays, including `qpos` and `qvel`, with one
+row per environment. Their column counts can differ.
 
-Models including `wuji_hand2_beta1` support ordinary joint-torque control.
-Unsupported actuator/sensor components are rejected before spawning and are
-never silently dropped.
+| Part | Public `qpos` | Public `qvel` |
+| --- | --- | --- |
+| Floating root | World xyz + quaternion **wxyz** (7 values) | World body-origin linear velocity + **body-frame** angular velocity (6 values) |
+| Revolute joint | Angle in radians | Angular velocity in rad/s |
+| Prismatic joint | Displacement in metres | Velocity in m/s |
+| Spherical joint | Native joint-frame rotation-vector XYZ (3 values) | Three native rotational velocity coordinates, not a naive rotation-vector derivative |
+| Dynamic rigid object | World xyz + wxyz (7 values) | World body-origin linear velocity + body-frame angular velocity (6 values) |
 
-### Camera metadata and poses
+A floating robot with seven scalar joints therefore has `nq=14`, `nv=13`.
+Static objects have body entries but no dynamic coordinates. Dynamic objects
+append their state windows; complex scenes need metadata-based indexing.
+`get_root_state_layout(body_name)` returns the appropriate root indices.
+Body getters ending in `_w` return world-frame quantities; do not confuse their
+angular velocities with the body-frame root angular velocity stored in `qvel`.
+
+SuperDex internally uses a rotation vector for a free root and different native
+velocity conventions. The adapter converts those representations, composes authored
+parent-joint/joint-link transforms, and accounts for velocity offsets caused by
+rotation around translated joints. Nontrivial transform/Jacobian regressions verify
+these conversions. Do not manually reinterpret native arrays as public state.
+
+For spherical joints, a bare joint selection expands to three coordinates;
+`/x`, `/y`, `/z` names select individual coordinates. Constraints and transmissions
+do not add action coordinates. Use metadata to determine actual ownership.
+
+### Efforts, position targets and substeps
+
+| Control path | Meaning of the input |
+| --- | --- |
+| Native bot or selected native scene joint: `step(ctrl)` | Physical effort: N for prismatic joints, N·m for revolute joints |
+| Audited MJCF motor | Authored motor input, respecting gear and limits |
+| Audited MJCF position actuator | Position target converted using authored gains and limits |
+| `step_controller(targets)` | Controller-specific targets; controller output is recalculated per physics substep |
+
+Do not interpret every backend/actuator's `step()` input as the same physical
+quantity. Task action normalization belongs to UniLab. `set_pre_step_control()`
+also runs once per physics substep. Pending body forces and actuator forces are
+combined so one native force write cannot erase another contribution.
+`apply_body_force()` uses world-frame COM forces and torques for dynamic bodies;
+static targets are rejected.
+
+### Reset, contacts and sensors
+
+Reset restores an initial native dynamic snapshot, clears controls/pending forces
+and refreshes caches. State assignment restores public kinematics, not every hidden
+solver-history value; snapshot bytes are not portable checkpoints.
+
+Named joint/frame signals, gyro and velocimeter values are reconstructed from
+native state. Supported MJCF plane/geom `contact data="found" num="1"` sensors use
+native contact points and the actual actor pair. Contact data describes the **last
+completed solve**: after teleporting or resetting, take a positive physics step
+before expecting fresh contacts. A zero-duration solve does not rebuild the manifold.
+
+The audited MJCF path recognizes accelerometers but cannot provide instantaneous
+point acceleration. Requesting/binding them raises `NotImplementedError`; unused
+accelerometers do not prevent loading that profile. This is separate from native
+bot component validation, which currently accepts only `SENSOR_CAMERA` components.
+
+<a id="cameras-and-controllers"></a>
+## 5. Use cameras and controllers
+
+### Camera metadata and mounted poses
+
+On an open **native bot/archive with authored cameras**, and with NumPy imported:
 
 ```python
-names = backend.get_camera_names()
-settings = backend.get_camera_parameters(names[0])
-poses = backend.get_camera_poses(names[0])          # (num_envs, 7): xyz + wxyz
-poses = backend.get_camera_poses(names[0], env_ids) # selected rows
+for name in backend.get_camera_names():
+    settings = backend.get_camera_parameters(name)
+    poses = backend.get_camera_poses(name)  # (num_envs, 7): xyz + wxyz
+    selected = backend.get_camera_poses(name, np.array([0]))
+    print(name, settings, poses, selected)
 ```
+
+These APIs expose metadata and poses, **not image pixels**. Empty camera inventories
+are valid, which is why the example iterates instead of indexing the first camera.
+`get_sensor_data(camera_name)` directs callers to the camera accessors.
 
 Settings are detached dictionaries with SDK snake_case fields: `name`,
 `image_width`, `image_height`, `fov_vertical_deg`, `near_clip`, `far_clip`,
 `forward_axis`, `up_axis_local`, `offset_local`, `look_at`, `look_distance`.
-Image dimensions are pixels, vertical FOV is degrees, and clip distances, offsets
-and look distance are metres. Axis fields retain the authored SDK convention.
-The returned pose is the mounted sensor frame, not an optical view matrix;
-renderers must interpret the axis/offset settings separately. Translated and
-rotated mounts are supported. Poses reflect stepping, state assignment and
-selective reset. `get_sensor_data(camera_name)` directs callers to these
-accessors. Image generation and scene-level camera authoring are out of scope.
-Every spawn verifies authored camera inventory, mounts, attachments and settings.
+Dimensions are pixels, FOV is degrees, and distances are metres. The returned pose
+is the mounted sensor frame, not a renderer's optical view matrix; interpret the
+axis/offset settings separately. Poses update after stepping, state writes and
+selective reset. Spawn-time validation checks camera inventory, mounts and settings.
+Do not infer native scene-camera support from native bot-camera support.
 
-### Explicit controller execution
+### Built-in controllers
+
+| Controller | Shared target type | Meaning |
+| --- | --- | --- |
+| `BASIC_JSC_PD` | `JointTarget` | Desired joint positions |
+| `BASIC_OSC_PD` | `CartesianTarget` | Desired end-effector pose in the documented controller frame |
+| `MOCHI_ARTICULATED_POSE` | `ArticulationPoseTarget` | Desired root/articulation pose |
+
+Call `get_controller_descriptions()` for model-specific availability. These APIs
+require a compatible native bot/archive; the Cart Pole scene example is not a
+valid backend for configuring these bot controllers. Authored scene pose controllers
+are a separate scene-loading feature.
+
+This complete example uses fixed-base FR3 and holds its initial joint target:
 
 ```python
 import json
-from unisim import JointTarget
-
-# A fixed-base robot: every array contains one entry per native actor DOF.
-n = backend.num_actuators
-backend.configure_controller(
-    "BASIC_JSC_PD",
-    param_args=json.dumps({"Kp": [10.] * n, "Kd": [1.] * n,
-                           "saturation": [2.] * n, "deadband": [0.] * n}),
-)
-targets = [JointTarget(q) for q in backend.get_dof_pos()]
-backend.step_controller(targets, nsteps=8)
-backend.clear_controller()
-```
-
-`param_args` and `init_args` accept SDK inline JSON or parameter-file strings.
-File paths passed to this API follow the SDK's working-directory rules; the
-qualification CLI resolves its config-file references relative to that file.
-Controller instances and histories are independent per environment. One type
-is configured at a time; clear it before switching. While configured, ordinary
-`step(ctrl)` and user pre-step callbacks are rejected. Clearing restores ordinary
-torque stepping and removes any solver-side pose controller.
-
-| Controller identifier | Shared target and coordinate convention |
-| --- | --- |
-| `BASIC_JSC_PD` | `JointTarget(positions)`: `get_dof_pos()` order, excluding floating roots. Radians for hinges/spherical rotation vectors, metres for slides. Authored gains/saturation/deadband still cover native DOFs; use zero root gains for an unactuated base. |
-| `BASIC_OSC_PD` | `CartesianTarget(pose)`: xyz + wxyz relative to the configured root link. `init_args` retains authored `baseLinkName` and `eeLinkName`. |
-| `MOCHI_ARTICULATED_POSE` | `ArticulationPoseTarget(root_pose, joint_positions=...)` or `link_poses=...`: world xyz + wxyz root pose; joint positions in public order or parent-relative xyz + wxyz poses for every link, including the root. |
-
-`get_controller_descriptions()` gives identifiers, availability reasons, target
-kinds, coordinate names and link ordering for the loaded profile. A descriptor
-is not permission to replace an authored scene controller. All target arrays are
-validated for the complete environment batch before stepping. SDK objects are
-created internally. Existing native target objects remain accepted with
-`DeprecationWarning`; new callers should use the shared types exported by `unisim`.
-
-JSC/OSC read fresh native observations each physics substep and their joint
-outputs are clipped to the adapter's effort limits. Nonzero free-root effort
-is rejected. The pose controller uses the native implicit solver: its
-saturation limits the elastic contribution, not total torque. No gravity
-compensation, IK, controller composition or policy logic is added.
-
-The current SDK cannot initialize OSC on the tested floating-base bot because
-its effort-limit lookup mixes bot and actor DOF indices. The adapter reports
-this as unsupported with the SDK cause; it does not change the model or solver.
-JSC and articulated-pose execution are tested on fixed and floating roots.
-
-Both execution modes compute controllers between completed physics steps;
-Python callbacks do not execute inside native workers. Reset/state assignment
-resets only selected controller instances, and targets are supplied afresh on
-every `step_controller` call. Parameter/target errors are validated before
-advancing physics; failed initialization releases partial controller instances.
-
-### Universal qualification
-
-Select explicit bots or the whole bundle. Optional rigid fragments and explicit
-effort limits work independently of camera/controller support:
-
-```bash
-uv run scripts/superdex_component_qualify.py \
-    --bots bots/arms/fr3_v2/fr3_v2.superdex_bot --effort-limit 87,87,87,87,12,12,12
-uv run scripts/superdex_component_qualify.py \
-    --bots bots/hands/wuji_hand2_beta1/left/wuji_hand2_beta1_left.superdex_bot \
-    --effort-limit 1 --scene prefabs/sphere/sphere.mochi_prefab
-uv run scripts/superdex_component_qualify.py --all
-uv run scripts/superdex_component_qualify.py \
-    --bots bots/arms/fr3_v2/fr3_v2.superdex_bot --effort-limit 87,87,87,87,12,12,12 \
-    --controller-config docs/superdex-component-qualification/configs/fr3-jsc.json \
-    --out /tmp/fr3-jsc-qualification
-uv run pytest -q tests/test_superdex_component_qualification.py
-```
-
-Controller configuration files contain `type_name`, `param_args` and `init_args`;
-the latter two are SDK JSON/file strings. Examples for all three controllers
-live in `superdex-component-qualification/configs/`. The runner builds its own
-SDK reference, compares 1,040 physics steps in batch and serial modes, checks
-camera metadata/poses, rigid fragments, effort clipping, reset, isolation and
-lifecycle. It reports absent cameras as skipped. Unsupported models are blocked;
-other exceptions and numerical mismatches fail. `--all` continues after either
-and exits nonzero if any model fails or is blocked. Qualification is evidence
-for the recorded fixtures, not a guarantee for every asset.
-
-
-## Native scenes (stage 7)
-
-`SceneCfg.model_file` accepts `.mochi_scene` files with one root-file articulation
-containing fixed/revolute/prismatic joints, including a prismatic first joint,
-plus independent rigid actors and nested rigid prefabs. Additional rigid
-`SceneCfg.fragment_files` use the existing path-resolution rule. Set
-`SUPERDEX_ASSETS_PATH` to the local bundle root for bundle-relative mesh references.
-
-```python
 import os
 from pathlib import Path
 
-from unisim import create_backend
+from unisim import JointTarget, create_backend
 from unisim.scene import SceneCfg
 
-assets = Path(os.environ["SUPERDEX_ASSETS_PATH"])
+assets = Path(os.environ["SUPERDEX_ASSETS_PATH"]).expanduser().resolve()
 backend = create_backend(
     "superdex",
-    SceneCfg(str(assets / "benchmarks/cart_pole/cart_pole.mochi_scene")),
-    num_envs=2,
-    sim_dt=0.002,
-    superdex_controlled_joints=["Cart"],
-    superdex_effort_limits=[3.0],
+    SceneCfg(str(assets / "bots/arms/fr3_v2/fr3_v2.superdex_bot")),
+    num_envs=1, sim_dt=0.002,
+    superdex_execution_mode="serial",
+    superdex_effort_limits=[87, 87, 87, 87, 12, 12, 12],
 )
 try:
-    import numpy as np
-
-    backend.step(np.zeros((2, 1)))  # Physical force along the Cart joint axis.
-    backend.reset()
+    print(backend.get_controller_descriptions())
+    n = backend.num_actuators
+    backend.configure_controller(
+        "BASIC_JSC_PD",
+        param_args=json.dumps({
+            "Kp": [10.0] * n,
+            "Kd": [1.0] * n,
+            "saturation": [2.0] * n,
+            "deadband": [0.0] * n,
+        }),
+    )
+    targets = [JointTarget(q.copy()) for q in backend.get_dof_pos()]
+    backend.step_controller(targets, nsteps=8)
+    backend.clear_controller()
 finally:
     backend.close()
 ```
 
-`superdex_controlled_joints` is required for scene inputs and determines action
-order. Names must uniquely select active authored hinge/slide joints; fixed or
-unknown joints are rejected. `superdex_effort_limits` supplies one finite
-positive limit per input. Controls are clipped physical forces/torques; passive
-joints remain in state but receive no selected effort. These options do not
-change native bot or MJCF controls; `controlled_joints` is rejected for those inputs.
+For PD control, `Kp` multiplies position error and `Kd` provides damping; saturation
+limits output. Configure one controller per environment, use `step_controller()`,
+then clear it before switching control paths. A pre-step callback and a configured
+controller cannot be active together. The example's parameter-array lengths are
+for fixed-base FR3; native floating-root configurations may need root placeholders.
+Floating-base OSC is explicitly unavailable because of the SDK indexing limitation.
 
-| Qualified scene | Physical effort inputs | Limits | State dimensions |
-| --- | --- | --- | --- |
-| Cart Pole | `Cart` | 3 | nq=nv=2 |
-| Half Cheetah | `BackThigh`, `BackShin`, `BackFoot`, `FrontThigh`, `FrontShin`, `FrontFoot` | 120, 90, 60, 120, 60, 30 | nq=nv=9 |
+Native SDK targets are deprecated; use the shared target types. Configuration
+files contain `type_name`, `param_args`, `init_args`, with SDK JSON strings or file
+paths. CLI configuration-file paths resolve relative to the config file.
+Absolute-target JSON schemas and ready-made FR3 examples are in
+[superdex-configs/](superdex-configs/); CLI targets must match the configured type.
 
-Scene gravity and solver settings are preserved; absent values use SDK defaults.
-These two scenes use gravity `[0, -9.8, 0]`, not the bot loader's negative-Z
-convention. `sim_dt` remains caller-owned: the SDK scene schema has no timestep
-field, and such fields are rejected. Nested scene settings must match the root's
-explicit values; conflicting or otherwise unresolved settings fail. No gravity
-or solver override options are added. Effective settings appear in the report.
+<a id="tools"></a>
+## 6. View and compare models
 
-The SDK loader retains actor names, shapes, transforms and authored layer-contact
-filters. Half Cheetah's joint-tracking controller supplies rest springs while
-`step()` applies external efforts. Reset restores the initial spring targets and
-velocities without destroying snapshot-owned controller entities. The explicit
-bot controller API cannot replace an authored scene controller. Native coordinates
-are preserved, and there is no implicit ground plane: the benchmark application
-adds ground separately. UniLab owns action normalization, rewards and training.
-
-All articulation DoFs precede dynamic rigid-object coordinates. Each dynamic
-rigid object adds world xyz/wxyz qpos and world-origin linear/body-angular qvel;
-static fixtures add body entries but no coordinates. Existing body, force,
-full/selective reset and state-roundtrip APIs apply to the complete scene.
-State round trips restore kinematics, not hidden solver history. Each environment
-owns its actors/controllers; failed partial instantiation is cleaned up.
-
-The historical Stage 7 profile excluded multiple articulations, FREE/spherical scene joints,
-mechanical cycles, soft bodies, scene cameras/plugins, arbitrary constraints,
-non-rigid nested prefabs and controllers other than joint-tracking pose springs.
-Stage 8 extends those rigid capabilities below. Deformables and custom
-components remain deferred, and unsupported fields fail explicitly.
+### Viewer: inspect geometry and behavior
 
 ```bash
-SUPERDEX_ASSETS_PATH="$PWD/assets/superdex" uv run --no-sync scripts/superdex_scene_qualify.py
-SUPERDEX_ASSETS_PATH="$PWD/assets/superdex" uv run --no-sync pytest -q tests/test_superdex_scenes.py
-uv run --no-sync scripts/superdex_scene_qualify.py --viewer --scenes half_cheetah
-uv run --no-sync scripts/superdex_scene_qualify.py --viewer --frames 240
+uv run --no-sync scripts/superdex_viewer.py bots/arms/fr3_v2/fr3_v2.superdex_bot
+uv run --no-sync scripts/superdex_viewer.py prefabs/sphere/sphere.mochi_prefab
+uv run --no-sync scripts/superdex_viewer.py bots/arms/fr3_v2/fr3_v2.superdex_bot --compare
+uv run --no-sync scripts/superdex_viewer.py --list-profiles
 ```
 
-The [Stage 7 report](superdex-scene-qualification/README.md) records 1,000 steps
-per scene in each execution mode, with two environments, zero measured SDK
-state/body-position deviation and passing reset/isolation/control/lifecycle checks.
-Both 240-frame renderer smokes passed with zero reset error. Manual visual
-inspection remains outstanding; no other scene is qualified by these results.
+| Option / mode | Behavior |
+| --- | --- |
+| Normal viewer | Loads and steps through the adapter's public API; `run_playback()` opens the native viewer |
+| `--compare` | Adds an independent direct-SDK simulation/window; both advance together and close together |
+| Registered bot profile | Default-pose hold, bounded movement and reset demonstration |
+| Unknown supported model | Passive stepping; no invented control profile |
+| `--controlled-joints Cart --effort-limit 3.0` | Selects scene/prefab controls and their scalar limit |
+| `--controller-config FILE --absolute-target FILE` | Uses a compatible bot/archive controller and matching target |
+| `--fragments FILE ...` | Adds rigid prefab fragments to a bot/archive |
+| `--no-gravity` | Overrides gravity with zero for this session |
+| `--frames N` | Explicit headless renderer smoke; at least 6 frames |
+| `--out results/viewer.json` | Opt-in JSON evidence file |
 
+Passive does not mean frozen: gravity and authored dynamics still act. Smoke runs
+exercise startup/stepping/reset/cleanup but do not establish human visual approval.
+The viewer saves no images or videos. SDK comparison accepts native inputs; audited
+MJCF retains the single adapter viewer and its existing pytest coverage.
 
-## Complete native rigid-body profile (Stage 8)
+The backend also has a separate **offline recording** path when a compatible
+visual MJCF model is available (`SceneCfg.visual_model_file` for native assets).
+That path uses the shared MuJoCo renderer and can work in serial or batch mode;
+it is not camera image capture and is not the viewer script's `--frames` mode.
+The native interactive path rejects debug-overlay and `on_frame` callbacks.
 
-Use externally authored assets through `SceneCfg` and `create_backend`; no scene
-builder is introduced. Inputs include native bots, bot archives, standalone
-rigid/articulated prefabs and scenes with zero, one or multiple articulations.
-New profiles require `num_envs=1` and `superdex_execution_mode="serial"`.
-Previously qualified batch profiles retain their regression coverage.
+### Comparison: verify adapter-versus-SDK agreement
 
-```python
-backend = create_backend(
-    "superdex", SceneCfg("/path/to/authored_scene.mochi_scene"), 1, 0.002,
-    superdex_execution_mode="serial",
-    superdex_controlled_joints=["arm/shoulder", "hand/ball"],
-    superdex_effort_limits=[10, 1, 1, 1],  # hinge plus three spherical DOFs
-)
+```bash
+export SUPERDEX_ASSETS_PATH="$PWD/assets/superdex"
+uv run --no-sync scripts/superdex_compare.py bots/arms/fr3_v2/fr3_v2.superdex_bot
+uv run --no-sync scripts/superdex_compare.py --all
+uv run --no-sync scripts/superdex_compare.py --all --match hand
+uv run --no-sync scripts/superdex_compare.py --fixtures
+uv run --no-sync scripts/superdex_compare.py --all --out results/superdex
+uv run --no-sync scripts/superdex_compare.py bots/arms/fr3_v2/fr3_v2.superdex_bot \
+    --controller-config docs/superdex-configs/fr3-jsc.json \
+    --absolute-target docs/superdex-configs/fr3-jsc-absolute.json
 ```
 
-Spherical qpos uses native joint-frame rotation-vector XYZ, with three native
-velocity and effort coordinates. The bare joint name expands to its three DOFs;
-explicit `/x`, `/y`, `/z` names select individual coordinates. Metadata records
-actual joint ownership, rather than guessing from these suffixes. Closed-loop
-constraints and transmissions do not add action coordinates. Limits stay in the
-native solver and effort limits apply per selected control coordinate.
+Both sides use **SuperDex physics**. One side is loaded/stepped through UniSim;
+the reference is independently materialized through the SDK. Matching conditions
+include initial state, controls, timestep, gravity and solver settings. This tests
+adapter fidelity, not equivalence between SuperDex and a different physics engine.
 
-`backend.model.articulations` records each articulation's qpos/qvel and link
-slices. Each free root adds seven qpos and six qvel values; roots retain the
-world-position/wxyz and world-origin-linear/body-angular convention, including
-nested rotated/translated reference frames. Dynamic rigid objects follow all
-articulations. `get_root_state_layout()` exposes each root. Multiple articulations
-use actor-qualified names, and ambiguous repeated actor names gain stable
-`#index` metadata suffixes without renaming native actors. Whole-joint index
-queries expand to all coordinates. `model.joint_coordinate_groups` exposes the
-mapping. Body forces use the owning articulation's Jacobian and every scene
-advances exactly once per substep.
+`--all` discovers models in the repository-local roots; `--roots DIR ...` chooses
+explicit roots. `--fixtures` generates regression models temporarily. Each model
+runs in an isolated subprocess; crashes/timeouts are recorded and later models
+continue. Tests cover routing/clipping, native and public state, body poses/velocities,
+contacts, cameras/controllers, resets, cleanup/recreation and qualified batch modes.
+Use `--composition FRAGMENT ...` with one bot to compare rigid-object composition.
 
-For articulated scenes/prefabs, explicitly select controls or provide `[]` for
-passive operation. Object-only scenes have zero actions. Authored constraints,
-tracking controllers (joint, link position and link rotation), contact filters,
-articulated skin, settings and initial velocities remain SDK-owned. State round
-trips restore kinematics; reset restores authored controller targets and scene
-state. No ground plane, coordinate conversion or scene assembly is implicit.
+| Result | Interpretation |
+| --- | --- |
+| Passed | The checks executed for this profile met their tolerances |
+| Blocked / unsupported | A named feature prevents this profile; never counted as passed |
+| Failed | An assertion, numerical check or other execution error failed |
+| Crashed / timeout | Worker terminated abnormally or exceeded its time budget |
+| Unverified | The required runtime was unavailable; no successful qualification |
 
-Bot archives and tagged external bot dependencies use the SDK resolver. For
-physics prefabs/scenes, use the nearest `.superdex_root`, or set
-`SUPERDEX_ASSETS_PATH` for root-relative dependencies; `./` paths resolve beside
-the containing file. External roots do not need the historical bundle layout or
-checksum. Qualification fixtures remain local and independent of the SDK checkout.
+Expected static blockers do not make an otherwise successful sweep fail. Numerical
+failures, unexpected runtime rejections, missing runtimes, crashes and timeouts
+produce a nonzero exit code. Read the result counts, not only the exit code.
+`--out` writes `comparison.json` with checks, limitations and reproducibility
+fingerprints into the specified directory. Use ignored `results/`; never commit
+those outputs. No persistent report is written without `--out`.
 
-See the [Stage 8 report](superdex-rigid-qualification/README.md) for all 55 native
-target files, 11 synthetic fixtures, SDK/build fingerprints and exact evidence.
-The passive torso runner uses one serial environment. Runtime URDF's documented
-primitive-geometry loss and the tested floating OSC limitation are SDK blockers,
-not adapter support claims. Deformables, custom components, new batch execution,
-image rendering, conversion and solver work remain deferred.
+Default bot/controller rollouts are 1040 physics steps; scenes/compositions use
+1000. Bot/controller `--steps` overrides use complete eight-step intervals and
+can shorten the evidence. The nested robot-contact fixture retains 1000 steps at
+1 ms. A reduced run is not the full baseline, and a zero-gravity pass is not a
+qualification under gravity.
 
+<a id="assets"></a>
+## 7. Resolve and verify assets
 
-## Shared-interface alignment
+The main local bundle is `assets/superdex`; physics examples are under
+`assets/superdex-physics`. Payloads/licenses stay local and are excluded from
+package distributions. Maintenance uses `scripts/copy_superdex_assets.py`;
+qualification must not read the SDK source checkout or modify asset payloads.
 
-Application code can use the qualified SuperDex rigid profiles entirely through
-`SimBackend`. Native SDK handles remain private. The controller identifiers and
-configuration files are runtime-specific authored inputs, not portable controller
-algorithms; the public target values and method signatures are shared.
+For the viewer, `--assets ROOT` takes precedence over `SUPERDEX_ASSETS_PATH`, then
+the repository default. An existing explicit model path is accepted directly;
+otherwise the viewer resolves it under the selected root. It passes that root to
+both adapter and comparison workers. An external model without an explicit root
+or environment setting retains a local-directory fallback.
 
-```python
-from unisim import create_backend
-from unisim.scene import SceneCfg
-import numpy as np
+Dependency resolution is distinct from locating the model file. A nearby
+`.superdex_root` defines authored root references; scene `./...` dependencies are
+relative to the containing document, while ordinary relative scene references use
+the resolved asset root. Native bot bundles can also declare tagged dependency
+roots. Preserve authored references instead of moving individual model files away
+from their dependencies. Archives need `.mochi_bot_archive_metadata` naming their
+packed bot and the complete dependency closure.
 
-backend = create_backend(
-    "superdex", SceneCfg("assets/superdex/bots/grippers/2f_85/2f_85.superdex_bot"),
-    num_envs=1, sim_dt=0.002, superdex_execution_mode="serial",
-    superdex_effort_limits=1.0,  # expanded after native DOF discovery
-)
-try:
-    info = backend.get_model_info()
-    backend.set_gravity([0, 0, 0])  # world m/s², every environment, persists across reset
-    backend.step(np.zeros((backend.num_envs, backend.num_actuators)))
-    state = backend.get_state()
-    backend.reset()
-finally:
-    backend.close()
+The tracked [JSON inventory](superdex-assets-inventory.json) records provenance,
+hashes and dependencies, including packed archives. **Inventory candidates are not
+runtime qualifications.** The adapter does not re-hash the entire bundle on every load.
+
+Verify the local bundle against the existing inventory:
+
+```bash
+uv run --no-sync python - <<'PYTHON'
+from pathlib import Path
+from unisim.backend.superdex.assets import verify_asset_bundle
+
+print(verify_asset_bundle(
+    Path("assets/superdex"), Path("docs/superdex-assets-inventory.json")
+))
+PYTHON
 ```
 
-`get_model_info()` returns detached state dimensions, body names/parents,
-articulation ownership and state slices, joint-coordinate names/groups, and
-position/velocity indices, representations and units. Coordinate tables use
-`get_dof_pos()`/`get_dof_vel()` order. Spherical positions are rotation vectors;
-spherical velocities are joint-frame angular velocities, not rotation-vector
-derivatives. Floating root layouts remain world xyz/wxyz, world-origin linear
-velocity and body-frame angular velocity. Bot-level `worldFromRoot` placement is
-included, correcting the previous floating-state frame mismatch in Oculus hands. `backend.model` remains available for
-compatibility and diagnostics but is unnecessary for normal application setup.
+After an intentional local bundle change, refresh the manifest instead:
 
-A positive scalar effort limit expands over selected coordinates; a sequence
-must have exactly that many entries. Omission retains authored bot limits and
-errors if those are missing/invalid. Scenes still require explicit joint selection
-(use `[]` for passive scenes); selecting a spherical joint expands all three
-coordinates before limits are resolved. Invalid values are rejected even for an
-empty control vector. Ordinary native `step()` remains physical effort input.
+```bash
+uv run --no-sync scripts/copy_superdex_assets.py --inventory-only
+```
 
-`get_camera_*`, controller methods, `get_model_info()` and `set_gravity()` are
-optional shared operations: other adapters raise `NotImplementedError` until
-implemented. `close()` has an idempotent artifact-cleanup default; native adapters
-retain their resource owners. Geometry queries, domain randomization, image
-capture and the existing SDK-blocked profiles are not newly enabled.
+This refresh uses the local bundle and writes only the inventory JSON. It is not
+a way to repair accidentally missing assets. Keep this guide's limitations report
+current when asset coverage changes; generated Markdown compatibility tables are
+no longer maintained.
 
-Both native viewers use public metadata and methods. The rigid viewer accepts
-`--no-gravity`; it neither imports the SDK nor accesses private backend handles.
-Qualification tools retain clearly identified white-box native audits for
-compiled structure/contact checks and separate direct-SDK reference loops.
-New evidence is recorded in [the interface qualification report](superdex-interface-qualification/README.md);
-Stage 1–8 numerical reports retain their original results and fingerprints.
+<a id="architecture"></a>
+## 8. Understand the code and public interface
+
+```text
+Application / UniLab / normal viewer
+    -> create_backend("superdex", ...)
+    -> SuperDexBackend implementing SimBackend
+    -> SuperDex Physics / Robotics SDK
+```
+
+The [factory](../src/unisim/factory.py) selects the adapter;
+[SimBackend](../src/unisim/backend/base.py) declares the shared public interface.
+All current SuperDex public method names belong to that interface. Shared
+**declaration** does not imply support in every engine: defaults can raise
+`NotImplementedError`, and implementations can restrict models/modes.
+
+| Module in `src/unisim/backend/superdex/` | Responsibility |
+| --- | --- |
+| `__init__.py` | Exports `SuperDexBackend` and `SuperDexDependencyError` |
+| `backend.py` | Main class; lifecycle, stepping, state, forces, playback |
+| `components.py` | Camera validation and inherited camera/controller APIs (`BuiltinAPI`) |
+| `model.py` | Layouts, coordinate/root transformations and public metadata |
+| `runtime.py` | SDK discovery, runtime ownership, CPU topology |
+| `materialization.py` | Bot/archive and audited MJCF materialization, geometry |
+| `scenes.py` | Scene/prefab validation, loading and composition |
+| `assets.py` | Inventory, dependency closure and integrity verification |
+
+`SuperDexBackend(BuiltinAPI, SimBackend)` inherits the camera/controller methods
+from `components.py`. Therefore `backend.get_camera_names()` is a public adapter
+call even though its implementation is in another file.
+
+Three common calls illustrate where declarations and implementations differ:
+
+| Call | Declaration | Implementation used by SuperDex |
+| --- | --- | --- |
+| `backend.step(...)` | `SimBackend` | Override in `backend.py` |
+| `backend.reset(...)` | `SimBackend` | Inherited shared implementation, which calls SuperDex's `set_state()` |
+| `backend.get_camera_names()` | `SimBackend` | Override inherited from `BuiltinAPI` in `components.py` |
+
+Camera/controller operations can therefore belong to the shared interface even
+when only SuperDex currently implements them. Internal helpers such as `_refresh()`
+are not public interface methods and need not appear in `SimBackend`.
+
+These modules are not an enforced private boundary. The comparison tool directly
+uses asset/runtime/scene utilities and internal actor handles to inspect fidelity.
+The viewer's comparison worker also uses runtime helpers for its direct SDK scene.
+Asset-maintenance callers use `assets.py` directly. Normal simulation application
+code should stay on the public backend interface; private helpers/handles are not
+part of its compatibility contract.
+
+<a id="limitations"></a>
+## 9. Current limitations and unsupported assets
+
+This maintained report lists **direct model inputs** that cannot currently load.
+Supporting geometry, textures, CAD and configuration files are excluded.
+All ten rows below were identified by **static validation**, including recipe
+closure, not by successful SDK execution. They are adapter restrictions; claims
+about SDK behavior require separate direct evidence.
+
+| Model (relative to `assets/`) | Format | Unsupported feature | Blocker | Checked | Enabling capability |
+| --- | --- | --- | --- | --- | --- |
+| `superdex/test/urdf/fr3v2_1_urdf/robots/fr3v2_1_franka_hand.urdf` | URDF | direct URDF model loading | adapter restriction; historical SDK primitive-geometry loss also requires investigation | static validation | URDF ingestion or conversion to the audited MJCF profile |
+| `superdex/bots/fun/example_bot_2dof/example_bot_2dof.superdex_bot` | bot | custom actuator/sensor components (`MY_VELOCITY_SERVO_ACTUATOR`, `MY_CONTACT_FORCE_SENSOR`) | adapter restriction | static validation | translation of authored custom components; only `SENSOR_CAMERA` is supported |
+| `superdex/bots/sensors/dg5f_seed/dg5f_seed.superdex_bot` | bot | seed sensor component (`SENSOR_SEED_V1_MLP`) | adapter restriction | static validation | learned-sensor translation |
+| `superdex/bots/hands/dg5f_long_seed/left/dg5f_long_seed_left.superdex_bot` | bot | five seed sensors inherited through `AttachBot` recipes | adapter restriction | static validation (recipe closure) | learned-sensor translation |
+| `superdex/bots/hands/dg5f_long_seed/right/dg5f_long_seed_right.superdex_bot` | bot | five seed sensors inherited through `AttachBot` recipes | adapter restriction | static validation (recipe closure) | learned-sensor translation |
+| `superdex/bots/hands/dg5f_short_seed/left/dg5f_short_seed_left.superdex_bot` | bot | five seed sensors inherited through `AttachBot` recipes | adapter restriction | static validation (recipe closure) | learned-sensor translation |
+| `superdex/bots/hands/dg5f_short_seed/right/dg5f_short_seed_right.superdex_bot` | bot | five seed sensors inherited through `AttachBot` recipes | adapter restriction | static validation (recipe closure) | learned-sensor translation |
+| `superdex/bots/arm_hand_combos/fr3_dg5f_short_seed/right/fr3_dg5f_short_seed_right.superdex_bot` | bot | seed sensors inherited transitively through the attached seed hand | adapter restriction | static validation (recipe closure) | learned-sensor translation |
+| `superdex/prefabs/duck_lamp/duck_lamp_recumbent.mochi_prefab` | prefab | deformable (`soft`) actors — neoHookean material | adapter restriction | static validation | soft-body actor support in the audited scene profile |
+| `superdex-physics/samples/articulations_soft_skinned_double_pendulum.mochi_scene` | scene | deformable (`softSkinned`) actors | adapter restriction | static validation | soft-skinned actor support |
+
+A recipe can attach a bot containing an unsupported component. The blocker then
+propagates to the containing hand or arm-hand assembly even when its top-level
+file does not declare the component itself. Native bots currently accept
+`SENSOR_CAMERA`; custom actuators and learned seed sensors remain unsupported.
+
+### Restrictions that do not block every use of a model
+
+- Floating-base OSC is unavailable because of the SDK's bot-space/actor-space
+  effort-indexing mismatch; other supported control paths may still work.
+- Near-massless spherical hands are sensitive to gravity/probe torques in the debug
+  SDK. The comparison profile uses zero gravity and armature-scaled probes on both sides.
+- Deep self-collision history can trigger a native contact-query assertion; the
+  penetrating-contact check uses a fresh reference scene.
+- Passive scenes have no selected action space but can still load and simulate.
+- Model domain randomization, ROM/deformable/tactile state, GPU batched physics,
+  and the base interface's standalone image-capture APIs are not provided by this
+  profile. Playback support is described separately in section 6.
+
+The ten rows are the maintained local-bundle baseline, not proof that every future
+asset is supported. Fold newly discovered blockers into both language versions.
+Historical URDF primitive-geometry loss in the SDK still needs independent
+revalidation before planning a faithful importer.
+
+<a id="troubleshooting"></a>
+## 10. Troubleshoot common failures
+
+| Symptom | Meaning and action |
+| --- | --- |
+| Missing model | Check the local bundle, working directory and `--assets` / environment setting |
+| Mesh path repeats `benchmarks/cart_pole` | Model lookup and dependency loading used different roots; the viewer now propagates its selected root. For direct API use, export the correct `SUPERDEX_ASSETS_PATH` |
+| Explicit finite effort limits required | Supply positive scalar/per-coordinate limits in actuator order |
+| Explicit controlled joints required | Supply an ordered scene selection, or `[]` for passive loading |
+| Batch incompatible with debugger / advanced profile | Use serial mode; advanced profiles and interactive viewing also need one environment |
+| Controller configuration rejected | Check `get_controller_descriptions()`, model type, target type and native parameter dimensions |
+| No camera images | Camera accessors provide metadata/poses, not pixels; use the supported playback path for visualization |
+| Zero contact flags immediately after reset | Take a positive physics step; contacts describe the previous completed solve |
+| Asset works in another loader but is blocked here | Check the unsupported fields/components; UniSim rejects content it cannot faithfully translate |
+
+<a id="validation"></a>
+## 11. Validate changes and track remaining work
+
+```bash
+export SUPERDEX_ASSETS_PATH="$PWD/assets/superdex"
+uv run --no-sync scripts/superdex_compare.py --all --fixtures
+UV_NO_SYNC=1 make check
+make package
+```
+
+
+Use `uv lock --check` when dependency metadata changes. SDK-dependent tests require
+the optional runtime; asset-dependent tests use `SUPERDEX_ASSETS_PATH`. Core
+contract/import tests also run without native runtimes. Packaging must exclude
+asset payloads and generated results. No validation command implies a release or commit.
+
+| Check | What it establishes |
+| --- | --- |
+| Inventory verification | File/dependency integrity |
+| `make check` | Lint and regression tests |
+| Comparison tool | Direct SDK agreement for the exercised conditions |
+| Viewer `--frames` | Automated native renderer smoke |
+| Interactive human inspection | Visual assessment of geometry and behavior |
+| `make package` | Distribution build succeeds |
+
+The two runnable tools consolidate qualification/viewing workflows, not all unit
+tests. Focused pytest coverage remains in `tests/`:
+
+| Retained family | Comparison helper / regression location |
+| --- | --- |
+| FR3, bot routing/clipping, PD, contacts, reset, batch/serial | `check_bot`; bot/FR3 qualification tests |
+| FREE roots and translated/rotated authored frames | `check_bot`; `test_superdex_native_floating.py` |
+| Rigid scenes, multiple articulations, nested prefabs/controllers | `check_scene`; scene/rigid tests |
+| Robot plus nested sphere/peg board, actual robot contact/isolation | `check_prefab_contact` via `--fixtures`; prefab tests |
+| Cameras, controller substeps, forces, selective reset, link targets | `check_controller`; component/shared API tests |
+| Archives, spherical joints, tendons, coupled actuation | Synthetic fixtures; rigid/shared API/inventory tests |
+| Audited MJCF and lazy imports | Materialization/contract/import tests |
+
+Remaining work: learned/custom components, soft/soft-skinned bodies, faithful URDF
+loading, batch support for advanced trees, and human visual approval of qualified
+scenes. UniLab owns training, task rollouts and sim2sim policy validation.

@@ -1,4 +1,4 @@
-"""Audited, cold-path native-bot and MJCF materialization for SuperDex."""
+"""Audited, cold-path native-bot, MJCF and geometry materialization for SuperDex."""
 
 from __future__ import annotations
 
@@ -10,18 +10,73 @@ from typing import Any
 
 import numpy as np
 
-from unisim.backend.superdex.components import (
-    audit_components,
-    expected_parameters,
-    verify_cameras,
-)
-from unisim.backend.superdex.geometry import primitive_shape, rotation_matrix
-from unisim.backend.superdex.joints import coordinate_groups, coordinate_kinds, joint_coordinates
-from unisim.backend.superdex.plans import ModelPlan, SensorPlan
-from unisim.backend.superdex.root_state import RootReference
 from unisim.scene import SceneCfg
 from unisim.utils.rotation import np_quat_apply_batched, np_quat_mul_batched
 
+from .model import (
+    ModelPlan,
+    RootReference,
+    SensorPlan,
+    coordinate_groups,
+    coordinate_kinds,
+    joint_coordinates,
+)
+
+# --------------------------------------------------------------------- #
+# Cold construction of audited MJCF primitive collision meshes
+# --------------------------------------------------------------------- #
+
+def rotation_matrix(quat: Any) -> np.ndarray:
+    """Convert a canonical wxyz quaternion without importing an engine."""
+    q = np.asarray(quat, dtype=float)
+    q = q / np.linalg.norm(q)
+    w, x, y, z = q
+    return np.array(
+        [
+            [1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+            [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+            [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)],
+        ]
+    )
+
+
+def primitive_shape(physics: Any, kind: str, size: Any, pos: Any, quat: Any) -> Any:
+    """Bake a primitive into body coordinates and build its collision SDF.
+
+    Even spheres need a surface mesh for a dynamic SuperDex link. Mesh/SDF
+    sampling approximates the analytic MJCF surface; it is never done at reset.
+    """
+    import trimesh
+
+    size = np.asarray(size)
+    if kind == "box":
+        mesh = trimesh.creation.box(extents=2 * size[:3])
+    elif kind == "sphere":
+        mesh = trimesh.creation.icosphere(subdivisions=2, radius=float(size[0]))
+    elif kind == "cylinder":
+        mesh = trimesh.creation.cylinder(radius=float(size[0]), height=2 * size[1], sections=32)
+    elif kind == "capsule":
+        mesh = trimesh.creation.capsule(radius=float(size[0]), height=2 * size[1], count=[16, 32])
+    elif kind == "ellipsoid":
+        mesh = trimesh.creation.icosphere(subdivisions=2)
+        mesh.vertices *= size[:3]
+    else:
+        raise NotImplementedError(f"superdex collision geometry {kind!r} is unsupported")
+    vertices = np.asarray(mesh.vertices) @ rotation_matrix(quat).T + np.asarray(pos)
+    dtype = np.float64 if physics.uses_double_precision() else np.float32
+    native_mesh = physics.MeshData(
+        nodes_per_element=3,
+        coordinates=np.asarray(vertices, dtype=dtype).ravel(),
+        connectivity=np.asarray(mesh.faces, dtype=np.int32).ravel(),
+    )
+    model = physics.ModelData(mesh=native_mesh)
+    physics.model.bake_sdf(model)
+    return physics.create_model_shape(model)
+
+
+# --------------------------------------------------------------------- #
+# Native bot, bot-archive and audited MJCF materialization
+# --------------------------------------------------------------------- #
 
 def _noop() -> None:
     pass
@@ -66,7 +121,7 @@ def materialize_model(
     if path.suffix in {".superdex_bot", ".superdex_bot_archive"}:
         plan = _native_plan(physics, robotics, path, effort_limits)
         if scene.fragment_files:
-            from .prefabs import compose_rigid_prefabs
+            from .scenes import compose_rigid_prefabs
 
             return compose_rigid_prefabs(physics, plan, scene)
         return plan
@@ -118,6 +173,8 @@ def _native_plan(p: Any, r: Any, path: Path, efforts: float | Sequence[float] | 
     ):
         raise NotImplementedError("superdex native bot supports fixed/hinge/slide/spherical joints")
     names, active, ranges, native_indices = joint_coordinates(p, joints)
+    from .components import audit_components, expected_parameters
+
     cameras = audit_components(links)
     camera_params = {item.name: expected_parameters(r, item, path) for item in cameras}
     qoffset, voffset = (7, 6) if floating else (0, 0)
@@ -133,6 +190,8 @@ def _native_plan(p: Any, r: Any, path: Path, efforts: float | Sequence[float] | 
     bot = None
     try:
         bot = r.create_bot(temp, cfg, context)
+        from .components import verify_cameras
+
         verify_cameras(bot, cameras, camera_params)
         actor = bot.get_articulated_actor()
         joint_coordinates(p, joints, actor)

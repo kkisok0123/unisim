@@ -7,11 +7,11 @@
     "source_initial_commit": "1d7150946fa3f3d3fb09c2bff07eaa138cbfdee6",
     "local_derivative_paths": [],
     "historical_upstream_sha": "ed30ce16361329cbbed956173d6a4f5842815d24",
-    "generated_utc": "2026-09-18T02:44:47Z"
+    "generated_utc": "2026-09-18T07:49:10Z"
   },
   "file_count": 888,
-  "total_bytes": 260255576,
-  "tree_digest": "3f896fd4a0c30516f4538dfcafdb1bcdd4a35eea18e7ddd9ab9504bfe619b6cf",
+  "total_bytes": 260190819,
+  "tree_digest": "8732428d8dbb7c20b13c7f2d2f98632e91c2894f1c92f43495f9437e3e4c3574",
   "root_markers": [
     "bots",
     "prefabs",
@@ -25,9 +25,9 @@
   },
   "disposition_counts": {
     "control-profile": 1,
-    "profile-candidate": 38,
-    "recipe-candidate": 12,
-    "unsupported-features": 2
+    "profile-candidate": 37,
+    "recipe-candidate": 7,
+    "unsupported-features": 8
   },
   "entries": [
     {
@@ -370,8 +370,10 @@
       "entrypoint": "bots/arm_hand_combos/fr3_dg5f_short_seed/right/fr3_dg5f_short_seed_right.superdex_bot",
       "kind": "bot",
       "name": "fr3_dg5f_short_seed_right",
-      "disposition": "recipe-candidate",
-      "blockers": [],
+      "disposition": "unsupported-features",
+      "blockers": [
+        "custom actuator/sensor components via dg5f_seed.superdex_bot: SENSOR_SEED_V1_MLP"
+      ],
       "required_capabilities": [
         "recipe-composition"
       ],
@@ -3558,8 +3560,10 @@
       "entrypoint": "bots/hands/dg5f_long_seed/left/dg5f_long_seed_left.superdex_bot",
       "kind": "bot",
       "name": "dg5f_long_seed_left",
-      "disposition": "recipe-candidate",
-      "blockers": [],
+      "disposition": "unsupported-features",
+      "blockers": [
+        "custom actuator/sensor components via dg5f_seed.superdex_bot: SENSOR_SEED_V1_MLP"
+      ],
       "required_capabilities": [
         "recipe-composition"
       ],
@@ -3711,8 +3715,10 @@
       "entrypoint": "bots/hands/dg5f_long_seed/right/dg5f_long_seed_right.superdex_bot",
       "kind": "bot",
       "name": "dg5f_long_seed_right",
-      "disposition": "recipe-candidate",
-      "blockers": [],
+      "disposition": "unsupported-features",
+      "blockers": [
+        "custom actuator/sensor components via dg5f_seed.superdex_bot: SENSOR_SEED_V1_MLP"
+      ],
       "required_capabilities": [
         "recipe-composition"
       ],
@@ -4824,8 +4830,10 @@
       "entrypoint": "bots/hands/dg5f_short_seed/left/dg5f_short_seed_left.superdex_bot",
       "kind": "bot",
       "name": "dg5f_short_seed_left",
-      "disposition": "recipe-candidate",
-      "blockers": [],
+      "disposition": "unsupported-features",
+      "blockers": [
+        "custom actuator/sensor components via dg5f_seed.superdex_bot: SENSOR_SEED_V1_MLP"
+      ],
       "required_capabilities": [
         "recipe-composition"
       ],
@@ -4977,8 +4985,10 @@
       "entrypoint": "bots/hands/dg5f_short_seed/right/dg5f_short_seed_right.superdex_bot",
       "kind": "bot",
       "name": "dg5f_short_seed_right",
-      "disposition": "recipe-candidate",
-      "blockers": [],
+      "disposition": "unsupported-features",
+      "blockers": [
+        "custom actuator/sensor components via dg5f_seed.superdex_bot: SENSOR_SEED_V1_MLP"
+      ],
       "required_capabilities": [
         "recipe-composition"
       ],
@@ -7538,13 +7548,17 @@
       "entrypoint": "bots/sensors/dg5f_seed/dg5f_seed.superdex_bot",
       "kind": "bot",
       "name": "dg5f_seed",
-      "disposition": "profile-candidate",
-      "blockers": [],
+      "disposition": "unsupported-features",
+      "blockers": [
+        "custom actuator/sensor components remain deferred"
+      ],
       "required_capabilities": [
-        "native-floating-root"
+        "native-floating-root",
+        "actuator-sensor-components"
       ],
       "required_capability_stages": [
-        4
+        4,
+        6
       ],
       "joint_counts": {
         "Free": 1,

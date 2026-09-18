@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from unisim.backend.superdex.prefabs import audit_prefab
+from unisim.backend.superdex.scenes import audit_prefab
 from unisim.scene import SceneCfg
 
 
@@ -82,8 +82,8 @@ def synthetic(request, tmp_path, monkeypatch):
     pytest.importorskip("mujoco")
     from unisim import create_backend
     from unisim.backend.superdex import materialization
-    from unisim.backend.superdex.geometry import primitive_shape
-    from unisim.backend.superdex.prefabs import compose_rigid_prefabs
+    from unisim.backend.superdex.materialization import primitive_shape
+    from unisim.backend.superdex.scenes import compose_rigid_prefabs
 
     model = tmp_path / "robot.xml"
     model.write_text("""<mujoco><option gravity="0 0 0"/><worldbody>
@@ -197,11 +197,22 @@ def test_local_nested_prefab_qualification(tmp_path):
     if not root:
         pytest.skip("set SUPERDEX_ASSETS_PATH for local prefab qualification")
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-    from superdex_prefab_qualify import INVENTORY_REPORT, qualify, verify_asset_bundle
+    import superdex_compare as compare
 
-    verify_asset_bundle(Path(root), INVENTORY_REPORT)
-    results = qualify(Path(root).resolve(), tmp_path)
-    assert all(result["robot_object_contact_steps"] > 0 for result in results.values())
+    from unisim.backend.superdex.assets import verify_asset_bundle
+
+    verify_asset_bundle(Path(root).resolve(), compare.INVENTORY_REPORT)
+    bot = Path(root).resolve() / compare.PREFAB_BOT
+    task = compare.WorkerTask(
+        label="fr3_prefabs",
+        path=str(bot),
+        kind="bot",
+        prefab_contact_root=str(Path(root).resolve()),
+    )
+    result = compare.run_model_subprocess(task, timeout=900)
+    assert result["status"] == "passed", result.get("worker_output_tail", "")
+    for mode in ("serial", "batch"):
+        assert result["checks"]["prefab_contact_" + mode]["robot_object_contact_steps"] > 0
 
 
 def test_partial_prefab_instantiation_cleans_up(synthetic, monkeypatch):
@@ -230,3 +241,26 @@ def test_partial_prefab_instantiation_cleans_up(synthetic, monkeypatch):
     recreated = create_backend("superdex", scene, 2, 0.002, superdex_execution_mode=mode)
     recreated.close()
     assert not p.is_initialized()
+
+
+def test_generic_composition_compares_rigid_geometry_and_state():
+    root = os.environ.get("SUPERDEX_ASSETS_PATH")
+    if not root:
+        pytest.skip("set SUPERDEX_ASSETS_PATH for composition qualification")
+    pytest.importorskip("superdex.physics")
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    import superdex_compare as compare
+
+    root = Path(root).resolve()
+    result = compare.run_model_subprocess(
+        compare.WorkerTask(
+            label="composition",
+            path=str(root / compare.PREFAB_BOT),
+            kind="bot",
+            composition=[str(root / compare.PREFAB_SPHERE), str(root / compare.PREFAB_BOARD)],
+        )
+    )
+    assert result["status"] == "passed", result.get("worker_output_tail")
+    for suffix in ("", "_batch"):
+        assert result["checks"]["trajectory_equivalence" + suffix]["passed"]
+        assert result["checks"]["reset" + suffix]["passed"]

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib.util
 import os
 import sys
 from pathlib import Path
@@ -12,7 +11,7 @@ import numpy as np
 import pytest
 
 from unisim.backend.superdex.materialization import _native_plan
-from unisim.backend.superdex.root_state import RootReference
+from unisim.backend.superdex.model import RootReference
 
 
 def fixture_runtime(root="FREE", child="REVOLUTE", offset=False):
@@ -55,10 +54,12 @@ def fixture_runtime(root="FREE", child="REVOLUTE", offset=False):
         get_nested_link_actors=lambda: [0, 1],
         get_articulated_pose=lambda out: np.copyto(out, pose),
         get_num_dofs=lambda: len(pose),
-        get_articulated_shape_info=lambda: SimpleNamespace(dof_info=[
-            SimpleNamespace(offset=0, get_size=lambda: 6 if root == "FREE" else 0),
-            SimpleNamespace(offset=6 if root == "FREE" else 0, get_size=lambda: 1),
-        ]),
+        get_articulated_shape_info=lambda: SimpleNamespace(
+            dof_info=[
+                SimpleNamespace(offset=0, get_size=lambda: 6 if root == "FREE" else 0),
+                SimpleNamespace(offset=6 if root == "FREE" else 0, get_size=lambda: 1),
+            ]
+        ),
     )
     link = SimpleNamespace(
         is_static=lambda: False,
@@ -69,8 +70,11 @@ def fixture_runtime(root="FREE", child="REVOLUTE", offset=False):
     scene = SimpleNamespace(get_actor=lambda h: link)
     physics = SimpleNamespace(
         ArticulatedJointType=SimpleNamespace(
-            HARD="HARD", FREE="FREE", REVOLUTE="REVOLUTE",
-            PRISMATIC="PRISMATIC", SPHERICAL="SPHERICAL"
+            HARD="HARD",
+            FREE="FREE",
+            REVOLUTE="REVOLUTE",
+            PRISMATIC="PRISMATIC",
+            SPHERICAL="SPHERICAL",
         ),
         create_scene=lambda name: scene,
         destroy_scene=lambda s: None,
@@ -81,7 +85,8 @@ def fixture_runtime(root="FREE", child="REVOLUTE", offset=False):
         load_bot_prefab_from_file=lambda path: cfg,
         create_context=lambda: object(),
         create_bot=lambda *args: SimpleNamespace(
-            get_articulated_actor=lambda: actor, get_sensor_handles=lambda: [],
+            get_articulated_actor=lambda: actor,
+            get_sensor_handles=lambda: [],
             get_actuator_handles=lambda: [],
         ),
         destroy_bot=lambda *args: None,
@@ -120,44 +125,67 @@ def test_unsupported_native_root_profiles_are_rejected(kwargs, match):
 def test_authored_root_translation_changes_default_world_pose():
     p, r = fixture_runtime(offset=True)
     plan = _native_plan(p, r, Path("synthetic.superdex_bot"), None)
-    np.testing.assert_allclose(plan.default_qpos[:3], [1.2, -.3, .4])
+    np.testing.assert_allclose(plan.default_qpos[:3], [1.2, -0.3, 0.4])
 
 
 def test_translated_rotated_root_frames_have_correct_origin_velocity():
-    half = np.sqrt(.5)
+    half = np.sqrt(0.5)
     reference = RootReference(
-        np.array([.2, -.3, .4]), np.array([half, 0, 0, half]),
-        np.array([.1, 0, 0]), np.array([half, half, 0, 0]),
+        np.array([0.2, -0.3, 0.4]),
+        np.array([half, 0, 0, half]),
+        np.array([0.1, 0, 0]),
+        np.array([half, half, 0, 0]),
     )
-    q = np.tile([.1, .2, .3, 1, 0, 0, 0], (2, 1))
-    v = np.tile([1., 2, 3, 4, 5, 6], (2, 1))
+    q = np.tile([0.1, 0.2, 0.3, 1, 0, 0, 0], (2, 1))
+    v = np.tile([1.0, 2, 3, 4, 5, 6], (2, 1))
     world_q, world_v = reference.to_world(q, v)
-    np.testing.assert_allclose(world_q, np.tile([0, -.1, .7, .5, .5, .5, .5], (2, 1)),
-                               atol=1e-14)
+    np.testing.assert_allclose(
+        world_q, np.tile([0, -0.1, 0.7, 0.5, 0.5, 0.5, 0.5], (2, 1)), atol=1e-14
+    )
     np.testing.assert_allclose(world_v, np.tile([-2.6, 1, 2.5, 4, 6, -5], (2, 1)))
     back_q, back_v = reference.from_world(world_q, world_v)
     np.testing.assert_allclose(back_q, q, atol=1e-14)
     np.testing.assert_allclose(back_v, v, atol=1e-14)
 
 
-@pytest.mark.parametrize("key", [
-    "allegro_v5_left", "allegro_v5_right",
-    "dg5f_short_left", "dg5f_short_right", "dg5f_long_left", "dg5f_long_right",
-    "openarm_v20_left_gripper", "openarm_v20_right_gripper",
-    "wuji_hand2_beta1_left", "wuji_hand2_beta1_right",
-])
+FLOATING_HANDS = {
+    "allegro_v5_left": "bots/hands/allegro_v5/left/allegro_v5_left.superdex_bot",
+    "allegro_v5_right": "bots/hands/allegro_v5/right/allegro_v5_right.superdex_bot",
+    "dg5f_short_left": "bots/hands/dg5f_short/left/dg5f_short_left.superdex_bot",
+    "dg5f_short_right": "bots/hands/dg5f_short/right/dg5f_short_right.superdex_bot",
+    "dg5f_long_left": "bots/hands/dg5f_long/left/dg5f_long_left.superdex_bot",
+    "dg5f_long_right": "bots/hands/dg5f_long/right/dg5f_long_right.superdex_bot",
+    "openarm_v20_left_gripper": (
+        "bots/grippers/openarm_v20/left/openarm_v20_left_gripper.superdex_bot"
+    ),
+    "openarm_v20_right_gripper": (
+        "bots/grippers/openarm_v20/right/openarm_v20_right_gripper.superdex_bot"
+    ),
+    "wuji_hand2_beta1_left": "bots/hands/wuji_hand2_beta1/left/wuji_hand2_beta1_left.superdex_bot",
+    "wuji_hand2_beta1_right": (
+        "bots/hands/wuji_hand2_beta1/right/wuji_hand2_beta1_right.superdex_bot"
+    ),
+}
+
+
+@pytest.mark.parametrize("key", sorted(FLOATING_HANDS))
 def test_floating_model_qualification(key):
     assets = os.environ.get("SUPERDEX_ASSETS_PATH")
     if not assets:
         pytest.skip("set SUPERDEX_ASSETS_PATH for local floating-hand qualification")
     pytest.importorskip("superdex.physics")
-    script = Path(__file__).resolve().parents[1] / "scripts/superdex_floating_qualify.py"
-    spec = importlib.util.spec_from_file_location("floating_qualify", script)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    candidates = module.discover_floating(Path(assets))
-    result = module.qualify(Path(assets) / candidates[key])
-    assert set(result) == {"serial", "batch"}
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    import superdex_compare as compare
+
+    task = compare.WorkerTask(
+        label=key,
+        path=str(Path(assets) / FLOATING_HANDS[key]),
+        kind="bot",
+        steps=compare.FLOATING_STEPS,
+    )
+    result = compare.run_model_subprocess(task, timeout=900)
+    assert result["status"] == "passed", result.get("worker_output_tail", "")[-400:]
+    assert result["checks"]["trajectory_equivalence"]["passed"]
 
 
 def test_native_translated_rotated_reference_frames(monkeypatch):
@@ -172,20 +200,29 @@ def test_native_translated_rotated_reference_frames(monkeypatch):
     def load_with_offsets(path):
         cfg = load(path)
         cfg.joints[0].parent_link_from_joint = p.TransformRT(
-            translation=[.2, -.1, .3], rotation=p.Quaternion.from_rotation_vector([.4, .2, -.3])
+            translation=[0.2, -0.1, 0.3],
+            rotation=p.Quaternion.from_rotation_vector([0.4, 0.2, -0.3]),
         )
         cfg.links[0].parent_joint_from_link = p.TransformRT(
-            translation=[.03, -.02, .04], rotation=p.Quaternion.from_rotation_vector([-.2, .3, .1])
+            translation=[0.03, -0.02, 0.04],
+            rotation=p.Quaternion.from_rotation_vector([-0.2, 0.3, 0.1]),
         )
         return cfg
 
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    import superdex_compare as compare
+
     monkeypatch.setattr(r, "load_bot_prefab_from_file", load_with_offsets)
-    script = Path(__file__).resolve().parents[1] / "scripts/superdex_floating_qualify.py"
-    spec = importlib.util.spec_from_file_location("floating_offset_qualify", script)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    result = module.qualify(Path(assets) / module.HANDS["allegro_v5_right"], steps=64)
-    assert set(result) == {"serial", "batch"}
+    path = Path(assets) / "bots/hands/allegro_v5/right/allegro_v5_right.superdex_bot"
+    from unisim.backend.superdex.runtime import acquire_runtime, release_runtime
+
+    acquire_runtime(p)
+    try:
+        run = compare.CheckRun("allegro_offset", "bot")
+        compare.check_bot(compare.ModelRef(path, "bot", "allegro_offset"), run, steps=64 * 8)
+        assert not run.failures, run.checks
+    finally:
+        release_runtime(p)
 
 
 @pytest.mark.parametrize(
@@ -221,16 +258,27 @@ def test_viewer_closes_on_window_exit_and_errors(monkeypatch, failure):
         def close(self):
             event("close")
 
-    monkeypatch.setitem(sys.modules, "superdex.physics.viewer", SimpleNamespace(
-        VIEWER_AVAILABLE=True, Viewer=Viewer, ViewerCfg=lambda **kw: kw,
-    ))
+    monkeypatch.setitem(
+        sys.modules,
+        "superdex.physics.viewer",
+        SimpleNamespace(
+            VIEWER_AVAILABLE=True,
+            Viewer=Viewer,
+            ViewerCfg=lambda **kw: kw,
+        ),
+    )
     backend = SimpleNamespace(_execution_mode="serial", num_envs=1, _worlds=[object()])
 
     def play():
         SuperDexBackend._run_interactive_playback(
-            backend, env=None, initialize=lambda: event("initialize"),
-            step=lambda obs: event("step"), num_steps=None, offscreen=False,
-            debug_overlay_getter=None, on_frame=None,
+            backend,
+            env=None,
+            initialize=lambda: event("initialize"),
+            step=lambda obs: event("step"),
+            num_steps=None,
+            offscreen=False,
+            debug_overlay_getter=None,
+            on_frame=None,
         )
 
     if failure:

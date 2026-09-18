@@ -33,7 +33,8 @@ pip install "unisim-core[mujoco]"      # plus an engine extra when needed
 
 Available extras: `mujoco`, `motrix`, `drake`, `mjwarp`, `genesis`, `newton`,
 `isaacgym`, `isaacsim`, `superdex`. SuperDex's Python 3.12 CPU development
-profile is described in [`docs/superdex.md`](docs/superdex.md). The Isaac extras
+profile is described in [`docs/superdex.md`](docs/superdex.md)
+([中文版](docs/superdex_zh.md)). The Isaac extras
 are empty spellings because those
 vendor SDKs are not redistributable; their adapters discover dedicated worker
 installations at construction time. See

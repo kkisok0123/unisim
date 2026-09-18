@@ -32,11 +32,14 @@ from unisim.utils.rotation import (
     np_quat_mul_batched as multiply,
 )
 
-from .builtin_api import BuiltinAPI
-from .cpu_topology import physical_cpu_count
-from .dependencies import load_superdex_dependencies
-from .plans import ModelPlan, SensorPlan
-from .runtime import acquire_runtime, release_runtime
+from .components import BuiltinAPI
+from .model import ModelPlan, SensorPlan, coordinate_groups, model_info
+from .runtime import (
+    acquire_runtime,
+    load_superdex_dependencies,
+    physical_cpu_count,
+    release_runtime,
+)
 
 
 class SuperDexBackend(BuiltinAPI, SimBackend):
@@ -127,8 +130,6 @@ class SuperDexBackend(BuiltinAPI, SimBackend):
                     "superdex advanced native assets require execution_mode='serial', num_envs=1"
                 )
             self._body_lookup = {name: i for i, name in enumerate(self._plan.body_names)}
-            from .joints import coordinate_groups
-
             self._joint_lookup = (
                 self._plan.joint_coordinate_groups or coordinate_groups(self._plan.joint_names)
             )
@@ -1084,8 +1085,6 @@ class SuperDexBackend(BuiltinAPI, SimBackend):
 
     def get_model_info(self):
         self._check_open()
-        from .metadata import model_info
-
         return model_info(self.model)
 
     def set_gravity(self, gravity: Sequence[float]) -> None:

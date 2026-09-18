@@ -249,7 +249,13 @@ def test_unchanged_scene_qualification(key, monkeypatch):
     if not root:
         pytest.skip("set SUPERDEX_ASSETS_PATH for unchanged-scene qualification")
     monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[1] / "scripts"))
-    from superdex_scene_qualify import qualify
+    import superdex_compare as compare
 
-    result = qualify(Path(root), key)
-    assert all(v["status"] == "passed" for v in result.values())
+    scene = {
+        "cart_pole": "benchmarks/cart_pole/cart_pole.mochi_scene",
+        "half_cheetah": "benchmarks/half_cheetah/half_cheetah.mochi_scene",
+    }[key]
+    task = compare.WorkerTask(label=key, path=str(Path(root) / scene), kind="scene",
+                              steps=compare.TRAJECTORY_STEPS)
+    result = compare.run_model_subprocess(task, timeout=900)
+    assert result["status"] == "passed", result.get("worker_output_tail", "")[-400:]

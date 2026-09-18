@@ -10,3 +10,6 @@ assets/**
 !assets/superdex/
 !assets/superdex/superdex-assets-integration-plan.md
 !assets/superdex/README.md
+
+# Optional SuperDex comparison/viewer output (--out); never committed.
+results/

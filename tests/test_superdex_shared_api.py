@@ -64,17 +64,27 @@ def test_optional_defaults_and_idempotent_cleanup():
     handle.cleanup.assert_called_once()
 
 
-@pytest.mark.parametrize("script", ["superdex_rigid_viewer.py", "superdex_bot_viewer.py"])
+@pytest.mark.parametrize("script", ["superdex_viewer.py"])
 def test_normal_viewers_do_not_import_sdk_or_access_private_backend(script):
     tree = ast.parse((ROOT / "scripts" / script).read_text())
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            assert all(n.name.split(".")[0] != "superdex" for n in node.names)
-        if isinstance(node, ast.ImportFrom):
-            assert (node.module or "").split(".")[0] != "superdex"
-        if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
-            if node.value.id == "backend":
-                assert not node.attr.startswith("_") and node.attr != "model"
+    # The independent SDK comparison worker is intentionally native. Application
+    # playback and its demo/controller paths must stay on the public boundary.
+    functions = [
+        node
+        for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.ClassDef))
+        and node.name in {"run_single", "backend_options", "Demo", "PassiveView"}
+    ]
+    assert {node.name for node in functions} >= {"run_single", "backend_options", "Demo"}
+    for function in functions:
+        for node in ast.walk(function):
+            if isinstance(node, ast.Import):
+                assert all(n.name.split(".")[0] != "superdex" for n in node.names)
+            if isinstance(node, ast.ImportFrom):
+                assert (node.module or "").split(".")[0] != "superdex"
+            if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
+                if node.value.id == "backend":
+                    assert not node.attr.startswith("_") and node.attr != "model"
 
 
 @pytest.fixture
@@ -84,7 +94,7 @@ def assets(tmp_path):
     pytest.importorskip("superdex.physics")
     pytest.importorskip("superdex.robotics")
     sys.path.insert(0, str(ROOT / "scripts"))
-    from superdex_rigid_fixtures import generate
+    from superdex_compare import synthetic_fixtures as generate
 
     return generate(tmp_path)
 
@@ -344,7 +354,9 @@ def test_bot_placement_is_included_in_public_root_state(assets, mode):
             np.testing.assert_allclose(np.abs(np.sum(actual * expected, axis=1)), 1, atol=2e-6)
             np.testing.assert_allclose(
                 # SDK float32 body and generalized-velocity readbacks differ by a few ULPs.
-                state["qvel"][:, :3], b.get_body_lin_vel_w([root])[:, 0], atol=1e-5
+                state["qvel"][:, :3],
+                b.get_body_lin_vel_w([root])[:, 0],
+                atol=1e-5,
             )
 
         compare()

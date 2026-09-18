@@ -1,9 +1,0 @@
-{
-  "asset": "/home/pc829/UniFamily/unisim/assets/superdex-physics/samples/articulations_skinned_double_pendulum.mochi_scene",
-  "status": "passed",
-  "frames": 120,
-  "reset_error": 0.0,
-  "evidence": "renderer smoke",
-  "manual_inspection": "not claimed",
-  "saved_images": false
-}

@@ -14,8 +14,7 @@ from unisim.scene import SceneCfg
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
-from superdex_rigid_fixtures import generate  # noqa: E402
-from superdex_rigid_qualify import qualify  # noqa: E402
+from superdex_compare import synthetic_fixtures as generate  # noqa: E402
 
 
 @pytest.fixture
@@ -26,6 +25,16 @@ def fixtures(tmp_path):
     return generate(tmp_path)
 
 
+def qualify(path, root, steps=1000):
+    """Run the consolidated comparison tool's worker on one fixture."""
+    import importlib
+
+    compare = importlib.import_module("superdex_compare")
+    task = compare.WorkerTask(label=path.stem, path=str(path), kind=compare._kind_of(path),
+                              steps=steps)
+    return compare.run_model_subprocess(task, timeout=600)
+
+
 @pytest.mark.parametrize(
     "name",
     [
@@ -34,7 +43,7 @@ def fixtures(tmp_path):
         "tendon",
         "archive",
         "camera_archive",
-        "ball_bot",
+        "ball",
         "spherical",
         "multiple",
         "nested",
@@ -44,11 +53,17 @@ def fixtures(tmp_path):
 )
 def test_native_rigid_sdk_equivalence_and_lifecycle(fixtures, name):
     result = qualify(fixtures[name], fixtures[name].parent, steps=1000)
-    assert result["status"] == "passed"
-    assert result["native_state_max_deviation"] == 0
-    assert result["cleanup_recreation"]
+    assert result["status"] == "passed", result.get("worker_output_tail", "")[-400:]
+    # The adapter and the direct SDK integrate the same code path, so the
+    # trajectory comparison is exact. Bots carry the lifecycle
+    # create/step/reset/close equivalent of the scene cleanup check.
+    trajectory = result["checks"].get("trajectory_equivalence", {})
+    assert trajectory.get("passed"), trajectory
+    recreation = result["checks"].get("cleanup_recreation") or result["checks"]["lifecycle"]
+    assert recreation["passed"]
     if name == "contact":
-        assert result["contact_force_peak"] > 1
+        assert result["checks"]["trajectory_equivalence"][
+            "reference_contact_force_steps"] > 0
 
 
 def create(path, joints=None, limits=None):
@@ -153,7 +168,7 @@ def test_spherical_controller_targets_match_sdk(fixtures, kind):
 
     from unisim import ArticulationPoseTarget, JointTarget, create_backend
 
-    path = fixtures["ball_bot"]
+    path = fixtures["ball"]
     b = create_backend("superdex", SceneCfg(str(path)), 1, 0.002, superdex_execution_mode="serial")
     world = p.create_scene("ball_controller_reference")
     context = r.create_context()
@@ -232,7 +247,7 @@ def test_unnamed_instances_have_distinct_metadata_without_renaming_native_actors
 def test_joint_groups_are_derived_from_native_joint_identity():
     from types import SimpleNamespace
 
-    from unisim.backend.superdex.joints import coordinate_groups
+    from unisim.backend.superdex.model import coordinate_groups
 
     names = ("independent/x", "independent/y", "independent/z")
     groups = coordinate_groups(names, [0, 1, 2], [SimpleNamespace(name=n) for n in names])

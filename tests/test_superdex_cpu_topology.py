@@ -2,7 +2,7 @@
 
 from unittest.mock import patch
 
-from unisim.backend.superdex import cpu_topology
+from unisim.backend.superdex import runtime as cpu_topology
 
 
 def test_macos_physical_cpu_count_uses_sysctl() -> None:

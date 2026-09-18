@@ -57,8 +57,11 @@ def _seed_bundle(root: Path) -> Path:
         {
             "name": "arm",
             "links": [
-                {"name": "base", "shape": "collision/base.mochi.h5",
-                 "renderModel": "render/base.glb"},
+                {
+                    "name": "base",
+                    "shape": "collision/base.mochi.h5",
+                    "renderModel": "render/base.glb",
+                },
             ],
             "joints": [{"name": "world_joint", "type": "Hard"}],
             "defaultPose": [0.0],
@@ -86,20 +89,13 @@ def test_module_imports_without_engine_sdks():
         "import sys; from unisim.backend.superdex import assets; "
         "assert not [n for n in sys.modules if n.startswith(('superdex', 'mujoco', 'torch'))]"
     )
-    result = subprocess.run(
-        [sys.executable, "-c", code], capture_output=True, text=True
-    )
+    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
 
 
 def test_importing_unisim_does_not_load_asset_module():
-    code = (
-        "import sys; import unisim; "
-        "assert 'unisim.backend.superdex.assets' not in sys.modules"
-    )
-    result = subprocess.run(
-        [sys.executable, "-c", code], capture_output=True, text=True
-    )
+    code = "import sys; import unisim; assert 'unisim.backend.superdex.assets' not in sys.modules"
+    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
 
 
@@ -121,15 +117,9 @@ def test_build_inventory_classifies_fixed_base_bots(tmp_path):
 
 def test_floating_root_and_components_are_blocked_not_dropped(tmp_path):
     bundle = _seed_bundle(tmp_path / "bundle")
-    hand = json.loads(
-        (bundle / "bots" / "hands" / "hand.superdex_bot").read_text()
-    )
-    hand["links"][0]["actuators"] = [
-        {"name": "a0", "type": "CUSTOM_POSITION_SERVO", "params": {}}
-    ]
-    hand["links"][0]["sensors"] = [
-        {"name": "s0", "type": "CUSTOM_CONTACT_FORCE_SENSOR"}
-    ]
+    hand = json.loads((bundle / "bots" / "hands" / "hand.superdex_bot").read_text())
+    hand["links"][0]["actuators"] = [{"name": "a0", "type": "CUSTOM_POSITION_SERVO", "params": {}}]
+    hand["links"][0]["sensors"] = [{"name": "s0", "type": "CUSTOM_CONTACT_FORCE_SENSOR"}]
     _write(bundle / "bots" / "hands" / "hand.superdex_bot", hand)
     inventory = build_inventory(bundle, _provenance())
     hand_entry = next(e for e in inventory.entries if "hand" in e.entrypoint)
@@ -236,9 +226,7 @@ def test_shared_dependency_reuse_is_not_a_cycle(tmp_path):
 
 def test_lfs_pointer_detection(tmp_path):
     bundle = _seed_bundle(tmp_path / "bundle")
-    pointer = (
-        b"version https://git-lfs.github.com/spec/v1\noid sha256:" + b"0" * 64
-    )
+    pointer = b"version https://git-lfs.github.com/spec/v1\noid sha256:" + b"0" * 64
     (bundle / "bots" / "arms" / "collision" / "base.mochi.h5").write_bytes(pointer)
     inventory = build_inventory(bundle, _provenance())
     errors, _ = verify_bundle(inventory, bundle)
@@ -257,9 +245,7 @@ def test_scene_bundle_root_relative_resolution(tmp_path):
                 "articulated": [
                     {
                         "name": "cart",
-                        "links": [
-                            {"name": "pole", "shape": "benchmarks/pole.mochi.h5"}
-                        ],
+                        "links": [{"name": "pole", "shape": "benchmarks/pole.mochi.h5"}],
                         "joints": [{"name": "hinge", "type": "Revolute"}],
                     }
                 ]
@@ -303,9 +289,7 @@ def test_prefab_nested_references(tmp_path):
                     }
                 ]
             },
-            "prefabs": [
-                {"name": "b", "path": "./block_b.mochi_prefab"}
-            ],
+            "prefabs": [{"name": "b", "path": "./block_b.mochi_prefab"}],
         },
     )
     (bundle / "prefabs" / "collision").mkdir()
@@ -328,9 +312,7 @@ def test_prefab_nested_references(tmp_path):
     # Nested prefabs are entrypoints of their own, so their geometry is
     # recorded on their own inventory entry rather than the parent's.
     nested = next(e for e in inventory.entries if "block_b" in e.entrypoint)
-    assert {edge.target for edge in nested.dependencies} == {
-        "prefabs/collision/b.mochi.h5"
-    }
+    assert {edge.target for edge in nested.dependencies} == {"prefabs/collision/b.mochi.h5"}
     errors, _ = verify_bundle(inventory, bundle)
     assert errors == []
 
@@ -354,9 +336,7 @@ def test_controller_entry_is_self_contained(tmp_path):
 
 def test_local_derivative_flag_is_recorded(tmp_path):
     bundle = _seed_bundle(tmp_path / "bundle")
-    inventory = build_inventory(
-        bundle, _provenance(), {"bots/arms/arm.superdex_bot"}
-    )
+    inventory = build_inventory(bundle, _provenance(), {"bots/arms/arm.superdex_bot"})
     arm = next(e for e in inventory.entries if "arm" in e.entrypoint)
     assert arm.local_derivative
     hand = next(e for e in inventory.entries if "hand" in e.entrypoint)
@@ -423,9 +403,7 @@ def _run_copy(
     ]
     if report_dir is not None:
         command += ["--report-dir", str(report_dir)]
-    return subprocess.run(
-        command, capture_output=True, text=True, cwd=SCRIPT.parents[1]
-    )
+    return subprocess.run(command, capture_output=True, text=True, cwd=SCRIPT.parents[1])
 
 
 def test_copy_script_copies_and_verifies(tmp_path):
@@ -435,12 +413,8 @@ def test_copy_script_copies_and_verifies(tmp_path):
     result = _run_copy(source, destination, reports)
     assert result.returncode == 0, result.stderr + result.stdout
     assert (destination / "bots" / ".superdex_root").is_file()
-    assert (
-        destination / "bots" / "arms" / "collision" / "base.mochi.h5"
-    ).read_bytes() == b"col"
-    report = json.loads(
-        (reports / "superdex-assets-inventory.json").read_text()
-    )
+    assert (destination / "bots" / "arms" / "collision" / "base.mochi.h5").read_bytes() == b"col"
+    report = json.loads((reports / "superdex-assets-inventory.json").read_text())
     assert report["entry_counts_by_kind"] == {"bot": 2}
     # Idempotent re-run also succeeds.
     result2 = _run_copy(source, destination, reports)
@@ -474,14 +448,10 @@ def test_copy_script_deterministic_reports(tmp_path):
     reports = tmp_path / "reports"
     result = _run_copy(source, destination, reports)
     assert result.returncode == 0, result.stderr
-    first = json.loads(
-        (reports / "superdex-assets-inventory.json").read_text()
-    )
+    first = json.loads((reports / "superdex-assets-inventory.json").read_text())
     second_run = _run_copy(source, destination, reports)
     assert second_run.returncode == 0
-    second = json.loads(
-        (reports / "superdex-assets-inventory.json").read_text()
-    )
+    second = json.loads((reports / "superdex-assets-inventory.json").read_text())
     # The tree digest pins the structure; repeated runs must agree on it and
     # on the entry classification, independent of timestamps.
     assert first["tree_digest"] == second["tree_digest"]
@@ -619,8 +589,51 @@ def test_stage8_candidates_do_not_retain_completed_feature_blockers(tmp_path):
     data["joints"].append({"name": "ball", "type": "Spherical"})
     data["cycles"] = [{"parentLink": 0, "childLink": 1}]
     _write(path, data)
-    entry = next(e for e in build_inventory(bundle, _provenance()).entries
-                 if "hand" in e.entrypoint)
+    entry = next(
+        e for e in build_inventory(bundle, _provenance()).entries if "hand" in e.entrypoint
+    )
     assert entry.disposition == DISPOSITION_PROFILE_CANDIDATE
     assert entry.blockers == ()
     assert {"spherical-joints", "mechanical-cycles"} <= set(entry.required_capabilities)
+
+
+@pytest.mark.parametrize("missing", [False, True])
+def test_archives_inventory_checks_packed_dependency_closure(tmp_path, missing):
+    import zipfile
+
+    (tmp_path / ".superdex_root").touch()
+    with zipfile.ZipFile(tmp_path / "packed.superdex_bot_archive", "w") as archive:
+        archive.writestr(".superdex_root", "")
+        archive.writestr(
+            ".mochi_bot_archive_metadata", json.dumps({"target": "robot.superdex_bot"})
+        )
+        archive.writestr(
+            "robot.superdex_bot",
+            json.dumps(
+                {
+                    "name": "robot",
+                    "joints": [{"name": "root", "type": "Hard"}],
+                    "links": [{"name": "base", "shape": "./shape.obj"}],
+                }
+            ),
+        )
+        if not missing:
+            archive.writestr("shape.obj", "v 0 0 0")
+    inventory = build_inventory(tmp_path, _provenance())
+    assert len(inventory.entries) == 1
+    entry = inventory.entries[0]
+    assert entry.kind == "archive"
+    assert entry.entrypoint == "packed.superdex_bot_archive"
+    assert any(not edge.resolved for edge in entry.dependencies) == missing
+    expected = DISPOSITION_UNRESOLVED_DEPENDENCY if missing else DISPOSITION_PROFILE_CANDIDATE
+    assert entry.disposition == expected
+
+
+def test_inventory_maintenance_writes_only_json(tmp_path):
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("asset_maintenance", SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.write_reports({"entries": []}, tmp_path)
+    assert [p.name for p in tmp_path.iterdir()] == ["superdex-assets-inventory.json"]

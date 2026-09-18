@@ -107,35 +107,44 @@ package/release tooling.  Out of scope: engine source/solver changes, task YAML,
 reward or rollout policy, training orchestration, distributed execution, and
 private SDK redistribution.
 
-## SuperDex native scene qualification
+## SuperDex qualification and tooling
 
-Stage 7 supports `.mochi_scene` files with one root-file articulation containing
-fixed, revolute and prismatic joints, including a prismatic first joint, plus
-rigid actors and nested rigid prefabs. Callers must supply ordered
+The adapter supports `.superdex_bot`/`.superdex_bot_archive` inputs (HARD or
+FREE root; spherical joints, cycles and coupled actuation in serial mode),
+`.mochi_scene`/`.mochi_prefab` rigid scenes (multiple articulations, nested
+prefabs, constraints, contact filters, authored pose controllers) and the
+audited MJCF profile. Scene callers must supply ordered
 `superdex_controlled_joints` and finite positive `superdex_effort_limits`.
 Actions are physical efforts; task action normalization remains with UniLab.
 Preserve authored gravity, solver settings, contact filters and supported native
-joint-tracking controllers. Use SDK defaults for missing scene settings and
+joint-tracking controllers; use SDK defaults for missing scene settings and
 caller `sim_dt` for the timestep. Reject unsupported fields and nested setting
-conflicts. Do not add a ground plane or change scene coordinates implicitly.
+conflicts; never add a ground plane or change scene coordinates implicitly.
 
-Use the repository-local assets; qualification must not read the SDK source
-checkout or modify asset payloads. Run:
+Two consolidated tools replace the former per-stage runners. Every model runs
+in an isolated subprocess against a direct SDK scene with identical inputs;
+known-unsupported models are classified with precise blockers and never count
+as passed. Use the repository-local assets; qualification must not read the SDK
+source checkout or modify asset payloads. Run:
 
 ```bash
-SUPERDEX_ASSETS_PATH="$PWD/assets/superdex" uv run --no-sync scripts/superdex_scene_qualify.py
-SUPERDEX_ASSETS_PATH="$PWD/assets/superdex" uv run --no-sync pytest -q tests/test_superdex_scenes.py
-uv run --no-sync scripts/superdex_scene_qualify.py --viewer --frames 240
+SUPERDEX_ASSETS_PATH="$PWD/assets/superdex" uv run --no-sync scripts/superdex_compare.py --all
+SUPERDEX_ASSETS_PATH="$PWD/assets/superdex" uv run --no-sync pytest -q tests/
+SUPERDEX_ASSETS_PATH="$PWD/assets/superdex" uv run --no-sync scripts/superdex_viewer.py \
+    benchmarks/cart_pole/cart_pole.mochi_scene --controlled-joints Cart --effort-limit 3.0
 ```
 
-Only Cart Pole and Half Cheetah have Stage 7 benchmark qualification. Publish
-scene reports under `docs/superdex-scene-qualification/`; update the SuperDex
-guide, asset README, integration plan, inventory and changelog with the exact
-coverage. Inventory candidates are not automatic runtime qualifications. Keep
-older reports intact and distinguish renderer smoke from manual inspection;
-Stage 5's manual inspection remains outstanding. Multiple articulations, soft
-bodies, scene camera/plugin components and advanced mechanisms require separate
-work. Run `make check` and `make package` before completing a scene change.
+Results print to the terminal; JSON reports and limitation records are opt-in
+via `--out` into the ignored `results/` directory — never commit generated
+reports. `docs/superdex.md` is the single authoritative guide and carries the
+maintained "Current limitations and unsupported assets" report; update it (plus
+the JSON inventory and changelog; keep asset README/plan as short pointers) whenever coverage
+changes, folding in any newly discovered blockers. Inventory candidates are not
+automatic runtime qualifications; renderer smoke (`--frames N`) is distinct
+from manual inspection (the interactive viewer, still outstanding for the
+qualified scenes). Multiple articulations in batch, soft bodies, learned
+components and URDF ingestion require separate work. Run `make check` and
+`make package` before completing any SuperDex change.
 
 ## CI and automated release
 

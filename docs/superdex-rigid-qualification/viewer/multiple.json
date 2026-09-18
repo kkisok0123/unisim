@@ -1,9 +1,0 @@
-{
-  "asset": "/tmp/superdex-stage8-fixtures/multiple.mochi_scene",
-  "status": "passed",
-  "frames": 120,
-  "reset_error": 3.990708430379186e-08,
-  "evidence": "renderer smoke",
-  "manual_inspection": "not claimed",
-  "saved_images": false
-}

@@ -2,6 +2,49 @@
 
 ## Unreleased
 
+- Pass the viewer's selected asset root to dependency loading and comparison
+  workers, so default-root and `--assets` scenes work without a prior
+  `SUPERDEX_ASSETS_PATH` export.
+- Consolidate the SuperDex backend from 17 modules to 8 (`model`, `runtime`,
+  `materialization`, `scenes`, `components`, `backend`, `assets`,
+  `__init__`), preserving public exports, shared API signatures, lazy SDK
+  loading and numerical behavior. Fold root frames, joint layouts,
+  articulations and metadata into `model`; dependency loading, runtime
+  ownership and CPU topology into `runtime`; MJCF geometry into
+  `materialization`; prefab audit/composition into `scenes`; controller APIs
+  into `components`.
+- Replace the twelve per-stage qualification/viewer scripts with two tools:
+  `scripts/superdex_compare.py` (numerical adapter-vs-SDK comparison over
+  every native model in isolated subprocesses, with format discovery,
+  limitation classification and opt-in JSON reports into the ignored
+  `results/` directory) and `scripts/superdex_viewer.py` (interactive viewing
+  for all four native formats plus MJCF, passive fallback, controller
+  configuration and synchronized `--compare` dual windows). Preserve the
+  historical tolerances, rollout lengths and check families; the synthetic
+  fixture generator is ported into the comparison tool.
+- Remove the generated qualification reports, compatibility tables,
+  screenshots and logs under `docs/superdex-*`; keep the JSON integrity
+  inventory and move the authored controller config/target examples to
+  `docs/superdex-configs/`. `docs/superdex.md` is now the single
+  authoritative guide, including the maintained "Current limitations and
+  unsupported assets" report covering the ten known blocked models (URDF
+  input, custom actuator/sensor components, seed sensors — including recipe
+  inheritance — and deformable actors).
+- Include packed bot archives and their dependencies in the integrity inventory;
+  stop generating the redundant Markdown inventory.
+- Restore full multi-articulation state checks, per-substep SDK controller comparison,
+  camera parity, transformed-root probes, and robot–prefab contact regressions.
+  Viewer comparison propagates options and failures across both windows; registered
+  bots use PD effort control and unknown models remain passive.
+- Inventory classification now propagates custom-component blockers through
+  recipe dependency closures (seed-sensor hands record `unsupported-features`
+  instead of `recipe-candidate`), accepts both `type` and `typeName` component
+  spellings, and prefers feature blockers over the recipe disposition.
+- Rewire the SuperDex pytest suites onto the consolidated tools (fresh
+  temporary-output checks replace historical-report tests); add coverage for
+  format discovery, archive handling, limitation classification and
+  subprocess failure isolation.
+
 - Fix rigid-viewer format routing: pass controlled-joint selection only for scenes
   and prefabs, and explain that `.mochi.h5` shape files are not standalone models.
 

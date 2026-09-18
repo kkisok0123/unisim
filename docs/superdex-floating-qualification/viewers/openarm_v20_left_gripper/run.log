@@ -1,7 +1,0 @@
-[polyscope] Backend: openGL3_glfw -- Loaded openGL version: 3.3.0 NVIDIA 580.178.04
-asset verification: skipped
-[initial-pose] holding authored default pose (inspect geometry)
-[bounded-movement] sine sweep, amplitudes [0.1, 0.1] rad
-[reset] backend.reset() restored default pose (max qpos error 0.00e+00 rad)
-[done] reset verified (settle deviation 0.000 rad under PD hold); close the window to exit
-report: /home/pc829/UniFamily/unisim/docs/superdex-floating-qualification/viewers/openarm_v20_left_gripper/report.json
