@@ -48,6 +48,7 @@ def create_backend(
     newton_njmax = kwargs.pop("newton_njmax", None)
     newton_capacity_check_steps = kwargs.pop("newton_capacity_check_steps", 1)
     superdex_num_workers = kwargs.pop("superdex_num_workers", 0)
+    superdex_num_worker_threads = kwargs.pop("superdex_num_worker_threads", 0)
     superdex_execution_mode = kwargs.pop("superdex_execution_mode", "batch")
     superdex_effort_limits = kwargs.pop("superdex_effort_limits", None)
     superdex_controlled_joints = kwargs.pop("superdex_controlled_joints", None)
@@ -158,6 +159,7 @@ def create_backend(
             )
         kwargs.pop("add_body_sensors", None)
         kwargs["num_workers"] = superdex_num_workers
+        kwargs["num_worker_threads"] = superdex_num_worker_threads
         kwargs["execution_mode"] = superdex_execution_mode
         kwargs["effort_limits"] = superdex_effort_limits
         kwargs["controlled_joints"] = superdex_controlled_joints

@@ -104,8 +104,13 @@ uv run --no-sync scripts/superdex_viewer.py \
 错误。连接调试器之前应设置 `superdex_execution_mode="serial"`。UniLab 对应配置为
 `env.superdex_execution_mode=serial`，交互评估还需使用一个播放环境。
 
-批量模式下，`superdex_num_workers=0` 表示自动选择当前进程可用的物理核心。SDK 内部工作线程被
-禁用，以免多个线程池竞争。串行模式应保持该参数为零；非零值会被拒绝。
+批量模式下，`superdex_num_workers=0` 表示自动选择当前进程可用的物理核心。串行模式应保持这个
+外层场景工作线程参数为零；非零值会被拒绝。
+
+`superdex_num_worker_threads` 用于在串行模式下配置进程级 SDK 内部求解器线程池：`-1` 表示由
+SuperDex 自动选择，`0`（默认值）表示单线程，正整数表示请求对应数量的线程。批量模式会拒绝非零值，
+避免两个线程池竞争。同一进程内所有同时存活的 SuperDex 后端必须使用相同值，因为它们共享 SDK
+运行时。
 
 ### MJCF 的审核范围
 

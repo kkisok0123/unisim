@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Expose `superdex_num_worker_threads` for serial SuperDex backends, forwarding
+  `-1`, `0`, or a positive worker count to the process-wide SDK runtime while
+  rejecting nested batch/runtime thread pools and conflicting live configurations.
 - Pass the viewer's selected asset root to dependency loading and comparison
   workers, so default-root and `--assets` scenes work without a prior
   `SUPERDEX_ASSETS_PATH` export.

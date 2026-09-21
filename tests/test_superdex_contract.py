@@ -7,6 +7,7 @@ from unittest.mock import patch
 import pytest
 
 from unisim import SuperDexBackend, create_backend
+from unisim.backend.superdex import runtime as superdex_runtime
 from unisim.backend.superdex.runtime import (
     SuperDexDependencyError,
     load_superdex_dependencies,
@@ -60,6 +61,7 @@ def test_factory_routes_only_superdex_options(monkeypatch):
         "superdex",
         SceneCfg("robot.superdex_bot"),
         superdex_num_workers=1,
+        superdex_num_worker_threads=4,
         superdex_execution_mode="serial",
         superdex_effort_limits=[3.0],
         superdex_controlled_joints=["joint"],
@@ -70,6 +72,7 @@ def test_factory_routes_only_superdex_options(monkeypatch):
     assert result == "backend"
     assert seen == {
         "num_workers": 1,
+        "num_worker_threads": 4,
         "execution_mode": "serial",
         "effort_limits": [3.0],
         "controlled_joints": ["joint"],
@@ -96,3 +99,90 @@ def test_invalid_execution_mode_is_rejected_before_loading_engine():
         SuperDexBackend(SceneCfg("unused"), 1, 0.01, execution_mode=True)
     with pytest.raises(ValueError, match="serial"):
         SuperDexBackend(SceneCfg("unused"), 1, 0.01, execution_mode="serial", num_workers=2)
+
+
+@pytest.mark.parametrize("num_worker_threads", [True, -2, 1.5, "4"])
+def test_invalid_runtime_worker_count_is_rejected_before_loading_engine(num_worker_threads):
+    with pytest.raises(ValueError, match="num_worker_threads"):
+        SuperDexBackend(
+            SceneCfg("unused"),
+            1,
+            0.01,
+            execution_mode="serial",
+            num_worker_threads=num_worker_threads,
+        )
+
+
+@pytest.mark.parametrize("num_worker_threads", [-1, 1, 4])
+def test_runtime_workers_are_rejected_in_batch_mode(num_worker_threads):
+    with pytest.raises(ValueError, match="batch execution mode"):
+        SuperDexBackend(
+            SceneCfg("unused"),
+            1,
+            0.01,
+            num_worker_threads=num_worker_threads,
+        )
+
+
+@pytest.mark.parametrize("num_worker_threads", [-1, 0, 4])
+def test_runtime_initializes_with_requested_worker_count(monkeypatch, num_worker_threads):
+    calls = []
+
+    class Physics:
+        @staticmethod
+        def is_initialized():
+            return False
+
+        @staticmethod
+        def initialize(**kwargs):
+            calls.append(("initialize", kwargs))
+
+        @staticmethod
+        def shutdown():
+            calls.append(("shutdown", {}))
+
+    monkeypatch.setattr(superdex_runtime, "_PID", None)
+    monkeypatch.setattr(superdex_runtime, "_USERS", 0)
+    monkeypatch.setattr(superdex_runtime, "_NUM_WORKER_THREADS", None)
+
+    superdex_runtime.acquire_runtime(Physics, num_worker_threads)
+    superdex_runtime.release_runtime(Physics)
+
+    assert calls == [
+        ("initialize", {"num_worker_threads": num_worker_threads}),
+        ("shutdown", {}),
+    ]
+
+
+def test_runtime_worker_count_must_match_live_runtime(monkeypatch):
+    calls = []
+
+    class Physics:
+        @staticmethod
+        def is_initialized():
+            return False
+
+        @staticmethod
+        def initialize(**kwargs):
+            calls.append(("initialize", kwargs))
+
+        @staticmethod
+        def shutdown():
+            calls.append(("shutdown", {}))
+
+    monkeypatch.setattr(superdex_runtime, "_PID", None)
+    monkeypatch.setattr(superdex_runtime, "_USERS", 0)
+    monkeypatch.setattr(superdex_runtime, "_NUM_WORKER_THREADS", None)
+
+    superdex_runtime.acquire_runtime(Physics, 4)
+    superdex_runtime.acquire_runtime(Physics, 4)
+    with pytest.raises(RuntimeError, match="already initialized"):
+        superdex_runtime.acquire_runtime(Physics, 2)
+    superdex_runtime.release_runtime(Physics)
+    superdex_runtime.release_runtime(Physics)
+
+    assert calls == [
+        ("initialize", {"num_worker_threads": 4}),
+        ("shutdown", {}),
+    ]
+    assert superdex_runtime._NUM_WORKER_THREADS is None

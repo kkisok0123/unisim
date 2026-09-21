@@ -64,6 +64,7 @@ class SuperDexBackend(BuiltinAPI, SimBackend):
         *,
         base_name: str | None = None,
         num_workers: int = 0,
+        num_worker_threads: int = 0,
         execution_mode: str = "batch",
         effort_limits: float | Sequence[float] | None = None,
         controlled_joints: Sequence[str] | None = None,
@@ -78,12 +79,20 @@ class SuperDexBackend(BuiltinAPI, SimBackend):
             raise ValueError("sim_dt must be finite and positive")
         if isinstance(num_workers, bool) or not isinstance(num_workers, int) or num_workers < 0:
             raise ValueError("num_workers must be a non-negative integer (0 is automatic)")
+        if (
+            isinstance(num_worker_threads, bool)
+            or not isinstance(num_worker_threads, int)
+            or num_worker_threads < -1
+        ):
+            raise ValueError("num_worker_threads must be -1 or a non-negative integer")
         if not isinstance(execution_mode, str):
             raise TypeError("execution_mode must be a string")
         if execution_mode not in ("batch", "serial"):
             raise ValueError("execution_mode must be 'batch' or 'serial'")
         if execution_mode == "serial" and num_workers:
             raise ValueError("num_workers has no effect in serial execution mode")
+        if execution_mode == "batch" and num_worker_threads:
+            raise ValueError("num_worker_threads must be 0 in batch execution mode")
         if not isinstance(allow_contact_approximation, bool):
             raise TypeError("allow_contact_approximation must be bool")
         self._num_envs = num_envs
@@ -113,7 +122,7 @@ class SuperDexBackend(BuiltinAPI, SimBackend):
         self._p, self._r = load_superdex_dependencies()
         self._dtype = np.float64 if self._p.uses_double_precision() else np.float32
         try:
-            acquire_runtime(self._p)
+            acquire_runtime(self._p, num_worker_threads)
             self._acquired = True
             from .materialization import materialize_model
 

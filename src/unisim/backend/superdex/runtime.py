@@ -97,11 +97,12 @@ def load_superdex_dependencies() -> tuple[Any, Any]:
 _LOCK = threading.RLock()
 _PID: int | None = None
 _USERS = 0
+_NUM_WORKER_THREADS: int | None = None
 
 
-def acquire_runtime(physics: Any) -> None:
-    """Initialize the single-threaded SDK once per spawn process."""
-    global _PID, _USERS
+def acquire_runtime(physics: Any, num_worker_threads: int = 0) -> None:
+    """Initialize the consistently configured SDK once per spawn process."""
+    global _NUM_WORKER_THREADS, _PID, _USERS
     with _LOCK:
         if _PID is not None and _PID != os.getpid():
             raise RuntimeError("superdex runtime was inherited by fork; use spawn collectors")
@@ -111,14 +112,20 @@ def acquire_runtime(physics: Any) -> None:
                     "SuperDex was initialized outside UniSim; close that runtime before "
                     "constructing a backend so initialization/shutdown ownership is unambiguous"
                 )
-            physics.initialize(num_worker_threads=0)
+            physics.initialize(num_worker_threads=num_worker_threads)
             _PID = os.getpid()
+            _NUM_WORKER_THREADS = num_worker_threads
+        elif num_worker_threads != _NUM_WORKER_THREADS:
+            raise RuntimeError(
+                "SuperDex runtime is already initialized with "
+                f"num_worker_threads={_NUM_WORKER_THREADS}; requested {num_worker_threads}"
+            )
         _USERS += 1
 
 
 def release_runtime(physics: Any) -> None:
     """Shut down only after the last backend has destroyed its native resources."""
-    global _PID, _USERS
+    global _NUM_WORKER_THREADS, _PID, _USERS
     with _LOCK:
         if _PID != os.getpid() or not _USERS:
             return
@@ -126,6 +133,7 @@ def release_runtime(physics: Any) -> None:
         if not _USERS:
             physics.shutdown()
             _PID = None
+            _NUM_WORKER_THREADS = None
 
 
 # --------------------------------------------------------------------- #

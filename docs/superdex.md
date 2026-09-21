@@ -120,8 +120,14 @@ is rejected to prevent native thread-affinity failures. Use
 `env.superdex_execution_mode=serial`; interactive evaluation also uses one play environment.
 
 In batch mode, `superdex_num_workers=0` selects the physical cores visible to the
-process. SDK-internal workers are disabled to avoid competing thread pools.
-Leave the worker setting at zero in serial mode; a nonzero value is rejected.
+process. Leave that outer scene-worker setting at zero in serial mode; a nonzero
+value is rejected.
+
+`superdex_num_worker_threads` controls the process-wide SDK-internal solver pool in
+serial mode: `-1` lets SuperDex choose, `0` (the default) is single-threaded, and a
+positive value requests that many threads. Nonzero values are rejected in batch mode
+to avoid competing thread pools. All live SuperDex backends in one process must use
+the same value because they share the SDK runtime.
 
 ### Audited MJCF boundary
 
