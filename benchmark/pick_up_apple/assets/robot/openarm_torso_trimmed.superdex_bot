@@ -1,0 +1,82 @@
+{
+  "defaultPose": [],
+  "joints": [
+    {
+      "name": "world_joint",
+      "type": "Hard",
+      "parentLinkFromJoint": {
+        "translation": [
+          0,
+          0.045,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0.7071067811865476,
+          0.7071067811865476
+        ]
+      }
+    },
+    {
+      "name": "openarm_body_link0_mount_joint",
+      "type": "Hard"
+    },
+    {
+      "name": "openarm_left_base_link_mount_joint",
+      "parentLinkFromJoint": {
+        "translation": [
+          0.0,
+          0.03,
+          0.6970000000000001
+        ]
+      },
+      "type": "Hard"
+    },
+    {
+      "name": "openarm_right_base_link_mount_joint",
+      "parentLinkFromJoint": {
+        "translation": [
+          0.0,
+          -0.03,
+          0.6970000000000001
+        ]
+      },
+      "type": "Hard"
+    }
+  ],
+  "links": [
+    {
+      "name": "world"
+    },
+    {
+      "centerOfMass": [
+        -0.010805330078551292,
+        -7.218977558657094e-08,
+        0.2893312563590259
+      ],
+      "mass": 7.455974700551109,
+      "momentOfInertia": [
+        0.46538714424175265,
+        -3.697851588911581e-09,
+        -0.017313887680191403,
+        0.47082738012108594,
+        1.1195987278726592e-07,
+        0.01792233209906742
+      ],
+      "name": "openarm_body_link0",
+      "parentLink": 0,
+      "renderModel": "openarm_torso_trimmed.glb",
+      "shape": "openarm_torso_trimmed_collision.obj"
+    },
+    {
+      "name": "openarm_left_base_link",
+      "parentLink": 1
+    },
+    {
+      "name": "openarm_right_base_link",
+      "parentLink": 1
+    }
+  ],
+  "name": "openarm_v20_torso"
+}

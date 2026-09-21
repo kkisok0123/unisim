@@ -1,0 +1,40 @@
+{
+  "source": "https://github.com/huangkiki/Dexlab",
+  "source_path": "demos/apple-stem-grasp",
+  "generated_by": "UniSim physical task port",
+  "files": {
+    "assets/LICENSE-Dexlab": "0b81e2ea9cf9c447b3317b84e5bbaca9f3cf98a5d08ef8d754a3286f21c3392a",
+    "assets/LICENSE-openarm-arm": "7a9364906449d6fb1f65e168f1d6210ad624afa2078d2f978231750ffcc033b3",
+    "assets/LICENSE-wuji-hand": "38b27e3155e0c1c8d6f3e909e7a00359a302085dfd9ae963b52a91cbbe25afa3",
+    "assets/NOTICE-Dexlab": "9c32aa3af2ab9914da195d3386f885ea66ca4970fc7b5ed900030862b0b97706",
+    "assets/NOTICE-openarm-arm": "2b250d0f3853dcec24f56aa338f9c6deb85759f007ba94b58fa238494969c3b3",
+    "assets/NOTICE-wuji-hand": "26aa011244daa01bb27296c57476a89cb88840ddaa51bbf5ece7a36ac6d064be",
+    "assets/joint_to_native_link.json": "fe0cad8d7ee0afbc44c622aee5709de9f06e94dd7273d0f28ff1a41a036e9018",
+    "assets/objects/apple-collision.obj": "c36ef0287066f8ad2a32d6a7727deb3c113cabbd0330288248a140ad837218f4",
+    "assets/objects/apple_with_stem.mochi.h5": "e75d196249b21bb1ea536d14f6f19f301dd1652f1703e38e6c544a2d566e9e4b",
+    "assets/objects/objects.mochi_prefab": "99517dd854929a548f0e4e6acae60bce0b8268de5b14bffbc8098f1bf51a1f53",
+    "assets/objects/sources.json": "20b3dba762aaf2f2031fbc95feac13d599bf94e54a57ccb134b6a33d56cedbe3",
+    "assets/objects/stem-collision.obj": "772e209e616aaabf69944ffff84d241ace423e4e187a0323ca0e603dd08cd495",
+    "assets/objects/table.mochi.h5": "0e80adc84f84e7d029e5638e2f7550d2c3e9214e495bfd5acf653d64bc8a5f7f",
+    "assets/robot/openarm_torso_trimmed.glb": "d018be51126b1d02df1efd891fcc1716c76cac82da28179f4e0ee83bf20a2164",
+    "assets/robot/openarm_torso_trimmed.superdex_bot": "eaf2963d83927749435f5d2286532ac12c56ad989886cc620b31dc1ad467b84a",
+    "assets/robot/openarm_torso_trimmed_collision.obj": "5044847b456fdc662140a8a1306881ef4b4c95d935a7494774a826c3b3682403",
+    "assets/robot/openarm_v20_wuji_trimmed.superdex_bot": "900f38020c791fa5f768e4157976770e44903fb0d4782153287dea0ab7b77eb5",
+    "assets/stem.json": "3355bc7087fde8eddc175df3ee3a5ce0be9f0bcd7ad6396a50670cc2a7c02f89",
+    "evidence/dexlab_summary.json": "ac406214039e1e2ebf8c6f89d58a89b87b5934b1ed075c1ab51a643a6db4b8b5",
+    "evidence/dexlab_trajectory.npz": "471b1b1cbb889ffd1db31a782dd6c254cca040183a483f455a087790d7ea7c17"
+  },
+  "source_commit": "eab7e0114858fc96bfe54821590a0e3a8031e113",
+  "adapted_source_files": [
+    "src/plan_wuji_pinch.py",
+    "src/apple_scene.py",
+    "src/wuji_regrasp.py",
+    "src/wuji_stem_grasp.py",
+    "src/verify_wuji_sequence.py"
+  ],
+  "modifications": [
+    "Task dynamics use UniSim step_controller at 500 Hz with shared joint targets.",
+    "Planning and native contact verification retained from Dexlab; renderer uses live native playback.",
+    "Robot dependencies resolved through an ephemeral root into the unchanged local SuperDex bundle."
+  ]
+}

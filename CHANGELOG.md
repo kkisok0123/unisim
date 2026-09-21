@@ -5,6 +5,11 @@
 - Expose `superdex_num_worker_threads` for serial SuperDex backends, forwarding
   `-1`, `0`, or a positive worker count to the process-wide SDK runtime while
   rejecting nested batch/runtime thread pools and conflicting live configurations.
+- Add the first engine benchmark workload port under `benchmark/pick_up_apple`: the
+  DexLab OpenArm/Wuji apple-stem task replayed through the public SuperDex
+  `SimBackend`, with a rigid apple/table fragment, retained reference evidence,
+  controller-driven replay, finite-state/basic-pose checks, and explicit
+  contact-qualification limitations.
 - Pass the viewer's selected asset root to dependency loading and comparison
   workers, so default-root and `--assets` scenes work without a prior
   `SUPERDEX_ASSETS_PATH` export.

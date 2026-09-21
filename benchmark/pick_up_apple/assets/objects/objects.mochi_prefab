@@ -1,0 +1,36 @@
+{
+  "actors": {
+    "rigid": [
+      {
+        "name": "table",
+        "shape": "./table.mochi.h5",
+        "isStatic": true,
+        "colliderType": "BOX",
+        "translation": [
+          0.3,
+          0.46,
+          0.2795
+        ]
+      },
+      {
+        "name": "apple_with_stem",
+        "shape": "./apple_with_stem.mochi.h5",
+        "mass": 0.2,
+        "colliderType": "SDF",
+        "sdf": {
+          "resolutionMode": "EXPLICIT",
+          "resolutionDelta": [
+            0.0002,
+            0.0002,
+            0.0002
+          ]
+        },
+        "translation": [
+          0.3,
+          0.4,
+          0.34783494
+        ]
+      }
+    ]
+  }
+}

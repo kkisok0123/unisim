@@ -13,3 +13,4 @@ assets/**
 
 # Optional SuperDex comparison/viewer output (--out); never committed.
 results/
+tests/

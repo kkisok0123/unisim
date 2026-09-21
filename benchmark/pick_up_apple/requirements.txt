@@ -1,0 +1,4 @@
+# FP64 native payloads only. Use --no-deps: their upstream facade dependencies
+# overlap with UniSim's patched superdex-*-uni distributions.
+superdex-physics-fp64==1.0.0
+superdex-robotics-fp64==1.0.0
