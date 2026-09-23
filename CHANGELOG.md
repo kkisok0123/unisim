@@ -2,9 +2,61 @@
 
 ## Unreleased
 
+- Add an observational live viewer to the Isaac apple controller-parity runner.
+  `--viewer` opens Isaac's GUI, focuses the shared task camera, renders at a
+  configurable `--viewer-rate` independently of the 2 ms physics cadence, and
+  stops cleanly when the user closes the window. Controller targets, gains,
+  timestep, and parity checks are unchanged. Isaac articulation API inputs are
+  now consistently converted to torch tensors.
+
+- Add an Isaac controller-parity runner for pick-up apple. It settles the authored
+  USD, generates targets through the shared MuJoCo FK planner in a subprocess,
+  remaps them into Isaac DOF order, applies one 54-joint target per 2 ms, uses
+  and verifies the unchanged SuperDex/MuJoCo PD gains, replans at 23 s from the
+  actual Isaac apple pose, and checks joint-set/state/time/base parity. Recorded
+  DexLab body poses remain evidence only; grasp/contact equivalence is not claimed.
+
+- Author the pick-up-apple Isaac USD as the SuperDex/MuJoCo initial scene rather
+  than a saved post-run snapshot: restore the exact apple pose and zero authored
+  velocities, make the table truly static, deactivate all 12 collisionless virtual
+  frames while rewiring their arm-base joints, preserve the 79 real links and 140
+  contact exclusions, and qualify the saved definition without persisting live
+  state. Enabling source-selective robot self-collision remains a documented
+  blocker because the imported articulation becomes non-finite by step 18.
+
+- Require at least 3 seconds of MuJoCo apple settling and a sustained 0.5-second
+  position/orientation stability window before grasp planning, with a 10-second
+  timeout and settling diagnostics. Preserve residual physical velocities and
+  leave the SuperDex benchmark unchanged.
+
 - Expose `superdex_num_worker_threads` for serial SuperDex backends, forwarding
   `-1`, `0`, or a positive worker count to the process-wide SDK runtime while
   rejecting nested batch/runtime thread pools and conflicting live configurations.
+- Add a controller-free MuJoCo scene exporter for the pick-up-apple benchmark. It
+  deterministically converts the SuperDex robot/table/apple fragment to MJCF,
+  exports collision meshes, preserves inertials/joint definitions/contact
+  exclusions, and validates definition parity without claiming engine-equivalent
+  contact dynamics.
+- Add a UniSim MuJoCo replay path for pick-up apple. It creates an actuator-bearing
+  runtime MJCF from the controller-free exported scene, settles the apple through a
+  separate MuJoCo backend, ports online arm/pinch/lift/regrasp planning to MuJoCo
+  FK, and sends 500 Hz joint targets to unbounded MuJoCo position servos with the
+  unchanged SuperDex gain schedule. It disables duplicated passive damping and
+  automatic bad-state resets, verifies the 23-second gain update on all pool-owned
+  models, and records controller/integrator/time metadata. An optional real-time
+  passive viewer mirrors adapter-owned state without changing the simulation.
+- Correct the pick-up-apple MuJoCo definition export to retain the SuperDex
+  virtual-root transform, preserve authored default joint poses and quaternion
+  conventions in planning, and use separate fruit/stem collision geoms instead
+  of a single convex hull spanning both shapes. Render the apple in red from an
+  unstripped visual model (the adapter simulation model discards visual-only
+  geoms), focus the passive viewer on the task, and handle Ctrl-C without a
+  traceback.
+- Keep the pick-up-apple SuperDex native pose-controller path unchanged while the
+  MuJoCo path emulates it with affine position actuators. The installed MuJoCoUni
+  3.11 runtime predates the requested MuJoCo 3.13 `discrete` integrator, so the
+  runner explicitly reports its `implicit` fallback and fails on `BADQACC` instead
+  of resetting or silently changing timestep, limits, or gains.
 - Add the first engine benchmark workload port under `benchmark/pick_up_apple`: the
   DexLab OpenArm/Wuji apple-stem task replayed through the public SuperDex
   `SimBackend`, with a rigid apple/table fragment, retained reference evidence,

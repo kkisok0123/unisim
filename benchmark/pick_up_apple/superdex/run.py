@@ -16,7 +16,7 @@ from unisim import ArticulationPoseTarget, create_backend
 from unisim.scene import SceneCfg
 
 ROOT = Path(__file__).resolve().parent
-REPO = ROOT.parents[1]
+REPO = ROOT.parents[2]
 ROBOT = ROOT / "assets/robot/openarm_v20_wuji_trimmed.superdex_bot"
 OBJECTS = ROOT / "assets/objects/objects.mochi_prefab"
 DT = 0.002

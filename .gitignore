@@ -14,3 +14,7 @@ assets/**
 # Optional SuperDex comparison/viewer output (--out); never committed.
 results/
 tests/
+# Generated pick-up-apple MuJoCo scene artifacts; regenerate with export_mujoco.py.
+benchmark/pick_up_apple/mujoco/
+# MuJoCo runtime log from local benchmark runs.
+MUJOCO_LOG.TXT
