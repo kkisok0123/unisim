@@ -14,6 +14,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import numpy as np
+from initial_pose import APPLE_POSE_WXYZ
 from scipy.spatial.transform import Rotation
 from superdex import physics, robotics
 
@@ -209,7 +210,7 @@ def add_robot_link(
             body,
             "geom",
             name=f"{link.name}_collision",
-            type="mesh",
+            type="sdf",
             mesh=str(link.name),
         )
     for child in children[links.index(link)]:
@@ -340,12 +341,14 @@ def main() -> None:
                 if resolution.shape != (3,) or not np.allclose(resolution, [0.0002] * 3):
                     raise ValueError(f"{name}: expected the SuperDex 0.2 mm SDF resolution")
                 export_mesh(shape, exported, name)
-                body = ET.SubElement(
-                    worldbody,
-                    "body",
-                    name=name,
-                    pos=fmt(np.asarray(actor["translation"], dtype=float)),
-                )
+                body_attributes = {
+                    "name": name,
+                    "pos": fmt(np.asarray(actor["translation"], dtype=float)),
+                }
+                if name == "apple_with_stem":
+                    body_attributes["pos"] = fmt(APPLE_POSE_WXYZ[:3])
+                    body_attributes["quat"] = fmt(APPLE_POSE_WXYZ[3:])
+                body = ET.SubElement(worldbody, "body", body_attributes)
                 ET.SubElement(body, "freejoint", name=f"{name}_root")
                 com, inertia, quat = mesh_inertia(vertices, faces, float(actor["mass"]))
                 attributes = {

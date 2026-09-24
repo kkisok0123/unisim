@@ -13,6 +13,7 @@ from pathlib import Path
 
 import mujoco
 import numpy as np
+from initial_pose import APPLE_POSE_WXYZ, SUPERDEX_SETTLING_SECONDS
 from planning import GraspPlan, Kinematics, plan_body_grasp
 from runtime import (
     APPLE_SDF_GEOM,
@@ -21,7 +22,6 @@ from runtime import (
     GAIN_SWITCH_TIME,
     INTEGRATOR,
     ROOT,
-    build_settling_scene,
     compile_physics_model,
     controller_metadata,
     hinge_names,
@@ -263,9 +263,6 @@ def run_task(
     contacts_enabled: bool = True,
 ):
     del output
-    settling_scene = runtime_scene.parent / "settling.xml"
-    settling_diagnostics: dict = {}
-    apple_q, apple_v = settled_apple(settling_scene, DT, diagnostics=settling_diagnostics)
     physics_model, collision_metadata = compile_physics_model(runtime_scene)
     backend = create_backend(
         "mujoco",
@@ -302,6 +299,21 @@ def run_task(
         ):
             raise RuntimeError("MuJoCo automatic bad-state reset is still enabled")
         names, qpos_ids, _ = model_joint_indices(backend.model)
+        apple_joint = mujoco.mj_name2id(
+            backend.model, mujoco.mjtObj.mjOBJ_JOINT, "apple_with_stem_root"
+        )
+        apple_qadr = int(backend.model.jnt_qposadr[apple_joint])
+        apple_q = np.asarray(backend.model.qpos0[apple_qadr : apple_qadr + 7], dtype=float).copy()
+        if not np.allclose(apple_q, APPLE_POSE_WXYZ, atol=1e-12, rtol=0):
+            raise RuntimeError("MuJoCo scene has a stale apple pose; rerun mujoco_src/export.py")
+        apple_v = np.zeros(6, dtype=float)
+        settling_diagnostics = {
+            "performed": False,
+            "source": "SuperDex FP64 settled pose",
+            "source_seconds": SUPERDEX_SETTLING_SECONDS,
+            "initial_pose_wxyz": apple_q.tolist(),
+            "initial_velocity_zero": True,
+        }
         kin = Kinematics()
         if names != kin.names:
             raise ValueError("planner and MuJoCo adapter joint order differ")
@@ -536,7 +548,6 @@ def main() -> int:
     if not np.isfinite(args.seconds) or not DT <= args.seconds <= 40:
         parser.error("--seconds must be between 0.002 and 40")
     runtime = write_runtime_scene(disable_contacts=args.disable_contacts)
-    build_settling_scene(runtime.parent / "settling.xml")
     if not DISCRETE_AVAILABLE:
         print(
             "NOTICE: the requested discrete integrator was introduced in MuJoCo 3.13, "

@@ -22,6 +22,10 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parent.parent
 SCENE = Path(__file__).resolve().with_name("scene_sdf.usd")
+FULL_EXPERIENCE = (
+    Path.home()
+    / ".unilab/isaacsim/venv/lib/python3.11/site-packages/isaacsim/apps/isaacsim.exp.full.kit"
+)
 DT = 0.002
 GAIN_SWITCH_TIME = 23.0
 SETTLE_MIN_SECONDS = 3.0
@@ -35,6 +39,13 @@ CAMERA_TARGET = np.asarray([0.25, 0.30, 0.42], dtype=float)
 ROBOT_ROOT = "/scene_sdf/openarm_body_link0/openarm_body_link0"
 APPLE_ROOT = "/scene_sdf/apple_with_stem/apple_with_stem"
 APPLE_COLLIDER = f"{APPLE_ROOT}/collisions/apple_with_stem/apple_with_stem"
+GRASP_FRICTION = 2.0
+GRASP_MATERIAL_PATH = "/IsaacAppleGraspMaterial"
+GRASP_FRICTION_PRIMS = (
+    APPLE_ROOT,
+    "/scene_sdf/openarm_body_link0/r_index_finger_pad",
+    "/scene_sdf/openarm_body_link0/r_thumb_pad",
+)
 TABLE_TOP = 0.2995  # Authored table height, also checked by qualify.py.
 BAD_PHYSX_MESSAGES = (
     "Invalid PhysX transform",
@@ -73,6 +84,26 @@ def configure_viewer_camera(*, enabled: bool) -> None:
     from isaacsim.core.utils.viewports import set_camera_view
 
     set_camera_view(eye=CAMERA_EYE, target=CAMERA_TARGET)
+
+
+def wait_while_timeline_paused(*, app, world, viewer_clock, enabled: bool) -> int:
+    """Let the user pause the full GUI without advancing control or physics."""
+    if app is None or not enabled:
+        return 0
+
+    import omni.timeline
+
+    timeline = omni.timeline.get_timeline_interface()
+    waited_updates = 0
+    while not timeline.is_playing():
+        if not app_is_running(app):
+            break
+        app.update()
+        waited_updates += 1
+        time.sleep(0.01)
+    if waited_updates and viewer_clock.world is world:
+        viewer_clock.reset()
+    return waited_updates
 
 
 class ViewerClock:
@@ -201,12 +232,22 @@ def angle_between(quaternion: np.ndarray, reference: np.ndarray) -> float:
 
 
 def settle_apple(
-    world, apple, *, app=None, viewer_clock: ViewerClock | None = None
+    world,
+    apple,
+    *,
+    app=None,
+    viewer_clock: ViewerClock | None = None,
+    ui_pause: bool = False,
 ) -> tuple[np.ndarray, dict]:
     window_size = int(np.ceil(SETTLE_WINDOW_SECONDS / DT)) + 1
     poses = deque(maxlen=window_size)
     diagnostics: dict = {}
     for step in range(1, int(np.floor(SETTLE_TIMEOUT_SECONDS / DT)) + 1):
+        if not app_is_running(app):
+            raise RuntimeError("Isaac viewer was closed while settling the apple")
+        wait_while_timeline_paused(
+            app=app, world=world, viewer_clock=viewer_clock, enabled=ui_pause
+        )
         if not app_is_running(app):
             raise RuntimeError("Isaac viewer was closed while settling the apple")
         world.step(render=False)
@@ -282,6 +323,36 @@ def remove_effort_limits(robot, joint_count: int) -> None:
         raise RuntimeError(f"Isaac drive effort limits remain active: {actual}")
 
 
+def configure_grasp_friction(stage) -> dict:
+    """Bind the validated pinch material in the unsaved runtime session layer."""
+    from pxr import PhysxSchema, UsdPhysics, UsdShade
+
+    previous_target = stage.GetEditTarget()
+    stage.SetEditTarget(stage.GetSessionLayer())
+    try:
+        material = UsdShade.Material.Define(stage, GRASP_MATERIAL_PATH)
+        physics = UsdPhysics.MaterialAPI.Apply(material.GetPrim())
+        physics.CreateStaticFrictionAttr().Set(GRASP_FRICTION)
+        physics.CreateDynamicFrictionAttr().Set(GRASP_FRICTION)
+        physics.CreateRestitutionAttr().Set(0.0)
+        PhysxSchema.PhysxMaterialAPI.Apply(material.GetPrim())
+        for path in GRASP_FRICTION_PRIMS:
+            prim = stage.GetPrimAtPath(path)
+            if not prim:
+                raise RuntimeError(f"Isaac grasp material target is missing: {path}")
+            binding = UsdShade.MaterialBindingAPI.Apply(prim)
+            binding.Bind(material, UsdShade.Tokens.strongerThanDescendants, "physics")
+            bound, _ = binding.ComputeBoundMaterial("physics")
+            if not bound or bound.GetPath() != material.GetPath():
+                raise RuntimeError(f"Isaac grasp material was not bound to {path}")
+    finally:
+        stage.SetEditTarget(previous_target)
+    return {
+        "static_friction": GRASP_FRICTION,
+        "dynamic_friction": GRASP_FRICTION,
+        "material_path": GRASP_MATERIAL_PATH,
+        "bound_prims": list(GRASP_FRICTION_PRIMS),
+    }
 
 
 def apple_clearance(vertices: np.ndarray, position: np.ndarray, quaternion: np.ndarray) -> float:
@@ -327,6 +398,7 @@ def run_task(
     viewer: bool = False,
     viewer_rate_hz: float = DEFAULT_VIEWER_RATE_HZ,
     viewer_pace_realtime: bool = True,
+    viewer_ui_pause: bool = False,
 ) -> dict:
     from isaacsim.core.api import World
     from isaacsim.core.prims import SingleArticulation, SingleRigidPrim
@@ -342,6 +414,7 @@ def run_task(
         backend="torch",
         device="cuda:0",
     )
+    grasp_friction = configure_grasp_friction(world.stage)
     robot = world.scene.add(
         SingleArticulation(ROBOT_ROOT, name="apple_robot", reset_xform_properties=False)
     )
@@ -363,7 +436,13 @@ def run_task(
         enabled=viewer, rate_hz=viewer_rate_hz, app=app, world=world,
         pace_realtime=viewer_pace_realtime,
     )
-    apple_pose, settling = settle_apple(world, apple, app=app, viewer_clock=viewer_clock)
+    apple_pose, settling = settle_apple(
+        world,
+        apple,
+        app=app,
+        viewer_clock=viewer_clock,
+        ui_pause=viewer and viewer_ui_pause,
+    )
     targets, plan_names, plan_pre = shared_targets(apple_pose=apple_pose, stop=seconds)
     permutation = np.asarray([plan_names.index(name) for name in isaac_names], dtype=int)
     targets = targets[:, permutation]
@@ -389,6 +468,7 @@ def run_task(
     records = []
     switched_gain_readback = None
     viewer_closed_early = False
+    ui_pause_updates = 0
     steps_completed = 0
     max_tracking_error = 0.0
     gain_switch_applied = False
@@ -406,6 +486,12 @@ def run_task(
     previous_time = float(world.current_time)
     viewer_clock.reset()
     for count in range(total_steps):
+        if not app_is_running(app):
+            viewer_closed_early = True
+            break
+        ui_pause_updates += wait_while_timeline_paused(
+            app=app, world=world, viewer_clock=viewer_clock, enabled=viewer and viewer_ui_pause
+        )
         if not app_is_running(app):
             viewer_closed_early = True
             break
@@ -517,6 +603,7 @@ def run_task(
         phases, phase_checks = phase_clearance_summary(records)
         checks.update(phase_checks)
     summary = {
+        "grasp_friction": grasp_friction,
         "normal_gain_readback": normal_gain_readback,
         "max_efforts_unlimited": True,
         "switched_gain_readback": switched_gain_readback,
@@ -532,6 +619,8 @@ def run_task(
         "viewer_enabled": viewer,
         "viewer_rate_hz": viewer_clock.rate_hz if viewer else None,
         "viewer_unpaced": viewer and not viewer_pace_realtime,
+        "viewer_ui_pause_enabled": viewer and viewer_ui_pause,
+        "viewer_ui_pause_updates": ui_pause_updates if viewer and viewer_ui_pause else 0,
         "viewer_closed_early": viewer_closed_early,
         "real_time_pacing": viewer_clock.real_time_pacing,
         "joint_names": list(isaac_names),
@@ -587,6 +676,10 @@ def main() -> int:
         "--unpaced", action="store_true",
         help="run physics without real-time sleeping while keeping the viewer",
     )
+    parser.add_argument(
+        "--viewer-ui-pause", action="store_true",
+        help="allow the full-mode viewer pause button to hold the control loop",
+    )
     parser.add_argument("--out", type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--_worker", action="store_true", help=argparse.SUPPRESS)
@@ -602,7 +695,11 @@ def main() -> int:
 
     from isaacsim import SimulationApp
 
-    app = SimulationApp({"headless": not args.viewer})
+    # Full mode exposes the complete Physics menu in the viewer; headless runs stay lightweight.
+    app = SimulationApp(
+        {"headless": not args.viewer},
+        experience=str(FULL_EXPERIENCE) if args.viewer else "",
+    )
     error = None
     summary = None
     try:
@@ -634,6 +731,7 @@ def main() -> int:
             viewer=args.viewer,
             viewer_rate_hz=args.viewer_rate,
             viewer_pace_realtime=not args.unpaced,
+            viewer_ui_pause=args.viewer_ui_pause,
         )
         log_stream.pump()
         summary["invalid_physx_messages"] = messages

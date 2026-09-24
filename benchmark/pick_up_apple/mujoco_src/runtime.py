@@ -16,8 +16,9 @@ GAIN_SWITCH_TIME = 23.0
 REQUESTED_INTEGRATOR = "discrete"
 APPLE_SDF_GEOM = "apple_with_stem_collision"
 APPLE_SDF_MESH = "apple_with_stem"
+ROBOT_SDF_EDGE_FACTOR = 0.5  # Twice the SuperDex AUTO quarter-mean-edge spacing.
 APPLE_COLLISION_RGBA = (0.1, 0.8, 0.1, 0.65)
-SDF_TARGET_SPACING = 0.0002
+SDF_TARGET_SPACING = 0.0004
 
 
 def _obj_vertices(path: Path) -> np.ndarray:
@@ -39,6 +40,18 @@ def required_sdf_octree_depth(mesh_path: Path, spacing: float = SDF_TARGET_SPACI
     # The diagonal bounds every axis-aligned extent after MuJoCo recenters and
     # principal-axis-aligns the mesh during compilation.
     diameter = float(np.linalg.norm(extent))
+    return max(1, math.ceil(math.log2(diameter / spacing)))
+
+
+def robot_sdf_octree_depth(mesh_path: Path) -> int:
+    """Use half-mean-edge voxels, twice the SuperDex AUTO spacing."""
+    import trimesh
+
+    mesh = trimesh.load_mesh(mesh_path, process=False)
+    if not mesh.is_volume:
+        raise ValueError(f"robot SDF mesh must be a closed volume: {mesh_path}")
+    spacing = float(np.mean(mesh.edges_unique_length) * ROBOT_SDF_EDGE_FACTOR)
+    diameter = float(np.linalg.norm(mesh.extents))
     return max(1, math.ceil(math.log2(diameter / spacing)))
 
 
@@ -64,7 +77,7 @@ def sdf_collision_metadata(model: mujoco.MjModel) -> dict[str, object]:
     maximum_cell_width = float(np.max(finest))
     if maximum_cell_width > SDF_TARGET_SPACING * (1 + 1e-9):
         raise ValueError(
-            "Compiled MuJoCo apple SDF is coarser than SuperDex: "
+            "Compiled MuJoCo apple SDF exceeds the requested spacing: "
             f"{maximum_cell_width:.9g} m > {SDF_TARGET_SPACING:.9g} m"
         )
     return {
@@ -80,7 +93,7 @@ def sdf_collision_metadata(model: mujoco.MjModel) -> dict[str, object]:
 def compile_physics_model(
     path: Path | str, *, discard_visual: bool = True
 ) -> tuple[mujoco.MjModel, dict[str, object]]:
-    """Compile the native apple mesh SDF at SuperDex's 0.2 mm target spacing."""
+    """Compile apple and robot SDFs at the task's coarser MuJoCo settings."""
     scene_path = Path(path).resolve()
     spec = mujoco.MjSpec.from_file(str(scene_path))
     collision = spec.geom(APPLE_SDF_GEOM)
@@ -92,6 +105,16 @@ def compile_physics_model(
         raise ValueError(f"MuJoCo scene is missing mesh {APPLE_SDF_MESH!r}")
     mesh_path = scene_path.parent / "meshes" / f"{APPLE_SDF_MESH}.obj"
     mesh.octree_maxdepth = required_sdf_octree_depth(mesh_path)
+    for geom in spec.worldbody.find_all(mujoco.mjtObj.mjOBJ_GEOM):
+        if not geom.name.endswith("_collision") or geom.name == APPLE_SDF_GEOM:
+            continue
+        if geom.type != mujoco.mjtGeom.mjGEOM_SDF:
+            raise ValueError(f"MuJoCo robot collision geom must be SDF: {geom.name}")
+        robot_mesh = spec.mesh(geom.meshname)
+        if robot_mesh is None:
+            raise ValueError(f"MuJoCo robot collision mesh is missing: {geom.meshname}")
+        robot_path = scene_path.parent / "meshes" / f"{geom.meshname}.obj"
+        robot_mesh.octree_maxdepth = robot_sdf_octree_depth(robot_path)
     spec.compiler.discardvisual = discard_visual
     model = spec.compile()
     return model, sdf_collision_metadata(model)
@@ -213,9 +236,11 @@ def load_planning_model() -> tuple[mujoco.MjModel, mujoco.MjData, np.ndarray, np
     apple = spec.body("apple_with_stem")
     if apple is None:
         raise ValueError("Planning scene is missing apple_with_stem")
-    # IK only needs the robot. Removing the apple prevents an unnecessary SDF
-    # build and keeps planning independent of the collision-grid cache.
+    # IK needs robot body frames and inertials, not collision grids. Avoid
+    # compiling the 79 robot SDFs or the apple SDF for each planning model.
     spec.delete(apple)
+    for geom in list(spec.worldbody.find_all(mujoco.mjtObj.mjOBJ_GEOM)):
+        spec.delete(geom)
     model = spec.compile()
     data = mujoco.MjData(model)
     qadr, vadr = model_joint_arrays(model)

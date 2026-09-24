@@ -66,14 +66,24 @@ SUPERDEX_PRECISION=fp64 uv run --no-sync python benchmark/pick_up_apple/mujoco_s
 The exporter writes ignored `benchmark/pick_up_apple/mujoco/` artifacts, exports
 collision meshes, preserves the source root transform, link/joint frames and
 inertials, converts disabled contact overrides to `<contact><exclude/>`, and adds
-the free apple plus static table. The table uses the source `BOX` collider and the
-combined apple/stem mesh uses MuJoCo's native mesh SDF. Before physics starts,
-`mujoco_src/runtime.py` chooses an octree depth whose finest cells are no wider than
-SuperDex's 0.2 mm target and rejects a compiled model that fails that check. For
-the current asset this is depth 10 and approximately 0.115 mm maximum cell width;
-compilation takes about 37 seconds and peaks near 8 GB RSS on the reference machine.
-The scene intentionally defines **no actuators**. Matching spatial discretization
-does not make the two engines' contact solvers or resulting forces identical.
+the free apple plus static table. The table uses the source `BOX` collider.
+All 79 robot collision meshes and the combined apple/stem mesh use MuJoCo SDFs;
+MuJoCo uses deliberately coarser SDF settings: robot octree depths target half
+the mean mesh edge (twice SuperDex's AUTO spacing), and the apple targets 0.4 mm
+instead of SuperDex's 0.2 mm. `mujoco_src/runtime.py` selects the octree depths
+before physics starts and checks the compiled apple cell width. The previous
+finer robot/0.2 mm apple profile took 106 seconds end to end and peaked near
+26.4 GB RSS for a 2.6-second smoke on the reference machine. The coarser profile
+completed the same smoke in 62 seconds at 7.5 GB peak RSS; its apple octree is
+depth 9 with 0.229 mm maximum finest cell width. A short smoke does not validate
+the later pinch or full grasp.
+The scene intentionally defines **no actuators**. Its apple body starts at the
+SuperDex FP64 pose after the task's three-second settling run, with world position
+`(0.2975742052, 0.4016949083, 0.3447551202)` and quaternion in `wxyz` order
+`(0.9994968288, -0.0182256720, -0.0259598530, -0.0000135425)`. This is an
+authored initial pose, not a guarantee that MuJoCo will hold it after stepping.
+Matching spatial discretization does not make the two engines' contact solvers or
+resulting forces identical.
 
 ## Isaac scene authoring and qualification
 
@@ -88,7 +98,7 @@ LD_LIBRARY_PATH="$HOME/.unilab/isaacsim/compat/libxml2" \
 ```
 
 `--author` writes the USD before stepping and never saves a live pose or velocity.
-The saved apple starts at the SuperDex/MuJoCo authored pose
+The saved Isaac apple starts at the source SuperDex asset pose
 `(0.3, 0.4, 0.34783494)` with identity rotation and zero velocity; all authored
 robot velocities are zero. The 12 collisionless virtual frames are deactivated,
 and their two arm-base joints are rewired to the physical root, preserving the
@@ -131,6 +141,11 @@ gain APIs use the source per-radian values; only authored USD angular drive
 attributes use per-degree values. Runtime drive effort limits are removed to
 match the unsaturated SuperDex and MuJoCo controllers. The viewer calls
 `world.render()` at its display rate to synchronize physics transforms.
+At runtime, Isaac binds a physics material with static and dynamic friction
+coefficients of 2.0 to the apple and right index/thumb pads. The binding lives
+in the unsaved session layer; the qualified USD asset is unchanged. This value
+restored the stem lift and 11–14 s hold in a focused Isaac run, but is not a
+calibrated material measurement.
 The summary checks the same 8–9 s lift and three hold/release clearance
 windows as MuJoCo, so a complete run fails when the apple is not lifted or
 released as planned. These geometric checks do not establish force/contact
@@ -158,20 +173,17 @@ separately compiled display model with the original visual meshes, so it is not
 an inspection of the physics SDF grid.
 
 The MuJoCo port generates an ignored runtime MJCF with one affine position servo
-per robot hinge, settles the apple in an isolated adapter-owned table/apple scene,
-performs the same arm/pinch/lift/regrasp planning using MuJoCo FK, and sends one
-position target per 2 ms physics step. Servo gains match the unchanged SuperDex
+per robot hinge, starts from the authored SuperDex three-second apple pose at zero
+velocity, performs the same arm/pinch/lift/regrasp planning using MuJoCo FK, and
+sends one position target per 1 ms physics step. Servo gains match the unchanged SuperDex
 controller, including the 23-second right-hand gain change. Actuator limits and
 duplicated passive damping are disabled. The runner disables automatic bad-state
 resets and records controller, integrator, gain-profile, monotonic-time, tracking,
 phase-clearance, and 20 Hz transform diagnostics.
 
-Before planning, MuJoCo settles for at least 3 seconds and requires a full
-0.5-second window whose poses stay within 0.25 mm and 0.25 degrees of the window's
-first pose. These tolerances allow the measured small mesh-contact jitter; they
-do not imply an exactly motionless apple. Settling fails after 10 seconds if the
-gate is not met. The final physical pose and velocities are preserved, and the
-summary records settling duration and measured excursions. SuperDex is unchanged.
+MuJoCo does not run a separate apple settling phase before planning. It checks
+that the compiled scene contains the authored pose and records the zero-velocity
+initialization in its summary. SuperDex keeps its own three-second settling run.
 
 The requested MuJoCo `discrete` integrator was introduced in MuJoCo 3.13 and is
 selected when the installed binding exposes it. This repository is currently pinned
@@ -187,8 +199,8 @@ real time. Closing either window ends the run cleanly and marks the requested
 steps incomplete; Ctrl-C closes the viewer/backend without a traceback.
 Exact controller/contact parity and the SuperDex force-balance verifier are not
 claimed: SuperDex uses an internal pose constraint, while the MuJoCo path uses a
-native-servo emulation. Both paths now use the same combined apple/stem surface and
-an SDF target spacing of at most 0.2 mm, but their contact solvers remain different.
+native-servo emulation. Both paths use the same combined apple/stem surface; MuJoCo now targets 0.4 mm
+for the apple, while SuperDex retains 0.2 mm. Their contact solvers also differ.
 
 ## Implementation and validation
 
