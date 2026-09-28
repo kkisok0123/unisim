@@ -7,6 +7,8 @@ import argparse
 import copy
 import gc
 import json
+import os
+import tempfile
 import time
 from collections import deque
 from pathlib import Path
@@ -542,20 +544,40 @@ def main() -> int:
         action="store_true",
         help="Disable contacts for the controller-only stability gate",
     )
+    parser.add_argument(
+        "--grasp-friction",
+        type=float,
+        help="override index/thumb pad sliding friction for this run (for example, 10)",
+    )
     parser.add_argument("--out", type=Path)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     if not np.isfinite(args.seconds) or not DT <= args.seconds <= 40:
         parser.error("--seconds must be between 0.002 and 40")
-    runtime = write_runtime_scene(disable_contacts=args.disable_contacts)
-    if not DISCRETE_AVAILABLE:
-        print(
-            "NOTICE: the requested discrete integrator was introduced in MuJoCo 3.13, "
-            "but this project is pinned to MuJoCo 3.11 by mujoco-uni-runtime 0.5.0; "
-            "using implicit and recording the unsupported capability.",
-            flush=True,
+    if args.grasp_friction is not None and (
+        not np.isfinite(args.grasp_friction) or args.grasp_friction <= 0
+    ):
+        parser.error("--grasp-friction must be finite and positive")
+    temporary_runtime = None
+    if args.grasp_friction is not None:
+        descriptor, name = tempfile.mkstemp(
+            prefix="runtime-friction-", suffix=".xml", dir=ROOT / "mujoco"
         )
+        os.close(descriptor)
+        temporary_runtime = Path(name)
     try:
+        runtime = write_runtime_scene(
+            path=temporary_runtime,
+            disable_contacts=args.disable_contacts,
+            grasp_friction=args.grasp_friction,
+        )
+        if not DISCRETE_AVAILABLE:
+            print(
+                "NOTICE: the requested discrete integrator was introduced in MuJoCo 3.13, "
+                "but this project is pinned to MuJoCo 3.11 by mujoco-uni-runtime 0.5.0; "
+                "using implicit and recording the unsupported capability.",
+                flush=True,
+            )
         summary, records, frames, names = run_task(
             runtime,
             args.seconds,
@@ -567,6 +589,12 @@ def main() -> int:
     except KeyboardInterrupt:
         print("\nInterrupted; viewer and MuJoCo backend closed.", flush=True)
         return 130
+    finally:
+        if temporary_runtime is not None:
+            temporary_runtime.unlink(missing_ok=True)
+    summary["grasp_pad_sliding_friction"] = (
+        1.0 if args.grasp_friction is None else args.grasp_friction
+    )
     if args.output:
         args.output.mkdir(parents=True, exist_ok=True)
         (args.output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")

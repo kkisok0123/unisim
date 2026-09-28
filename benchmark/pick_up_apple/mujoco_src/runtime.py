@@ -16,6 +16,7 @@ GAIN_SWITCH_TIME = 23.0
 REQUESTED_INTEGRATOR = "discrete"
 APPLE_SDF_GEOM = "apple_with_stem_collision"
 APPLE_SDF_MESH = "apple_with_stem"
+GRASP_PAD_GEOMS = ("r_index_finger_pad_collision", "r_thumb_pad_collision")
 ROBOT_SDF_EDGE_FACTOR = 0.5  # Twice the SuperDex AUTO quarter-mean-edge spacing.
 APPLE_COLLISION_RGBA = (0.1, 0.8, 0.1, 0.65)
 SDF_TARGET_SPACING = 0.0004
@@ -162,7 +163,10 @@ def build_position_gains(
 
 
 def write_runtime_scene(
-    path: Path | str | None = None, *, disable_contacts: bool = False
+    path: Path | str | None = None,
+    *,
+    disable_contacts: bool = False,
+    grasp_friction: float | None = None,
 ) -> Path:
     """Add native position servos without force limits or passive damping."""
     if not SCENE.exists():
@@ -185,6 +189,16 @@ def write_runtime_scene(
     flag.set("autoreset", "disable")
     if disable_contacts:
         flag.set("contact", "disable")
+    if grasp_friction is not None:
+        if not math.isfinite(grasp_friction) or grasp_friction <= 0:
+            raise ValueError("grasp friction must be finite and positive")
+        geoms = {geom.get("name"): geom for geom in root.iter("geom")}
+        for name in GRASP_PAD_GEOMS:
+            if name not in geoms:
+                raise ValueError(f"MuJoCo grasp pad geom is missing: {name}")
+            # MuJoCo combines equal-priority geom sliding friction by maximum.
+            # Keep torsional and rolling friction at their model defaults.
+            geoms[name].set("friction", f"{grasp_friction:.17g} 0.005 0.0001")
 
     names = tuple(
         joint.attrib["name"]

@@ -166,6 +166,27 @@ uv run --no-sync python benchmark/pick_up_apple/mujoco_src/run.py --seconds 1 \
   --output results/pick_up_apple_mujoco_smoke
 ```
 
+To try an effective sliding friction coefficient of 10 for index/thumb pad
+contacts with the combined apple/stem collider, run:
+
+```bash
+uv run --no-sync python benchmark/pick_up_apple/mujoco_src/run.py --seconds 9 \
+  --grasp-friction 10 --output results/pick_up_apple_mujoco_friction10_9s
+```
+
+The option changes only the two pad geoms in a temporary runtime MJCF. MuJoCo
+uses the larger coefficient for this equal-priority pad/apple pair, so its
+sliding coefficient becomes 10; torsional and rolling defaults remain unchanged.
+The tracked controller-free scene and default runtime remain at coefficient 1.
+In matched 9 s runs, the default never lifts the apple above the table, while
+coefficient 10 reaches 21.2 mm maximum clearance during 8–9 s. It falls back
+before 9 s; the 14 s coefficient-10 run stays on the table throughout the
+11–14 s hold window. These results are in the ignored
+`results/pick_up_apple_mujoco_default_9s/` and
+`results/pick_up_apple_mujoco_friction10_{9s,14s}/` directories. A short run's
+`passed` field only checks for any 8–9 s lift, so it does not certify a
+sustained hold.
+
 `--viewer` renders a native copy of the adapter's compiled physics model, including
 the same SDF octree and the apple collider colored translucent green at compile time.
 It omits visual-only geoms; press `C` in the MuJoCo viewer to show contact points. `--viewer-visual` uses a
