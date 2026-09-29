@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import csv
 import gc
 import json
 import os
@@ -38,6 +39,7 @@ from unisim.scene import SceneCfg
 SAMPLE_DT = 0.05
 STEPS_PER_SAMPLE = round(SAMPLE_DT / DT)
 TABLE_TOP_Z = 0.2995
+STEM_PAD_NAMES = ("r_index_finger_pad", "r_thumb_pad")
 
 
 def model_joint_indices(model):
@@ -135,6 +137,75 @@ def body_poses_from_backend(backend, data, body_ids: np.ndarray) -> tuple[np.nda
     data.qvel[:] = qvel
     mujoco.mj_forward(backend.model, data)
     return data.xpos[body_ids][None].copy(), data.xquat[body_ids][None].copy()
+
+
+def stem_pad_normal_forces(
+    backend, data, target, apple_body_id, apple_geom_id, pad_geom_ids, apple_mesh, stem_mesh
+):
+    """Re-solve the saved state and sum stem contact-normal forces in world coordinates."""
+    import trimesh
+
+    model = backend.model
+    mujoco.mj_setState(
+        model, data, backend.get_physics_state()[0], mujoco.mjtState.mjSTATE_FULLPHYSICS
+    )
+    data.ctrl[:] = target
+    mujoco.mj_forward(model, data)
+
+    forces = {name: np.zeros(3) for name in pad_geom_ids.values()}
+    candidates = []
+    for i in range(data.ncon):
+        contact = data.contact[i]
+        if contact.geom1 == apple_geom_id:
+            pad_id, sign = contact.geom2, -1
+        elif contact.geom2 == apple_geom_id:
+            pad_id, sign = contact.geom1, 1
+        else:
+            continue
+        name = pad_geom_ids.get(pad_id)
+        if name is None:
+            continue
+        rotation = np.asarray(data.xmat[apple_body_id]).reshape(3, 3)
+        local_point = (np.asarray(contact.pos) - data.xpos[apple_body_id]) @ rotation
+        candidates.append((i, name, sign, local_point))
+
+    if candidates:
+        points = np.asarray([row[3] for row in candidates])
+        _, fruit_distance, _ = trimesh.proximity.closest_point(apple_mesh, points)
+        _, stem_distance, _ = trimesh.proximity.closest_point(stem_mesh, points)
+        local_force = np.zeros(6)
+        for (i, name, sign, _), fruit, stem in zip(
+            candidates, fruit_distance, stem_distance, strict=True
+        ):
+            # Exclude the seam where the fruit and stem surfaces are indistinguishable.
+            if stem + 0.0002 >= fruit:
+                continue
+            local_force.fill(0)
+            mujoco.mj_contactForce(model, data, i, local_force)
+            if local_force[0] <= 0:
+                continue
+            frame = np.asarray(data.contact[i].frame).reshape(3, 3)
+            forces[name] += sign * frame[0] * local_force[0]
+    return {name: force.tolist() for name, force in forces.items()}
+
+
+def write_stem_contact_csv(path: Path, records: list[dict]) -> None:
+    """Write the world normal-force components for each pad to a CSV file."""
+    fields = ["time_s"]
+    for label in ("index", "thumb"):
+        fields.extend(f"{label}_normal_force_{axis}_n" for axis in ("x", "y", "z"))
+        fields.append(f"{label}_normal_force_magnitude_n")
+    with path.open("w", newline="") as stream:
+        writer = csv.DictWriter(stream, fieldnames=fields)
+        writer.writeheader()
+        for record in records:
+            row = {"time_s": record["time"] + DT}
+            for name, label in zip(STEM_PAD_NAMES, ("index", "thumb"), strict=True):
+                force = record["stem_pad_normal_forces_world_n"][name]
+                for axis, value in zip(("x", "y", "z"), force, strict=True):
+                    row[f"{label}_normal_force_{axis}_n"] = value
+                row[f"{label}_normal_force_magnitude_n"] = float(np.linalg.norm(force))
+            writer.writerow(row)
 
 
 def sync_live_viewer(backend, viewer_model, viewer, data) -> None:
@@ -259,12 +330,12 @@ def run_task(
     runtime_scene: Path,
     seconds: float,
     *,
+    start_time: float = 0.0,
     viewer: bool = False,
     viewer_visual: bool = False,
     output: Path | None = None,
     contacts_enabled: bool = True,
 ):
-    del output
     physics_model, collision_metadata = compile_physics_model(runtime_scene)
     backend = create_backend(
         "mujoco",
@@ -323,7 +394,7 @@ def run_task(
         plan = GraspPlan(kin, apple_q, stem)
         qpos = np.asarray(backend.model.qpos0, dtype=float).copy()
         qvel = np.zeros(backend.model.nv, dtype=float)
-        qpos[qpos_ids] = plan.pre
+        qpos[qpos_ids] = plan.pre if start_time == 0 else plan.target(start_time)
         apple_layout = backend.get_root_state_layout("apple_with_stem")
         qpos[list(apple_layout.qpos_indices)] = apple_q
         qvel[list(apple_layout.qvel_indices)] = apple_v
@@ -338,6 +409,18 @@ def run_task(
         )
         base_pose = np.r_[base_pos[0, 0], base_quat[0, 0]]
         apple_vertices = _mesh_vertices(ROOT / "superdex/assets/objects/apple-collision.obj")
+        monitor_contacts = output is not None and contacts_enabled
+        if monitor_contacts:
+            import trimesh
+
+            mesh_dir = ROOT / "superdex/assets/objects"
+            fruit_mesh = trimesh.load_mesh(mesh_dir / "apple-collision.obj", process=False)
+            stem_mesh = trimesh.load_mesh(mesh_dir / "stem-collision.obj", process=False)
+            apple_geom_id = int(backend.model.geom(APPLE_SDF_GEOM).id)
+            pad_geom_ids = {
+                int(backend.model.geom(f"{name}_collision").id): name
+                for name in STEM_PAD_NAMES
+            }
         body_ids = np.arange(1, backend.model.nbody, dtype=int)
         body_names = [
             mujoco.mj_id2name(backend.model, mujoco.mjtObj.mjOBJ_BODY, int(i)) for i in body_ids
@@ -349,7 +432,8 @@ def run_task(
         monotonic_time = True
         max_base_change = 0.0
         max_tracking_error = 0.0
-        gain_switch_applied = seconds <= GAIN_SWITCH_TIME
+        end_time = start_time + seconds
+        gain_switch_applied = end_time <= GAIN_SWITCH_TIME
         failure_reason = None
         viewer_started = None
         viewer_model = None
@@ -377,8 +461,8 @@ def run_task(
             if live_viewer is not None and count % STEPS_PER_SAMPLE == 0:
                 if not live_viewer.is_running():
                     break
-            t = count * DT
-            if count == round(GAIN_SWITCH_TIME / DT):
+            t = start_time + count * DT
+            if count == round((GAIN_SWITCH_TIME - start_time) / DT):
                 # Replan against the actual released fruit, then switch all
                 # right-hand gains on host and pool models between steps.
                 apple_pos, _ = body_poses_from_backend(
@@ -426,20 +510,26 @@ def run_task(
                 failure_reason = f"MuJoCo solver divergence at {t:.3f}s: {detail}"
                 break
             if count % STEPS_PER_SAMPLE == 0:
+                if monitor_contacts:
+                    normal_forces = stem_pad_normal_forces(
+                        backend, pose_data, target, apple_id, apple_geom_id, pad_geom_ids,
+                        fruit_mesh, stem_mesh,
+                    )
                 apple_pos, apple_quat = body_poses_from_backend(
                     backend, pose_data, np.asarray([apple_id], dtype=int)
                 )
                 clearance = apple_clearance(
                     apple_pos[0, 0], apple_quat[0, 0], apple_vertices
                 )
-                records.append(
-                    {
-                        "time": t,
-                        "apple_z": float(apple_pos[0, 0, 2]),
-                        "clearance": clearance,
-                        "max_joint_tracking_error": tracking_error,
-                    }
-                )
+                record = {
+                    "time": t,
+                    "apple_z": float(apple_pos[0, 0, 2]),
+                    "clearance": clearance,
+                    "max_joint_tracking_error": tracking_error,
+                }
+                if monitor_contacts:
+                    record["stem_pad_normal_forces_world_n"] = normal_forces
+                records.append(record)
                 pos, quat = body_poses_from_backend(backend, pose_data, body_ids)
                 frames.append(np.c_[pos[0], quat[0][:, [1, 2, 3, 0]]])
                 pos, quat = body_poses_from_backend(
@@ -477,8 +567,8 @@ def run_task(
             "gain_switch_applied": gain_switch_applied,
         }
         phases = {}
-        complete = steps_completed >= round(40 / DT)
-        if contacts_enabled and seconds >= 9:
+        complete = start_time == 0 and steps_completed >= round(40 / DT)
+        if contacts_enabled and end_time >= 9:
             lift_rows = [row for row in records if 8 <= row["time"] < 9]
             checks["nine_second_apple_lifted"] = bool(lift_rows) and max(
                 row["clearance"] for row in lift_rows
@@ -493,8 +583,23 @@ def run_task(
             "physics_steps": steps_completed,
             "seconds": steps_completed * DT,
             "requested_seconds": seconds,
+            "planner_start_time_s": start_time,
+            "planner_end_time_s": start_time + steps_completed * DT,
             "complete_sequence": complete,
             "contacts_enabled": contacts_enabled,
+            "stem_contact_monitor": (
+                {
+                    "sample_dt_s": SAMPLE_DT,
+                    "sample_time_offset_s": DT,
+                    "csv_file": "stem_contact_forces.csv",
+                    "method": "mj_contactForce normal component after re-solving adapter state",
+                    "classification": "stem surface at least 0.2 mm closer than fruit surface",
+                    "force_direction": (
+                        "normal force on apple/stem from each right finger pad, world frame"
+                    ),
+                }
+                if monitor_contacts else None
+            ),
             "controller": controller_metadata(),
             "collision_model": collision_metadata,
             "settling": settling_diagnostics,
@@ -530,9 +635,14 @@ def run_task(
         backend.close()
 
 
-def main() -> int:
+def main(*, start_time: float = 0.0, default_seconds: float = 40.0) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--seconds", type=float, default=40.0)
+    parser.add_argument(
+        "--seconds",
+        type=float,
+        default=default_seconds,
+        help="Seconds to simulate after the selected starting point",
+    )
     parser.add_argument(
         "--viewer", action="store_true", help="Show the actual compiled collision model"
     )
@@ -552,16 +662,18 @@ def main() -> int:
     parser.add_argument("--out", type=Path)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
-    if not np.isfinite(args.seconds) or not DT <= args.seconds <= 40:
-        parser.error("--seconds must be between 0.002 and 40")
+    if not np.isfinite(args.seconds) or not DT <= args.seconds <= 40 - start_time:
+        parser.error(f"--seconds must be between {DT:g} and {40 - start_time:g}")
     if args.grasp_friction is not None and (
         not np.isfinite(args.grasp_friction) or args.grasp_friction <= 0
     ):
         parser.error("--grasp-friction must be finite and positive")
     temporary_runtime = None
-    if args.grasp_friction is not None:
+    if args.grasp_friction is not None or start_time > 0:
         descriptor, name = tempfile.mkstemp(
-            prefix="runtime-friction-", suffix=".xml", dir=ROOT / "mujoco"
+            prefix="runtime-pregrasp-" if start_time > 0 else "runtime-friction-",
+            suffix=".xml",
+            dir=ROOT / "mujoco",
         )
         os.close(descriptor)
         temporary_runtime = Path(name)
@@ -581,6 +693,7 @@ def main() -> int:
         summary, records, frames, names = run_task(
             runtime,
             args.seconds,
+            start_time=start_time,
             viewer=args.viewer or args.viewer_visual,
             viewer_visual=args.viewer_visual,
             output=args.output,
@@ -598,7 +711,16 @@ def main() -> int:
     if args.output:
         args.output.mkdir(parents=True, exist_ok=True)
         (args.output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
-        (args.output / "metrics.json").write_text(json.dumps(records) + "\n")
+        (args.output / "metrics.json").write_text(
+            json.dumps(
+                [
+                    {key: value for key, value in record.items() if not key.startswith("stem_pad_")}
+                    for record in records
+                ]
+            ) + "\n"
+        )
+        if summary["stem_contact_monitor"] is not None:
+            write_stem_contact_csv(args.output / "stem_contact_forces.csv", records)
         np.savez_compressed(
             args.output / "trajectory.npz", frames=frames, names=names, dt=SAMPLE_DT
         )

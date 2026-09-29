@@ -8,6 +8,7 @@ DexLab body poses are not control inputs. Run with Isaac Sim's Python 3.11.
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import math
 import subprocess
@@ -27,6 +28,9 @@ FULL_EXPERIENCE = (
     / ".unilab/isaacsim/venv/lib/python3.11/site-packages/isaacsim/apps/isaacsim.exp.full.kit"
 )
 DT = 0.002
+CONTACT_SAMPLE_DT = 0.05
+CONTACT_SAMPLE_STEPS = round(CONTACT_SAMPLE_DT / DT)
+MAX_STEM_CONTACTS = 1024
 GAIN_SWITCH_TIME = 23.0
 SETTLE_MIN_SECONDS = 3.0
 SETTLE_WINDOW_SECONDS = 0.5
@@ -39,13 +43,11 @@ CAMERA_TARGET = np.asarray([0.25, 0.30, 0.42], dtype=float)
 ROBOT_ROOT = "/scene_sdf/openarm_body_link0/openarm_body_link0"
 APPLE_ROOT = "/scene_sdf/apple_with_stem/apple_with_stem"
 APPLE_COLLIDER = f"{APPLE_ROOT}/collisions/apple_with_stem/apple_with_stem"
+STEM_PAD_NAMES = ("r_index_finger_pad", "r_thumb_pad")
+STEM_PAD_PATHS = tuple(f"/scene_sdf/openarm_body_link0/{name}" for name in STEM_PAD_NAMES)
 GRASP_FRICTION = 2.0
 GRASP_MATERIAL_PATH = "/IsaacAppleGraspMaterial"
-GRASP_FRICTION_PRIMS = (
-    APPLE_ROOT,
-    "/scene_sdf/openarm_body_link0/r_index_finger_pad",
-    "/scene_sdf/openarm_body_link0/r_thumb_pad",
-)
+GRASP_FRICTION_PRIMS = (APPLE_ROOT, *STEM_PAD_PATHS)
 TABLE_TOP = 0.2995  # Authored table height, also checked by qualify.py.
 BAD_PHYSX_MESSAGES = (
     "Invalid PhysX transform",
@@ -364,6 +366,68 @@ def apple_clearance(vertices: np.ndarray, position: np.ndarray, quaternion: np.n
     return float(np.min(rotated[:, 2] + position[2]) - TABLE_TOP)
 
 
+def stem_pad_normal_forces(contact_view, apple_pose, fruit_mesh, stem_mesh) -> dict[str, list[float]]:
+    """Sum each pad's normal force on the stem in world coordinates."""
+    import trimesh
+
+    data = contact_view.get_contact_force_data(dt=DT)
+    if data is None:
+        raise RuntimeError("Isaac stem contact view is unavailable")
+    magnitudes, points, normals, _, counts, starts = (to_numpy(value) for value in data)
+    counts = np.asarray(counts, dtype=int)
+    starts = np.asarray(starts, dtype=int)
+    if counts.shape != (1, len(STEM_PAD_NAMES)) or starts.shape != counts.shape:
+        raise RuntimeError(f"Unexpected Isaac stem contact layout: {counts.shape}, {starts.shape}")
+    if int(counts.sum()) >= len(magnitudes):
+        raise RuntimeError("Isaac stem contact buffer is full; increase MAX_STEM_CONTACTS")
+
+    position = np.asarray(apple_pose[:3], dtype=float)
+    quaternion = np.asarray(apple_pose[3:], dtype=float)
+    inverse_vector = -quaternion[1:]
+    forces = {}
+    for index, name in enumerate(STEM_PAD_NAMES):
+        start, count = int(starts[0, index]), int(counts[0, index])
+        if start < 0 or count < 0 or start + count > len(magnitudes):
+            raise RuntimeError(f"Invalid Isaac contact range for {name}: {start}, {count}")
+        force = np.zeros(3, dtype=float)
+        if count:
+            contact_points = np.asarray(points[start : start + count], dtype=float)
+            relative = contact_points - position
+            local = relative + 2.0 * np.cross(
+                inverse_vector,
+                np.cross(inverse_vector, relative) + quaternion[0] * relative,
+            )
+            _, fruit_distance, _ = trimesh.proximity.closest_point(fruit_mesh, local)
+            _, stem_distance, _ = trimesh.proximity.closest_point(stem_mesh, local)
+            on_stem = stem_distance + 0.0002 < fruit_distance
+            normal_forces = np.asarray(magnitudes[start : start + count], dtype=float).reshape(-1)
+            contact_normals = np.asarray(normals[start : start + count], dtype=float)
+            if not np.isfinite(normal_forces).all() or not np.isfinite(contact_normals).all():
+                raise RuntimeError(f"Non-finite Isaac contact force for {name}")
+            force = np.sum(normal_forces[on_stem, None] * contact_normals[on_stem], axis=0)
+        forces[name] = force.tolist()
+    return forces
+
+
+def write_stem_contact_csv(path: Path, records: list[dict]) -> None:
+    """Write the same per-pad normal-force columns as the MuJoCo runner."""
+    fields = ["time_s"]
+    for label in ("index", "thumb"):
+        fields.extend(f"{label}_normal_force_{axis}_n" for axis in ("x", "y", "z"))
+        fields.append(f"{label}_normal_force_magnitude_n")
+    with path.open("w", newline="") as stream:
+        writer = csv.DictWriter(stream, fieldnames=fields)
+        writer.writeheader()
+        for record in records:
+            row = {"time_s": record["time"] + DT}
+            for name, label in zip(STEM_PAD_NAMES, ("index", "thumb"), strict=True):
+                force = record["stem_pad_normal_forces_world_n"][name]
+                for axis, value in zip(("x", "y", "z"), force, strict=True):
+                    row[f"{label}_normal_force_{axis}_n"] = value
+                row[f"{label}_normal_force_magnitude_n"] = float(np.linalg.norm(force))
+            writer.writerow(row)
+
+
 def phase_clearance_summary(records: list[dict]) -> tuple[dict, dict]:
     """Apply the same three clearance gates used by the MuJoCo replay."""
     phases = {}
@@ -401,6 +465,7 @@ def run_task(
     viewer_ui_pause: bool = False,
 ) -> dict:
     from isaacsim.core.api import World
+    from isaacsim.core.api.sensors.rigid_contact_view import RigidContactView
     from isaacsim.core.prims import SingleArticulation, SingleRigidPrim
     from isaacsim.core.simulation_manager import SimulationManager
     from isaacsim.core.utils.types import ArticulationAction
@@ -415,11 +480,29 @@ def run_task(
         device="cuda:0",
     )
     grasp_friction = configure_grasp_friction(world.stage)
+    monitor_contacts = output is not None
+    if monitor_contacts:
+        import trimesh
+
+        mesh_dir = ROOT / "superdex/assets/objects"
+        fruit_mesh = trimesh.load_mesh(mesh_dir / "apple-collision.obj", process=False)
+        stem_mesh = trimesh.load_mesh(mesh_dir / "stem-collision.obj", process=False)
+        contact_view = RigidContactView(
+            prim_paths_expr=[APPLE_ROOT],
+            filter_paths_expr=list(STEM_PAD_PATHS),
+            prepare_contact_sensors=True,
+            disable_stablization=False,
+            max_contact_count=MAX_STEM_CONTACTS,
+        )
     robot = world.scene.add(
         SingleArticulation(ROBOT_ROOT, name="apple_robot", reset_xform_properties=False)
     )
     apple = world.scene.add(SingleRigidPrim(APPLE_ROOT, name="apple", reset_xform_properties=False))
     world.reset()
+    if monitor_contacts:
+        contact_view.initialize(SimulationManager.get_physics_sim_view())
+        if contact_view.num_shapes != 1 or contact_view.num_filters != len(STEM_PAD_NAMES):
+            raise RuntimeError("Isaac stem contact view did not resolve the apple and both pads")
     if not math.isclose(float(world.get_physics_dt()), DT, rel_tol=0, abs_tol=1e-12):
         raise RuntimeError(f"Isaac physics timestep is not {DT}: {world.get_physics_dt()}")
     isaac_names = tuple(robot.dof_names)
@@ -466,6 +549,7 @@ def run_task(
         )
 
     records = []
+    stem_contact_records = []
     switched_gain_readback = None
     viewer_closed_early = False
     ui_pause_updates = 0
@@ -562,7 +646,16 @@ def run_task(
             max_base_translation, float(np.linalg.norm(robot_position - base_position))
         )
         max_base_rotation = max(max_base_rotation, angle_between(robot_quaternion, base_quaternion))
-        if count % round(0.05 / DT) == 0:
+        if count % CONTACT_SAMPLE_STEPS == 0:
+            if monitor_contacts:
+                stem_contact_records.append(
+                    {
+                        "time": t,
+                        "stem_pad_normal_forces_world_n": stem_pad_normal_forces(
+                            contact_view, apple_pose_now, fruit_mesh, stem_mesh
+                        ),
+                    }
+                )
             records.append(
                 {
                     "time": t,
@@ -624,6 +717,19 @@ def run_task(
         "viewer_closed_early": viewer_closed_early,
         "real_time_pacing": viewer_clock.real_time_pacing,
         "joint_names": list(isaac_names),
+        "stem_contact_monitor": (
+            {
+                "sample_dt_s": CONTACT_SAMPLE_DT,
+                "sample_time_offset_s": DT,
+                "csv_file": "stem_contact_forces.csv",
+                "method": "Isaac contact-view normal impulse divided by physics timestep",
+                "classification": "stem surface at least 0.2 mm closer than fruit surface",
+                "force_direction": (
+                    "normal force on apple/stem from each right finger pad, world frame"
+                ),
+            }
+            if monitor_contacts else None
+        ),
         "settling": settling,
         "maximum_joint_tracking_error_rad": max_tracking_error,
         "maximum_base_translation_m": max_base_translation,
@@ -637,6 +743,7 @@ def run_task(
         output.mkdir(parents=True, exist_ok=True)
         (output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
         (output / "metrics.json").write_text(json.dumps(records) + "\n")
+        write_stem_contact_csv(output / "stem_contact_forces.csv", stem_contact_records)
     return summary
 
 

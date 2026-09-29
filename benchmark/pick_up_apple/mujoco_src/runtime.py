@@ -153,7 +153,7 @@ def build_position_gains(
             if body_grasp and name.startswith("r_"):
                 kp[index], kv[index] = 0.8, 0.01
             else:
-                kp[index] = 30.0 if name.startswith(("r_index_finger", "r_thumb")) else 0.8
+                kp[index] = 30 if name.startswith(("r_index_finger", "r_thumb")) else 0.8
                 kv[index] = 0.02
         elif name.startswith("arm_openarm_"):
             kp[index], kv[index] = 1000.0, 40.0

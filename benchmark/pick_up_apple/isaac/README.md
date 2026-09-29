@@ -6,3 +6,10 @@
 - `scene_sdf.usd` and `configuration/*.usd`: generated Isaac Sim import assets. They are ignored by Git and must stay together because the scene references its layers.
 
 Run the scripts from the repository root using the commands in [the task README](../README.md).
+
+Run this first before you run any isaac task
+```bash
+source "$HOME/.unilab/isaacsim/venv/bin/activate"
+export LD_LIBRARY_PATH="$HOME/.unilab/isaacsim/compat/libxml2"
+export OMNI_KIT_ACCEPT_EULA=1
+```

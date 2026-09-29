@@ -187,6 +187,48 @@ before 9 s; the 14 s coefficient-10 run stays on the table throughout the
 `passed` field only checks for any 8–9 s lift, so it does not certify a
 sustained hold.
 
+To sweep right index/thumb gains for the first 14 s pickup attempt, using
+Kp = 32, 64, 128, 256, 512, 1024 and Kv = 1, 2, 4, 8, 16, 32, run:
+
+```bash
+uv run --no-sync --with matplotlib python \
+  benchmark/pick_up_apple/mujoco_src/sweep_kp.py --jobs 5
+```
+
+If running the script directly with `.venv/bin/python`, install the plotting
+dependency in that environment once with
+`uv pip install --python .venv/bin/python matplotlib`. To redraw plots from
+saved CSV files without rerunning physics, use
+`.venv/bin/python benchmark/pick_up_apple/mujoco_src/sweep_kp.py --plot-only`.
+
+The sweep runs all 36 Kp/Kv combinations, applying each pair directly to all
+eight right index/thumb joints. Override the grids with `--kps` and `--kvs`;
+use the same grids with `--plot-only` to reload those trial files.
+All other hand joints keep
+`Kp = 0.8, Kv = 0.1`; arm joints keep `Kp = 1000, Kv = 40`.
+Sliding friction remains 1.0 and planned targets stay fixed. It uses the
+compiled task model with native `mj_step` to read `mj_contactForce`, so this is
+a physics/contact diagnostic rather than adapter worker readback. Results live
+in ignored `results/pick_up_apple_kp_kv_sweep/`, using only CSV and PNG files:
+
+- `sweep_summary.csv`: applied Kp/Kv, force statistics, completion status,
+  warnings, and simulation settings.
+- `contact_force_kp_0032_kv_01.csv` (one per trial): 50 ms samples with time in
+  seconds, index/thumb/table world-force components and magnitudes in newtons,
+  active contact counts, and apple height in metres.
+- `contact_force_vs_time_kp_0032_5_8_s.png` (one per Kp): 5–8 s force traces,
+  one curve per Kv, with separate index and thumb panels. Partial runs use
+  dashed lines; unavailable samples are not replaced with zeros.
+- `mean_contact_force_vs_kv_5_8_s.png`: mean force magnitude over `5 <= t < 8`
+  versus Kv, one curve per Kp, with separate index and thumb panels. Kv uses
+  a base-2 logarithmic axis. Failed trials and trials ending before 8 s have
+  no mean-force point.
+
+Force magnitude is the norm of the summed world-force vector on the apple
+from each pad. CSV samples retain the full trial, while time plots display
+only 5–8 s. The planner's gravity feedforward remains at Kp 30 to keep targets
+fixed across the sweep.
+
 `--viewer` renders a native copy of the adapter's compiled physics model, including
 the same SDF octree and the apple collider colored translucent green at compile time.
 It omits visual-only geoms; press `C` in the MuJoCo viewer to show contact points. `--viewer-visual` uses a
