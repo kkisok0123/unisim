@@ -489,6 +489,9 @@
       geom2="apple_with_stem_collision"
       solref="0.005 1"
       solimp="0.9 1.00 0.001 0.5 2"/>
+    <pair geom1="table"
+      geom2="apple_with_stem_collision"
+      solref="0.02 1"/>
     <exclude name="exclude_r_wrist_r_index_finger_middle" body1="r_wrist" body2="r_index_finger_middle" />
     <exclude name="exclude_r_wrist_r_index_finger_distal" body1="r_wrist" body2="r_index_finger_distal" />
     <exclude name="exclude_r_wrist_r_index_finger_pad" body1="r_wrist" body2="r_index_finger_pad" />

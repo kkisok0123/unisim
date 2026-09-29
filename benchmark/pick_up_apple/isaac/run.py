@@ -19,6 +19,7 @@ import traceback
 from collections import deque
 from pathlib import Path
 
+import contact_metrics
 import numpy as np
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -30,7 +31,7 @@ FULL_EXPERIENCE = (
 DT = 0.002
 CONTACT_SAMPLE_DT = 0.05
 CONTACT_SAMPLE_STEPS = round(CONTACT_SAMPLE_DT / DT)
-MAX_STEM_CONTACTS = 1024
+MAX_COMPARE_CONTACTS = 4096
 GAIN_SWITCH_TIME = 23.0
 SETTLE_MIN_SECONDS = 3.0
 SETTLE_WINDOW_SECONDS = 0.5
@@ -43,6 +44,7 @@ CAMERA_TARGET = np.asarray([0.25, 0.30, 0.42], dtype=float)
 ROBOT_ROOT = "/scene_sdf/openarm_body_link0/openarm_body_link0"
 APPLE_ROOT = "/scene_sdf/apple_with_stem/apple_with_stem"
 APPLE_COLLIDER = f"{APPLE_ROOT}/collisions/apple_with_stem/apple_with_stem"
+TABLE_ROOT = "/scene_sdf/worldBody/table"
 STEM_PAD_NAMES = ("r_index_finger_pad", "r_thumb_pad")
 STEM_PAD_PATHS = tuple(f"/scene_sdf/openarm_body_link0/{name}" for name in STEM_PAD_NAMES)
 GRASP_FRICTION = 2.0
@@ -366,47 +368,29 @@ def apple_clearance(vertices: np.ndarray, position: np.ndarray, quaternion: np.n
     return float(np.min(rotated[:, 2] + position[2]) - TABLE_TOP)
 
 
-def stem_pad_normal_forces(contact_view, apple_pose, fruit_mesh, stem_mesh) -> dict[str, list[float]]:
-    """Sum each pad's normal force on the stem in world coordinates."""
-    import trimesh
+def contact_filter_paths(stage) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Name every robot contact with the apple, plus the two pads and table."""
+    other_paths = sorted(
+        str(prim.GetPath())
+        for prim in stage.Traverse()
+        if "PhysicsRigidBodyAPI" in prim.GetAppliedSchemas()
+        and str(prim.GetPath()).startswith("/scene_sdf/openarm_body_link0/")
+        and str(prim.GetPath()) not in STEM_PAD_PATHS
+    )
+    if not other_paths or not stage.GetPrimAtPath(TABLE_ROOT):
+        raise RuntimeError("Isaac comparison is missing robot contact bodies or the table")
+    paths = (*STEM_PAD_PATHS, TABLE_ROOT, *other_paths)
+    labels = ("index", "thumb", "table", *("other" for _ in other_paths))
+    return paths, labels
 
-    data = contact_view.get_contact_force_data(dt=DT)
-    if data is None:
-        raise RuntimeError("Isaac stem contact view is unavailable")
-    magnitudes, points, normals, _, counts, starts = (to_numpy(value) for value in data)
-    counts = np.asarray(counts, dtype=int)
-    starts = np.asarray(starts, dtype=int)
-    if counts.shape != (1, len(STEM_PAD_NAMES)) or starts.shape != counts.shape:
-        raise RuntimeError(f"Unexpected Isaac stem contact layout: {counts.shape}, {starts.shape}")
-    if int(counts.sum()) >= len(magnitudes):
-        raise RuntimeError("Isaac stem contact buffer is full; increase MAX_STEM_CONTACTS")
 
-    position = np.asarray(apple_pose[:3], dtype=float)
-    quaternion = np.asarray(apple_pose[3:], dtype=float)
-    inverse_vector = -quaternion[1:]
-    forces = {}
-    for index, name in enumerate(STEM_PAD_NAMES):
-        start, count = int(starts[0, index]), int(counts[0, index])
-        if start < 0 or count < 0 or start + count > len(magnitudes):
-            raise RuntimeError(f"Invalid Isaac contact range for {name}: {start}, {count}")
-        force = np.zeros(3, dtype=float)
-        if count:
-            contact_points = np.asarray(points[start : start + count], dtype=float)
-            relative = contact_points - position
-            local = relative + 2.0 * np.cross(
-                inverse_vector,
-                np.cross(inverse_vector, relative) + quaternion[0] * relative,
-            )
-            _, fruit_distance, _ = trimesh.proximity.closest_point(fruit_mesh, local)
-            _, stem_distance, _ = trimesh.proximity.closest_point(stem_mesh, local)
-            on_stem = stem_distance + 0.0002 < fruit_distance
-            normal_forces = np.asarray(magnitudes[start : start + count], dtype=float).reshape(-1)
-            contact_normals = np.asarray(normals[start : start + count], dtype=float)
-            if not np.isfinite(normal_forces).all() or not np.isfinite(contact_normals).all():
-                raise RuntimeError(f"Non-finite Isaac contact force for {name}")
-            force = np.sum(normal_forces[on_stem, None] * contact_normals[on_stem], axis=0)
-        forces[name] = force.tolist()
-    return forces
+def contact_event_sample(completed: int) -> bool:
+    time_s = completed * DT
+    if not 5.0 <= time_s <= 9.0:
+        return False
+    if 7.2 <= time_s <= 7.8:
+        return True
+    return completed % round(0.01 / DT) == 0
 
 
 def write_stem_contact_csv(path: Path, records: list[dict]) -> None:
@@ -419,7 +403,7 @@ def write_stem_contact_csv(path: Path, records: list[dict]) -> None:
         writer = csv.DictWriter(stream, fieldnames=fields)
         writer.writeheader()
         for record in records:
-            row = {"time_s": record["time"] + DT}
+            row = {"time_s": record["time"]}
             for name, label in zip(STEM_PAD_NAMES, ("index", "thumb"), strict=True):
                 force = record["stem_pad_normal_forces_world_n"][name]
                 for axis, value in zip(("x", "y", "z"), force, strict=True):
@@ -487,12 +471,13 @@ def run_task(
         mesh_dir = ROOT / "superdex/assets/objects"
         fruit_mesh = trimesh.load_mesh(mesh_dir / "apple-collision.obj", process=False)
         stem_mesh = trimesh.load_mesh(mesh_dir / "stem-collision.obj", process=False)
+        filter_paths, filter_labels = contact_filter_paths(world.stage)
         contact_view = RigidContactView(
             prim_paths_expr=[APPLE_ROOT],
-            filter_paths_expr=list(STEM_PAD_PATHS),
+            filter_paths_expr=list(filter_paths),
             prepare_contact_sensors=True,
             disable_stablization=False,
-            max_contact_count=MAX_STEM_CONTACTS,
+            max_contact_count=MAX_COMPARE_CONTACTS,
         )
     robot = world.scene.add(
         SingleArticulation(ROBOT_ROOT, name="apple_robot", reset_xform_properties=False)
@@ -501,8 +486,8 @@ def run_task(
     world.reset()
     if monitor_contacts:
         contact_view.initialize(SimulationManager.get_physics_sim_view())
-        if contact_view.num_shapes != 1 or contact_view.num_filters != len(STEM_PAD_NAMES):
-            raise RuntimeError("Isaac stem contact view did not resolve the apple and both pads")
+        if contact_view.num_shapes != 1 or contact_view.num_filters != len(filter_paths):
+            raise RuntimeError("Isaac contact view did not resolve the apple and all filters")
     if not math.isclose(float(world.get_physics_dt()), DT, rel_tol=0, abs_tol=1e-12):
         raise RuntimeError(f"Isaac physics timestep is not {DT}: {world.get_physics_dt()}")
     isaac_names = tuple(robot.dof_names)
@@ -550,6 +535,8 @@ def run_task(
 
     records = []
     stem_contact_records = []
+    contact_coarse = []
+    contact_event = []
     switched_gain_readback = None
     viewer_closed_early = False
     ui_pause_updates = 0
@@ -646,19 +633,33 @@ def run_task(
             max_base_translation, float(np.linalg.norm(robot_position - base_position))
         )
         max_base_rotation = max(max_base_rotation, angle_between(robot_quaternion, base_quaternion))
-        if count % CONTACT_SAMPLE_STEPS == 0:
-            if monitor_contacts:
+        sample_time = steps_completed * DT
+        coarse_sample = steps_completed % CONTACT_SAMPLE_STEPS == 0
+        event_sample = contact_event_sample(steps_completed)
+        if monitor_contacts and (coarse_sample or event_sample):
+            pairs = contact_metrics.capture(
+                contact_view, apple_pose_now, fruit_mesh, stem_mesh, filter_labels, DT
+            )
+            sample = (sample_time, pairs, apple_pose_now.copy())
+            if coarse_sample:
+                contact_coarse.append(sample)
                 stem_contact_records.append(
                     {
-                        "time": t,
-                        "stem_pad_normal_forces_world_n": stem_pad_normal_forces(
-                            contact_view, apple_pose_now, fruit_mesh, stem_mesh
-                        ),
+                        "time": sample_time,
+                        "stem_pad_normal_forces_world_n": {
+                            name: pairs[f"{label}_stem"]["normal"].tolist()
+                            for name, label in zip(
+                                STEM_PAD_NAMES, ("index", "thumb"), strict=True
+                            )
+                        },
                     }
                 )
+            if event_sample:
+                contact_event.append(sample)
+        if coarse_sample:
             records.append(
                 {
-                    "time": t,
+                    "time": sample_time,
                     "max_joint_tracking_error": tracking_error,
                     "apple_position": apple_pose_now[:3].tolist(),
                     "apple_quaternion_wxyz": apple_pose_now[3:].tolist(),
@@ -720,13 +721,25 @@ def run_task(
         "stem_contact_monitor": (
             {
                 "sample_dt_s": CONTACT_SAMPLE_DT,
-                "sample_time_offset_s": DT,
+                "sample_time_offset_s": 0.0,
                 "csv_file": "stem_contact_forces.csv",
                 "method": "Isaac contact-view normal impulse divided by physics timestep",
                 "classification": "stem surface at least 0.2 mm closer than fruit surface",
                 "force_direction": (
                     "normal force on apple/stem from each right finger pad, world frame"
                 ),
+            }
+            if monitor_contacts else None
+        ),
+        "contact_comparison": (
+            {
+                "coarse_csv": "contact_coarse.csv",
+                "event_csv": "contact_event.csv",
+                "filters": list(filter_paths),
+                "force_direction": "force on apple, world frame",
+                "method": "PhysX impulses divided by the 0.002 s physics timestep",
+                "friction": "tangential anchor forces, classified by anchor position",
+                "penetration": "negative PhysX contact separation",
             }
             if monitor_contacts else None
         ),
@@ -744,6 +757,8 @@ def run_task(
         (output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
         (output / "metrics.json").write_text(json.dumps(records) + "\n")
         write_stem_contact_csv(output / "stem_contact_forces.csv", stem_contact_records)
+        contact_metrics.write_csv(output / "contact_coarse.csv", contact_coarse)
+        contact_metrics.write_csv(output / "contact_event.csv", contact_event)
     return summary
 
 

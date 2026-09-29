@@ -8,6 +8,8 @@ import csv
 import hashlib
 import json
 import os
+import shutil
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -412,9 +414,70 @@ def _run_mujoco(seconds: float, output: Path) -> dict:
     }
 
 
+def _run_isaac(seconds: float, output: Path) -> dict:
+    """Run the Isaac task with its SDK Python and retain the shared contact CSVs."""
+    environment = os.environ.copy()
+    isaac_venv = Path.home() / ".unilab/isaacsim/venv"
+    interpreter = isaac_venv / "bin/python"
+    if not interpreter.is_file():
+        raise FileNotFoundError(f"Isaac Python is unavailable: {interpreter}")
+    environment.setdefault("VIRTUAL_ENV", str(isaac_venv))
+    environment.setdefault("OMNI_KIT_ACCEPT_EULA", "1")
+    compat = str(Path.home() / ".unilab/isaacsim/compat/libxml2")
+    environment["LD_LIBRARY_PATH"] = os.pathsep.join(
+        part for part in (compat, environment.get("LD_LIBRARY_PATH", "")) if part
+    )
+    task_output = output / "original"
+    summary_path = output / "summary.json"
+    source_paths = {
+        kind: task_output / f"contact_{kind}.csv" for kind in ("coarse", "event")
+    }
+
+    def modified_ns(path: Path) -> int:
+        return path.stat().st_mtime_ns if path.is_file() else -1
+
+    previous_summary = modified_ns(summary_path)
+    previous_sources = {kind: modified_ns(path) for kind, path in source_paths.items()}
+    command = [
+        str(interpreter), str(ROOT / "isaac/run.py"), "--seconds", str(seconds),
+        "--output", str(task_output), "--out", str(summary_path),
+    ]
+    log_path = output / "isaac.log"
+    with log_path.open("w") as log:
+        process = subprocess.run(
+            command, cwd=ROOT.parents[1], env=environment,
+            stdout=log, stderr=subprocess.STDOUT, check=False,
+        )
+    if modified_ns(summary_path) <= previous_summary:
+        raise RuntimeError(
+            f"Isaac did not write a summary (exit {process.returncode}); see {log_path}"
+        )
+    summary = json.loads(summary_path.read_text())
+    expected_steps = round(seconds / summary["physics_dt"])
+    if summary["steps"] != expected_steps or summary.get("invalid_physx_messages"):
+        raise RuntimeError(
+            f"Isaac run was incomplete or invalid; see {summary_path} and {log_path}"
+        )
+    for kind, source in source_paths.items():
+        destination = output / f"{kind}.csv"
+        if modified_ns(source) > previous_sources[kind]:
+            shutil.copyfile(source, destination)
+        elif kind == "coarse":
+            raise RuntimeError(f"Isaac contact CSV is missing; see {log_path}")
+        else:
+            destination.unlink(missing_ok=True)
+    return {
+        "engine": "isaac", "physics_dt_s": summary["physics_dt"],
+        "steps": summary["steps"], "warnings": summary.get("invalid_physx_messages", []),
+        "task_passed": summary["passed"],
+        "source_scene_sha256": _sha256(ROOT / "isaac/scene_sdf.usd"),
+        "contact_comparison": summary.get("contact_comparison"),
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--engine", choices=("mujoco", "superdex"), required=True)
+    parser.add_argument("--engine", choices=("mujoco", "superdex", "isaac"), required=True)
     parser.add_argument("--seconds", type=float, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
@@ -423,11 +486,16 @@ def main() -> int:
     args.output.mkdir(parents=True, exist_ok=True)
     if args.engine == "superdex":
         result = _run_superdex(args.seconds, args.output)
+    elif args.engine == "isaac":
+        result = _run_isaac(args.seconds, args.output)
     else:
         result = _run_mujoco(args.seconds, args.output)
     (args.output / "run.json").write_text(json.dumps(result, indent=2) + "\n")
-    print(json.dumps({key: value for key, value in result.items() if key != "summary"},
-                     indent=2))
+    print(json.dumps(
+        {key: value for key, value in result.items()
+         if key not in ("summary", "contact_comparison")},
+        indent=2,
+    ))
     return 0 if result["steps"] == round(args.seconds / result["physics_dt_s"]) else 1
 
 

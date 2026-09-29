@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Summarize matched MuJoCo and SuperDex apple-contact measurements."""
+"""Summarize matched SuperDex, MuJoCo and optional Isaac apple contacts."""
 
 from __future__ import annotations
 
@@ -23,6 +23,7 @@ FIELDS = (
     "friction_force_y_n", "friction_force_z_n",
 )
 PHASES = (
+    ("full_run", 0, float("inf")),
     ("approach", 0, 5),
     ("pinch", 5, 7),
     ("lift_onset", 7, 7.2),
@@ -58,10 +59,16 @@ def _geometric_clearance_mm(row: dict, vertices: np.ndarray) -> float:
     return 1000 * (_float(row, "apple_z_m") + float(rotated[:, 2].min()) - 0.2995)
 
 
-def _difference_csv(path: Path, superdex: dict, mujoco: dict, vertices: np.ndarray) -> dict:
-    common = sorted(superdex.keys() & mujoco.keys())
+def _difference_csv(
+    path: Path, reference: dict, target: dict, vertices: np.ndarray,
+    reference_name: str, target_name: str,
+) -> dict:
+    common = sorted(reference.keys() & target.keys())
+    if not common:
+        raise ValueError(f"No matched {reference_name}/{target_name} contact samples for {path}")
+    difference_name = f"{target_name}_minus_{reference_name}"
     fields = ["time_s", "pair"]
-    for name in ("superdex", "mujoco", "mujoco_minus_superdex"):
+    for name in (reference_name, target_name, difference_name):
         fields.extend(f"{name}_{field}" for field in FIELDS)
         fields.extend(f"{name}_{axis}_m" for axis in ("apple_x", "apple_y", "apple_z"))
         fields.extend((f"{name}_apple_clearance_mm", f"{name}_table_geometric_overlap_mm"))
@@ -70,35 +77,35 @@ def _difference_csv(path: Path, superdex: dict, mujoco: dict, vertices: np.ndarr
         writer = csv.DictWriter(stream, fieldnames=fields)
         writer.writeheader()
         for time_s, pair in common:
-            a, b = superdex[(time_s, pair)], mujoco[(time_s, pair)]
+            a, b = reference[(time_s, pair)], target[(time_s, pair)]
             row = {"time_s": time_s, "pair": pair}
             for field in FIELDS:
                 va, vb = _float(a, field), _float(b, field)
-                row[f"superdex_{field}"] = va
-                row[f"mujoco_{field}"] = vb
-                row[f"mujoco_minus_superdex_{field}"] = vb - va
+                row[f"{reference_name}_{field}"] = va
+                row[f"{target_name}_{field}"] = vb
+                row[f"{difference_name}_{field}"] = vb - va
             for axis in ("apple_x", "apple_y", "apple_z"):
                 field = f"{axis}_m"
                 va, vb = _float(a, field), _float(b, field)
-                row[f"superdex_{field}"] = va
-                row[f"mujoco_{field}"] = vb
-                row[f"mujoco_minus_superdex_{field}"] = vb - va
-            for engine, source in (("superdex", a), ("mujoco", b)):
+                row[f"{reference_name}_{field}"] = va
+                row[f"{target_name}_{field}"] = vb
+                row[f"{difference_name}_{field}"] = vb - va
+            for engine, source in ((reference_name, a), (target_name, b)):
                 key = engine, time_s
                 if key not in clearances:
                     clearances[key] = _geometric_clearance_mm(source, vertices)
                 row[f"{engine}_apple_clearance_mm"] = clearances[key]
                 row[f"{engine}_table_geometric_overlap_mm"] = max(0, -clearances[key])
             for field in ("apple_clearance_mm", "table_geometric_overlap_mm"):
-                row[f"mujoco_minus_superdex_{field}"] = (
-                    row[f"mujoco_{field}"] - row[f"superdex_{field}"]
+                row[f"{difference_name}_{field}"] = (
+                    row[f"{target_name}_{field}"] - row[f"{reference_name}_{field}"]
                 )
             writer.writerow(row)
     return {
         "matched_times": len({time for time, _ in common}),
         "matched_rows": len(common),
-        "superdex_unmatched_rows": len(superdex) - len(common),
-        "mujoco_unmatched_rows": len(mujoco) - len(common),
+        f"{reference_name}_unmatched_rows": len(reference) - len(common),
+        f"{target_name}_unmatched_rows": len(target) - len(common),
     }
 
 
@@ -126,33 +133,33 @@ def _phase_metrics(rows: dict, pair: str, start: float, stop: float) -> dict | N
     }
 
 
-def _make_plot(path: Path, superdex: dict, mujoco: dict) -> None:
+def _make_plot(path: Path, data_by_engine: dict[str, dict]) -> None:
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
     fig, axes = plt.subplots(3, 2, figsize=(11, 10), constrained_layout=True)
-    colors = {"superdex": "#2466a4", "mujoco": "#d95f02"}
+    colors = {"superdex": "#2466a4", "mujoco": "#d95f02", "isaac": "#2ca02c"}
     styles = {"index_stem": "-", "thumb_stem": "--"}
 
-    def series(data: dict, pair: str, field: str, start: float, stop: float):
+    def series(data: dict, pair: str, field: str):
         rows = sorted(
             (time, row) for (time, name), row in data.items()
-            if name == pair and start <= time <= stop
+            if name == pair
         )
         return [time for time, _ in rows], [_float(row, field) for _, row in rows]
 
-    for engine, data in (("superdex", superdex), ("mujoco", mujoco)):
+    for engine, data in data_by_engine.items():
         color = colors[engine]
         for ax, field, label in (
             (axes[0, 0], "apple_z_m", "Apple Z (m)"),
             (axes[0, 1], "apple_x_m", "Apple X (m)"),
         ):
-            x, y = series(data, "apple_table", field, 0, 14)
+            x, y = series(data, "apple_table", field)
             ax.plot(x, y, color=color, label=engine)
             ax.set_ylabel(label)
-        x, y = series(data, "apple_table", "total_force_z_n", 5, 9)
+        x, y = series(data, "apple_table", "total_force_z_n")
         axes[1, 1].plot(x, y, color=color, label=engine)
         for pair in ("index_stem", "thumb_stem"):
             label = f"{engine} {pair.split('_')[0]}"
@@ -161,7 +168,7 @@ def _make_plot(path: Path, superdex: dict, mujoco: dict) -> None:
                 (axes[2, 0], "friction_force_z_n"),
                 (axes[2, 1], "penetration_max_mm"),
             ):
-                x, y = series(data, pair, field, 5, 9)
+                x, y = series(data, pair, field)
                 ax.plot(x, y, color=color, linestyle=styles[pair], label=label)
     for ax, ylabel in (
         (axes[1, 0], "Pad normal load (N)"),
@@ -174,7 +181,39 @@ def _make_plot(path: Path, superdex: dict, mujoco: dict) -> None:
     for ax in axes.flat:
         ax.grid(alpha=0.25)
         ax.legend(fontsize=7)
-    fig.suptitle("Apple-stem grasp: fresh MuJoCo and SuperDex contact traces")
+    fig.suptitle("Apple-stem grasp: contact traces by engine")
+    fig.savefig(path, dpi=180)
+    plt.close(fig)
+
+
+def _make_pad_normal_component_plot(path: Path, data_by_engine: dict[str, dict]) -> None:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(3, 1, figsize=(11, 9), sharex=True, constrained_layout=True)
+    for axis, ax in zip("xyz", axes, strict=True):
+        field = f"normal_force_{axis}_n"
+        for engine, data in data_by_engine.items():
+            color = {"superdex": "#2466a4", "mujoco": "#d95f02", "isaac": "#2ca02c"}[engine]
+            for pad, style in (("index", "-"), ("thumb", "--")):
+                rows = sorted(
+                    (time, row) for (time, pair), row in data.items()
+                    if pair == f"{pad}_stem"
+                )
+                ax.plot(
+                    [time for time, _ in rows],
+                    [_float(row, field) for _, row in rows],
+                    color=color,
+                    linestyle=style,
+                    label=f"{engine} {pad}",
+                )
+        ax.set_ylabel(f"World {axis.upper()} (N)")
+        ax.grid(alpha=0.25)
+        ax.legend(fontsize=8)
+    axes[-1].set_xlabel("Planner time (s)")
+    fig.suptitle("Stem-contact normal force on apple from each pad")
     fig.savefig(path, dpi=180)
     plt.close(fig)
 
@@ -184,30 +223,47 @@ def main() -> int:
     parser.add_argument("directory", type=Path)
     args = parser.parse_args()
     root = args.directory
+    engines = ["superdex", "mujoco"]
+    if (root / "isaac/coarse.csv").is_file():
+        engines.append("isaac")
     data = {
-        engine: {kind: _load(root / engine / f"{kind}.csv")
-                 for kind in ("coarse", "event")}
-        for engine in ("superdex", "mujoco")
+        engine: {kind: _load(path) for kind in ("coarse", "event")
+                 if (path := root / engine / f"{kind}.csv").is_file()}
+        for engine in engines
     }
     vertices = _fruit_vertices()
     matches = {
         kind: _difference_csv(root / f"difference_{kind}.csv",
-                              data["superdex"][kind], data["mujoco"][kind], vertices)
+                              data["superdex"][kind], data["mujoco"][kind], vertices,
+                              "superdex", "mujoco")
         for kind in ("coarse", "event")
     }
+    if "isaac" in data:
+        for reference in ("superdex", "mujoco"):
+            for kind in data["isaac"]:
+                if kind not in data[reference]:
+                    continue
+                label = f"isaac_minus_{reference}_{kind}"
+                matches[label] = _difference_csv(
+                    root / f"difference_{label}.csv", data[reference][kind],
+                    data["isaac"][kind], vertices, reference, "isaac",
+                )
     phases = {}
     for label, start, stop in PHASES:
         phases[label] = {
             pair: {
                 engine: _phase_metrics(data[engine]["coarse"], pair, start, stop)
-                for engine in ("superdex", "mujoco")
+                for engine in engines
             }
             for pair in PAIRS
         }
     report = {"matches": matches, "phases": phases}
     (root / "phase_summary.json").write_text(json.dumps(report, indent=2) + "\n")
-    _make_plot(root / "contact_comparison.png", data["superdex"]["coarse"],
-               data["mujoco"]["coarse"])
+    coarse = {engine: data[engine]["coarse"] for engine in engines}
+    _make_plot(root / "contact_comparison.png", coarse)
+    _make_pad_normal_component_plot(
+        root / "pad_normal_force_components.png", coarse,
+    )
     print(json.dumps(matches, indent=2))
     return 0
 

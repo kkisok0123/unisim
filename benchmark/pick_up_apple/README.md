@@ -265,6 +265,34 @@ claimed: SuperDex uses an internal pose constraint, while the MuJoCo path uses a
 native-servo emulation. Both paths use the same combined apple/stem surface; MuJoCo now targets 0.4 mm
 for the apple, while SuperDex retains 0.2 mm. Their contact solvers also differ.
 
+## Three-engine contact comparison
+
+Record each engine for the same planner duration, then analyze the saved CSVs:
+
+```bash
+uv run --no-sync python benchmark/pick_up_apple/contact_compare.py \
+  --engine superdex --seconds 14 --output results/superdex_mujoco_comparison/superdex
+uv run --no-sync python benchmark/pick_up_apple/contact_compare.py \
+  --engine mujoco --seconds 14 --output results/superdex_mujoco_comparison/mujoco
+uv run --no-sync python benchmark/pick_up_apple/contact_compare.py \
+  --engine isaac --seconds 14 --output results/superdex_mujoco_comparison/isaac
+uv run --no-sync python benchmark/pick_up_apple/analyze_contact_compare.py \
+  results/superdex_mujoco_comparison
+```
+
+The Isaac command launches the installed Isaac Sim interpreter and writes a log
+under its output directory. All three engines record 50 ms samples over the run;
+the 5–9 s event CSVs use finer samples. Analysis writes the three-engine contact
+plots, per-phase summary, and pairwise difference CSVs. Isaac records apple
+contacts with the index and thumb pads, table, and other rigid robot links.
+Contact vectors are forces on the apple in world coordinates. Isaac divides
+PhysX impulses by its 2 ms timestep, reports friction at tangent anchors, and
+uses negative PhysX contact separation for penetration. Its runtime grasp
+friction is 2.0. Isaac's signed normal impulse is multiplied by its reported
+normal for world-force components; its absolute value is used for scalar normal
+load. These force and contact-count traces are diagnostic comparisons,
+not calibrated material equivalence across solvers.
+
 ## Implementation and validation
 
 - Dexlab's base placement and trimmed torso; unchanged repository-local arm/hand assets.
